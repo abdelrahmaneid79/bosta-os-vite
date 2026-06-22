@@ -377,6 +377,16 @@ export function SettingsScreen() {
   if (!en) return <EmptyState title="Sign in to manage settings" />;
   return (
     <div className="mx-auto max-w-xl space-y-4">
+      <Link to="/settings/history" className="lift block rounded-2xl border border-pink/40 bg-pink/[0.06] p-4">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-sm font-semibold text-text">Load my Bosta Bites history</div>
+            <div className="text-[12px] text-dim">Bring your real sales, expenses, stock buys, cheques and products in as editable entries.</div>
+          </div>
+          <span className="font-display text-sm font-semibold text-pink">Open →</span>
+        </div>
+      </Link>
+
       <Card>
         <Eyebrow>Account</Eyebrow>
         <Row label="Signed in" value={email ?? "—"} />

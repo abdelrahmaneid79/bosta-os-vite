@@ -43,6 +43,7 @@ export function CommandPalette() {
       { id: "a:expense", label: "Add expense", hint: "Action", group: "Create", run: () => go("/expenses") },
       { id: "a:cash", label: "Count cash", hint: "Action", group: "Create", run: () => go("/money") },
       { id: "a:import", label: "Import receipt / sheet", hint: "Action", group: "Create", run: () => go("/sales/import") },
+      { id: "a:history", label: "Load my Bosta Bites history", hint: "Action", group: "Create", run: () => go("/settings/history") },
     ];
     const prods: Cmd[] = (products.data ?? []).filter((p) => p.active).map((p) => ({
       id: `p:${p.id}`, label: p.name_en + (p.name_ar ? ` · ${p.name_ar}` : ""), hint: "Product", group: "Products", run: () => go(`/product/${p.id}`),

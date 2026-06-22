@@ -20,3 +20,7 @@ chats/
 *.xlsx
 *.xls
 *.csv
+# …except the bundled, already-cleaned Bosta Bites history that the in-app
+# importer fetches and turns into editable entries.
+!public/seed/
+!public/seed/*.csv

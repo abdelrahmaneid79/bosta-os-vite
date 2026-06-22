@@ -81,11 +81,15 @@ export async function deleteProduct(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/** Teach the import matcher an alternate name for a product (idempotent-ish). */
-export async function addAlias(productId: string, alias: string): Promise<void> {
+/** Teach the import matcher an alternate name (or barcode) for a product. The
+ *  matcher uses `normalized` for name lookups and the raw alias for barcodes. */
+export async function addAlias(
+  productId: string, alias: string,
+  aliasType: "name_ar" | "name_en" | "barcode" = "name_ar", source = "manual",
+): Promise<void> {
   const normalized = alias.trim().toLowerCase().replace(/\s+/g, " ");
   const { error } = await requireEngine().from("product_aliases").insert({
-    product_id: productId, alias: alias.trim(), normalized, alias_type: "name_ar", source: "manual",
+    product_id: productId, alias: alias.trim(), normalized, alias_type: aliasType, source,
   });
   if (error) throw error;
 }

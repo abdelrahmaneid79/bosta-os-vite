@@ -48,6 +48,7 @@ const ReportsScreen = L(more, "ReportsScreen");
 const SystemCheckScreen = L(more, "SystemCheckScreen");
 const SettingsScreen = L(more, "SettingsScreen");
 const ReceiptsScreen = lazy(() => receipts().then((m) => ({ default: m.ReceiptsScreen })));
+const HistoryImportScreen = lazy(() => import("@/features/engine/history-import").then((m) => ({ default: m.HistoryImportScreen })));
 const AnalyticsScreen = L(analytics, "AnalyticsScreen");
 const QAScreen = L(qa, "QAScreen");
 const PreferencesScreen = L(more, "PreferencesScreen");
@@ -80,7 +81,7 @@ const EL: Record<string, React.ReactNode> = {
   "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
   "/health": <HealthScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
-  "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
+  "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/settings/history": <HistoryImportScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
 };
 const build = (s: { id: string; label: string; icon: string; accent: string; tabs: { to: string; label: string }[] }): Group =>
   ({ id: s.id, label: s.label, icon: s.icon, accent: s.accent, tabs: s.tabs.map((t) => ({ ...t, el: EL[t.to] })) });

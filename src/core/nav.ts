@@ -41,6 +41,7 @@ export const SETTINGS_SECTION: NavSection = {
   tabs: [
     { to: "/settings", label: "General" },
     { to: "/settings/prefs", label: "Preferences" },
+    { to: "/settings/history", label: "Load history" },
     { to: "/system", label: "System" },
     { to: "/qa", label: "QA Mode" },
   ],
