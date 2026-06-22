@@ -21,14 +21,17 @@ describe("capability system", () => {
     expect(CAP.saleCreate).toBe("enabled");
     expect(CAP.saleItemAdd).toBe("enabled");
   });
-  it("financial reversals are flagged risky (need confirmation)", () => {
-    expect(cap("saleItemVoid")).toBe("risky");
-    expect(cap("saleItemEdit")).toBe("risky");
-    expect(cap("saleVoid")).toBe("risky");
-  });
-  it("unbuilt modules stay gated", () => {
-    for (const k of ["expenseCreate", "cashCount", "chequeRecord", "importApprove", "settingsEdit"] as const) {
-      expect(isEnabled(k)).toBe(false);
+  it("Expenses / Cash / Cheques / Settings are enabled", () => {
+    for (const k of ["expenseCreate", "cashCount", "withdrawal", "chequeRecord", "settlementOpen", "settingsEdit"] as const) {
+      expect(isEnabled(k)).toBe(true);
     }
+  });
+  it("financial reversals are flagged risky (need confirmation)", () => {
+    for (const k of ["saleItemVoid", "saleItemEdit", "saleVoid", "expenseVoid", "movementVoid", "chequeVoid"] as const) {
+      expect(cap(k)).toBe("risky");
+    }
+  });
+  it("imports remain gated until preview/approve ships", () => {
+    expect(isEnabled("importApprove")).toBe(false);
   });
 });

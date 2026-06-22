@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Stat, Button, Tabs } from "@/components/ui";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, Eyebrow, Stat, Button, Tabs, Field, Input } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/feedback";
 import { egp, egpShort, pct } from "@/core/utils/format";
 import { isEngineConfigured, sb } from "@/core/db/engine";
@@ -10,6 +10,11 @@ import { getStockSummary } from "@/core/read/stock";
 import { getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
 import { getPurchaseTotal } from "@/core/read/purchases";
+import { getSettings } from "@/core/read/expenses";
+import { getLocations } from "@/core/read/common";
+import { setAppSetting, setLocationTerm } from "@/core/db/mutations";
+import { WRITE_BADGE } from "@/core/capabilities";
+import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
 type RK = "30d" | "month" | "last";
@@ -87,7 +92,7 @@ export function SystemCheckScreen() {
   const env: Chk[] = [
     { name: "Supabase configured", ok: isEngineConfigured, detail: isEngineConfigured ? "URL + anon key present" : "missing env" },
     { name: "Authenticated session", ok: !!session, detail: session ? (email ?? "signed in") : "not signed in" },
-    { name: "Write mode", ok: true, detail: "Write-enabled: Goods + Purchases (others gated)" },
+    { name: "Write mode", ok: true, detail: "Operational (Imports gated)" },
   ];
   return (
     <div className="space-y-4">
@@ -130,21 +135,76 @@ export function ImportsScreen() {
   );
 }
 
-// ── Settings ────────────────────────────────────────────────────────────────
+// ── Settings (editable: tracking start, low-stock default, rent, revenue share)
 export function SettingsScreen() {
   const { email } = useAuth();
+  const toast = useUI().toast;
+  const qc = useQueryClient();
+  const settings = useQuery({ queryKey: ["settings"], queryFn: getSettings, enabled: en });
+  const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
+
+  const [tracking, setTracking] = useState("");
+  const [lowDefault, setLowDefault] = useState("");
+  const [rent, setRent] = useState("");
+  const [share, setShare] = useState("");
+  useEffect(() => {
+    const s = settings.data; if (!s) return;
+    if (typeof s["inventory_tracking_start_date"] === "string") setTracking(s["inventory_tracking_start_date"] as string);
+    if (s["low_stock_default"] != null) setLowDefault(String(s["low_stock_default"]));
+  }, [settings.data]);
+
+  const loc = locations.data?.[0];
+  const num = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+  const save = useMutation({
+    mutationFn: async (what: "tracking" | "low" | "rent" | "share") => {
+      if (what === "tracking") return setAppSetting("inventory_tracking_start_date", tracking);
+      if (what === "low") return setAppSetting("low_stock_default", num(lowDefault) ?? 0);
+      if (!loc) throw new Error("No location.");
+      if (what === "rent") return setLocationTerm(loc.id, "rent", num(rent) ?? 0, todayCairo());
+      return setLocationTerm(loc.id, "revenue_charge", (num(share) ?? 0) / 100, todayCairo()); // % → rate
+    },
+    onSuccess: () => { toast("Saved", "success"); qc.invalidateQueries(); },
+    onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error"),
+  });
+
+  if (!en) return <EmptyState title="Sign in to manage settings" />;
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <Card>
         <Eyebrow>Account</Eyebrow>
         <Row label="Signed in" value={email ?? "—"} />
-        <Row label="Mode" value="Write-enabled: Goods + Purchases" />
+        <Row label="Mode" value={WRITE_BADGE} />
         <Row label="Backend" value="Verified Supabase engine" last />
         <div className="mt-3"><SignOutButton /></div>
       </Card>
+
       <Card>
-        <Eyebrow>Business settings</Eyebrow>
-        <p className="text-sm text-muted">Rent, revenue-share and tracking-start live in the engine's <span className="font-mono text-pink">app_settings</span> / <span className="font-mono text-pink">location_terms</span>. Editing them is a write action — gated for now.</p>
+        <Eyebrow>Tracking & stock</Eyebrow>
+        <div className="mt-2 space-y-3">
+          <div className="flex items-end gap-2">
+            <Field label="Inventory tracking start"><Input type="date" value={tracking} onChange={(e) => setTracking(e.target.value)} /></Field>
+            <Button variant="outline" disabled={save.isPending} onClick={() => save.mutate("tracking")}>Save</Button>
+          </div>
+          <div className="flex items-end gap-2">
+            <Field label="Default low-stock alert (base units)"><Input type="number" step="any" value={lowDefault} onChange={(e) => setLowDefault(e.target.value)} /></Field>
+            <Button variant="outline" disabled={save.isPending} onClick={() => save.mutate("low")}>Save</Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <Eyebrow>Settlement terms (new effective from today)</Eyebrow>
+        <p className="mb-2 text-[12px] text-dim">Adds a new effective-dated lease term; the settlement engine uses the latest. Existing periods are unchanged.</p>
+        <div className="space-y-3">
+          <div className="flex items-end gap-2">
+            <Field label="Monthly rent (EGP, flat)"><Input type="number" step="any" value={rent} onChange={(e) => setRent(e.target.value)} placeholder="15000" /></Field>
+            <Button variant="outline" disabled={!loc || save.isPending} onClick={() => save.mutate("rent")}>Save</Button>
+          </div>
+          <div className="flex items-end gap-2">
+            <Field label="Revenue share (%)"><Input type="number" step="any" value={share} onChange={(e) => setShare(e.target.value)} placeholder="3" /></Field>
+            <Button variant="outline" disabled={!loc || save.isPending} onClick={() => save.mutate("share")}>Save</Button>
+          </div>
+        </div>
       </Card>
     </div>
   );

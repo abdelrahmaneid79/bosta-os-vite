@@ -71,3 +71,32 @@ Capabilities: **enabled** = Goods, Purchases, Sales (create/add-line). **risky**
 - [ ] Personal withdrawals (when Expenses ships) must NOT reduce profit — tracked as cash.
 
 Report any red error toast verbatim (most likely: RLS, or an RPC arg mismatch).
+
+---
+
+# Phases 3–4–7 — Expenses · Cash · Cheques · Settings (test locally)
+
+## Expenses (Spend)
+- [ ] + Expense → category (or type a new one) + amount + payment → Save → appears; total updates.
+- [ ] Void an expense (✕ → confirm) → removed from total, kept for audit.
+- [ ] Withdrawals are NOT here (they're on Cash).
+
+## Cash (Money)
+- [ ] + Cash in / − Cash out → balance changes (recalc).
+- [ ] Withdraw → balance drops; labelled "not an expense"; does NOT reduce profit.
+- [ ] Count cash → enter counted; if it differs from expected, a voidable adjustment lands the balance on reality; difference shown.
+- [ ] Void a movement (✕ → confirm) → balance recomputed.
+
+## Cheques / Settlements
+- [ ] Open this month → a settlement period appears (rent + 3% seeded).
+- [ ] + Cheque → pick period (expected auto-fills net_expected), status, received amount+date → Save.
+- [ ] Reconcile (confirm) → status → reconciled; difference shown vs expected.
+- [ ] Void cheque (confirm) → removed from totals, kept for audit.
+
+## Settings
+- [ ] Edit tracking-start date / low-stock default → Save → persists (app_settings).
+- [ ] Set monthly rent / revenue share % → Save → new effective-dated location_term (future periods use it; existing unchanged).
+
+## Capability badge
+- [ ] Header + System show "Operational · Imports coming soon".
+- [ ] Global + offers Sale/Purchase/Product/Expense/Count-cash (enabled); only "Upload screenshot" is Coming soon.

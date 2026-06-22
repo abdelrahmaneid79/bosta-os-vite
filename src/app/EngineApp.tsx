@@ -12,11 +12,11 @@ import { monthBoundsCairo } from "@/core/time";
 import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { GatedButton } from "@/components/ui";
 import { Toaster } from "@/components/feedback";
-import { ProductForm, PurchaseForm, SaleForm } from "@/features/engine/forms";
+import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
 import { WRITE_BADGE } from "@/core/capabilities";
 import { StockScreen, SalesScreen, PurchasesScreen, ReconcileScreen } from "@/features/engine/screens";
 import { DashboardScreen, HealthScreen, MissingScreen } from "@/features/engine/dashboard";
-import { MoneyScreen, ChequesScreen } from "@/features/engine/money";
+import { MoneyScreen, ChequesScreen, ExpensesScreen } from "@/features/engine/money";
 import { ReportsScreen, SystemCheckScreen, ImportsScreen, SettingsScreen } from "@/features/engine/more";
 
 const I = {
@@ -25,6 +25,7 @@ const I = {
   goods: "M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10",
   buy: "M6 6h15l-1.6 9H7.6zM6 6 5 3H2M9 20.5a.9.9 0 1 0 0-.01M18 20.5a.9.9 0 1 0 0-.01",
   cash: "M3 7h18v11H3zM3 11h18M7 15h3",
+  spend: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
   cheques: "M2 7h20v10H2zM2 11h20M6 15h4",
   profit: "M5 21V10M12 21V4M19 21v-7",
   reports: "M6 2h9l5 5v15H4V2zM9 13h6M9 17h6",
@@ -47,6 +48,7 @@ const NAV: Item[] = [
   { to: "/stock", label: "Goods", icon: I.goods, el: <StockScreen /> },
   { to: "/purchases", label: "Buy", icon: I.buy, el: <PurchasesScreen /> },
   { to: "/money", label: "Cash", icon: I.cash, el: <MoneyScreen /> },
+  { to: "/expenses", label: "Spend", icon: I.spend, el: <ExpensesScreen /> },
   { to: "/cheques", label: "Cheques", icon: I.cheques, el: <ChequesScreen /> },
   { to: "/reconcile", label: "Profit", icon: I.profit, el: <ReconcileScreen /> },
   { to: "/reports", label: "Reports", icon: I.reports, el: <ReportsScreen /> },
@@ -61,15 +63,15 @@ const FOOT: Item[] = [
 const ALL = [...NAV, ...FOOT];
 const FULLTITLE: Record<string, string> = {
   "/dashboard": "Today", "/sales": "Sales", "/stock": "Goods", "/purchases": "Purchases",
-  "/money": "Cash", "/cheques": "Cheques & Settlement", "/reconcile": "Profit", "/reports": "Reports",
+  "/money": "Cash", "/expenses": "Expenses", "/cheques": "Cheques & Settlement", "/reconcile": "Profit", "/reports": "Reports",
   "/health": "Business Health", "/missing": "Missing Data", "/imports": "Imports", "/system": "System Check", "/settings": "Settings",
 };
 
 function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [view, setView] = useState<null | "product" | "purchase" | "sale">(null);
+  const [view, setView] = useState<null | "product" | "purchase" | "sale" | "expense" | "cashcount">(null);
   if (!open) return null;
   const close = () => { setView(null); onClose(); };
-  const titles = { product: "Add product", purchase: "Add purchase", sale: "New sale day" } as const;
+  const titles = { product: "Add product", purchase: "Add purchase", sale: "New sale day", expense: "Add expense", cashcount: "Count cash" } as const;
   return (
     <div onClick={close} className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
       <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-md animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 shadow-sheet sm:rounded-3xl">
@@ -80,16 +82,18 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
         {view === "product" ? <ProductForm onDone={close} />
           : view === "purchase" ? <PurchaseForm onDone={close} />
           : view === "sale" ? <SaleForm onDone={close} />
+          : view === "expense" ? <ExpenseForm onDone={close} />
+          : view === "cashcount" ? <CashForm mode="count" onDone={close} />
           : (
           <div className="space-y-2">
-            {([["sale", "New sale"], ["purchase", "Add purchase"], ["product", "Add product"]] as const).map(([v, label]) => (
+            {([["sale", "New sale"], ["purchase", "Add purchase"], ["product", "Add product"], ["expense", "Add expense"], ["cashcount", "Count cash"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
                 <span className="font-display text-sm font-semibold text-text">{label}</span>
                 <span className="ml-auto rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-semibold text-good">enabled</span>
               </button>
             ))}
             <div className="pt-2 font-mono text-[10px] uppercase tracking-wider text-dim">Coming soon</div>
-            {["New expense", "Count cash", "Upload screenshot"].map((a) => <GatedButton key={a}>{a}</GatedButton>)}
+            {["Upload screenshot"].map((a) => <GatedButton key={a}>{a}</GatedButton>)}
           </div>
         )}
       </div>

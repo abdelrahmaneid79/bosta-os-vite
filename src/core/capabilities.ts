@@ -22,12 +22,22 @@ export const CAP = {
   saleItemEdit: "risky",   // reverses + reapplies inventory movement
   saleItemVoid: "risky",   // restores stock
   saleVoid: "risky",       // voids the whole day + its movements
-  // Later phases — not wired yet
-  expenseCreate: "not-built",
-  cashCount: "not-built",
-  chequeRecord: "not-built",
+  // Phase 3 — Expenses + Cash
+  expenseCreate: "enabled",
+  expenseVoid: "risky",
+  cashMovement: "enabled",
+  cashCount: "enabled",
+  withdrawal: "enabled",
+  movementVoid: "risky",
+  // Phase 4 — Cheques / Settlements
+  chequeRecord: "enabled",
+  chequeReconcile: "risky",
+  chequeVoid: "risky",
+  settlementOpen: "enabled",
+  // Phase 7 — Settings
+  settingsEdit: "enabled",
+  // Phase 6 — Imports (preview/approve flow not wired yet)
   importApprove: "not-built",
-  settingsEdit: "not-built",
 } as const satisfies Record<string, Capability>;
 
 export type CapKey = keyof typeof CAP;
@@ -35,4 +45,4 @@ export const cap = (k: CapKey): Capability => CAP[k];
 export const isEnabled = (k: CapKey): boolean => CAP[k] !== "not-built";
 
 /** Human label for the header/system badges. */
-export const WRITE_BADGE = "Write-enabled: Goods · Purchases · Sales";
+export const WRITE_BADGE = "Operational · Imports coming soon";

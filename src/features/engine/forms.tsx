@@ -4,10 +4,14 @@ import { Button, Field, Input, Select } from "@/components/ui";
 import { useUI } from "@/store/ui";
 import { todayCairo } from "@/core/time";
 import { getProducts, getLocations, getChannels } from "@/core/read/common";
-import type { Tables } from "@/core/db/tables";
+import { getExpenseCategories } from "@/core/read/expenses";
+import { getMoneyAccounts } from "@/core/read/money";
+import { getSettlementPeriods } from "@/core/read/settlements";
+import type { Tables, Enums } from "@/core/db/tables";
 import type { SaleLine } from "@/core/read/sales";
 import {
   createProduct, updateProduct, addPurchase, createSale, addSaleItem, editSaleItem,
+  addExpense, ensureExpenseCategory, createMovement, recordWithdrawal, recordCashCount, recordCheque,
   type ProductInput,
 } from "@/core/db/mutations";
 
@@ -173,6 +177,130 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
         <Input type="number" step="any" value={lineTotal} onChange={(e) => setLineTotal(e.target.value)} placeholder={computed ? String(Math.round(computed)) : ""} />
       </Field>
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : item ? "Save line" : "Add line"}</Button>
+    </form>
+  );
+}
+
+/* ─ Expense (operating ledger; withdrawals are NOT expenses) ────────────── */
+const PAYMENTS: Enums<"payment_method">[] = ["cash", "cheque", "card", "transfer", "credit", "unknown"];
+export function ExpenseForm({ onDone }: { onDone?: () => void }) {
+  const w = useWrite(onDone);
+  const cats = useQuery({ queryKey: ["expense-cats"], queryFn: getExpenseCategories });
+  const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations });
+  const [date, setDate] = useState(todayCairo());
+  const [categoryId, setCategoryId] = useState("");
+  const [newCat, setNewCat] = useState("");
+  const [amount, setAmount] = useState("");
+  const [pay, setPay] = useState<Enums<"payment_method">>("cash");
+  const [notes, setNotes] = useState("");
+  const loc = locations.data?.[0];
+  const m = useMutation({
+    mutationFn: async () => {
+      const catId = categoryId || (newCat.trim() ? await ensureExpenseCategory(newCat, true) : "");
+      if (!catId) throw new Error("Pick or name a category.");
+      return addExpense({ date, categoryId: catId, amount: num(amount) ?? 0, paymentMethod: pay, notes: notes || null, locationId: loc!.id });
+    },
+    onSuccess: () => w.ok("Expense added"), onError: w.fail,
+  });
+  const ready = !!loc && !!date && (num(amount) ?? 0) > 0 && (categoryId || newCat.trim());
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
+      {!loc && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No active location found.</div>}
+      <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      <Field label="Category">
+        <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <option value="">{cats.data?.length ? "Select…" : "No categories yet"}</option>
+          {(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </Select>
+      </Field>
+      {!categoryId && <Field label="…or new category (rent, supplies, salary, transport…)"><Input value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="Rent" /></Field>}
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Amount (EGP)"><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+        <Field label="Payment"><Select value={pay} onChange={(e) => setPay(e.target.value as Enums<"payment_method">)}>{PAYMENTS.map((p) => <option key={p} value={p}>{p}</option>)}</Select></Field>
+      </div>
+      <Field label="Note"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" /></Field>
+      <p className="text-[11px] text-dim">Operating expense. For owner cash taken out, use <b>Withdraw</b> on the Cash screen — that's a cash movement, never an expense.</p>
+      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Add expense"}</Button>
+    </form>
+  );
+}
+
+/* ─ Cash: movement (in / out / withdraw) and physical count ────────────── */
+type CashMode = "in" | "out" | "withdraw" | "count";
+export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void }) {
+  const w = useWrite(onDone);
+  const accounts = useQuery({ queryKey: ["money-accounts"], queryFn: getMoneyAccounts });
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(todayCairo());
+  const [notes, setNotes] = useState("");
+  const acc = accounts.data?.[0];
+  const m = useMutation({
+    mutationFn: () => {
+      const amt = num(amount) ?? 0;
+      if (mode === "count") return recordCashCount(acc!.id, amt, date, notes || null).then(() => {});
+      if (mode === "withdraw") return recordWithdrawal(acc!.id, amt, date, notes || null);
+      return createMovement({ accountId: acc!.id, type: mode === "in" ? "owner_injection" : "cash_expense", amount: amt, date, notes: notes || null });
+    },
+    onSuccess: () => w.ok(mode === "count" ? "Cash count saved" : mode === "withdraw" ? "Withdrawal recorded (cash, not profit)" : "Cash movement saved"),
+    onError: w.fail,
+  });
+  const label = mode === "count" ? "Counted cash (actual)" : mode === "in" ? "Cash added (EGP)" : mode === "out" ? "Cash out (EGP)" : "Withdrawal (EGP)";
+  const ready = !!acc && (num(amount) ?? -1) >= 0 && (mode === "count" || (num(amount) ?? 0) > 0);
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
+      {!acc && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No cash account found.</div>}
+      <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      <Field label={label}><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+      <Field label="Note"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" /></Field>
+      {mode === "withdraw" && <p className="text-[11px] text-warn">Recorded as a cash withdrawal — reduces cash, never counts against profit.</p>}
+      {mode === "count" && <p className="text-[11px] text-dim">We compare to the expected balance and post a voidable adjustment for any difference.</p>}
+      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : mode === "count" ? "Save count" : "Save"}</Button>
+    </form>
+  );
+}
+
+/* ─ Cheque: record a received/expected cheque against a settlement period ── */
+const CHQ_STATUS: Enums<"cheque_status">[] = ["expected", "received", "deposited", "cleared", "reconciled"];
+export function ChequeForm({ onDone }: { onDone?: () => void }) {
+  const w = useWrite(onDone);
+  const periods = useQuery({ queryKey: ["periods"], queryFn: getSettlementPeriods });
+  const [periodId, setPeriodId] = useState("");
+  const [status, setStatus] = useState<Enums<"cheque_status">>("received");
+  const [expected, setExpected] = useState("");
+  const [received, setReceived] = useState("");
+  const [date, setDate] = useState(todayCairo());
+  const [notes, setNotes] = useState("");
+  // default expected to the period's net_expected when picked
+  const onPeriod = (id: string) => { setPeriodId(id); const p = periods.data?.find((x) => x.id === id); if (p && !expected) setExpected(String(Math.round(p.netExpected))); };
+  const needsReceived = (["received", "deposited", "cleared", "reconciled"] as string[]).includes(status);
+  const m = useMutation({
+    mutationFn: () => recordCheque({
+      periodId, expected: num(expected) ?? 0, received: needsReceived ? (num(received) ?? 0) : null,
+      receivedDate: needsReceived ? date : null, status, notes: notes || null,
+    }),
+    onSuccess: () => w.ok("Cheque recorded"), onError: w.fail,
+  });
+  const ready = !!periodId && (num(expected) ?? -1) >= 0 && (!needsReceived || ((num(received) ?? -1) >= 0 && !!date));
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
+      <Field label="Settlement period">
+        <Select value={periodId} onChange={(e) => onPeriod(e.target.value)} required>
+          <option value="">Select period…</option>
+          {(periods.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.start}{p.end ? `→${p.end}` : ""} · expects {Math.round(p.netExpected)}</option>)}
+        </Select>
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Status"><Select value={status} onChange={(e) => setStatus(e.target.value as Enums<"cheque_status">)}>{CHQ_STATUS.map((s) => <option key={s} value={s}>{s}</option>)}</Select></Field>
+        <Field label="Expected (EGP)"><Input type="number" step="any" value={expected} onChange={(e) => setExpected(e.target.value)} /></Field>
+      </div>
+      {needsReceived && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Received (EGP)"><Input type="number" step="any" value={received} onChange={(e) => setReceived(e.target.value)} /></Field>
+          <Field label="Received date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+        </div>
+      )}
+      <Field label="Note"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" /></Field>
+      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Record cheque"}</Button>
     </form>
   );
 }
