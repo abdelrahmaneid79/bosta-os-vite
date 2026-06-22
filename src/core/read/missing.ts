@@ -6,7 +6,7 @@ import { getSettlementPeriods } from "./settlements";
 
 export type Severity = "high" | "medium" | "low";
 export interface MissingIssue {
-  key: string; title: string; detail: string; severity: Severity; count: number; route: string;
+  key: string; title: string; detail: string; severity: Severity; count: number; route: string; action: string;
 }
 
 export async function getMissingData(): Promise<MissingIssue[]> {
@@ -21,21 +21,26 @@ export async function getMissingData(): Promise<MissingIssue[]> {
   ]);
 
   if (stock.missingCostCount) issues.push({ key: "missing-cogs", title: "Products missing cost", severity: "high",
-    detail: "In stock but no recorded cost — profit is understated.", count: stock.missingCostCount, route: "/stock" });
+    detail: "In stock but no recorded cost — profit is understated.", count: stock.missingCostCount, route: "/purchases",
+    action: "Record a purchase for each so weighted-average cost is set." });
   if (stock.negativeCount) issues.push({ key: "negative-stock", title: "Negative stock", severity: "high",
-    detail: "On-hand below zero — a purchase is likely missing.", count: stock.negativeCount, route: "/stock" });
+    detail: "On-hand below zero — a purchase is likely missing.", count: stock.negativeCount, route: "/purchases",
+    action: "Add the missing purchase to bring on-hand back to reality." });
 
   const unmappedCount = unmapped.count ?? 0;
   if (unmappedCount) issues.push({ key: "unmapped", title: "Unmapped sale lines", severity: "medium",
-    detail: "Sale lines not linked to a product — excluded from product reports.", count: unmappedCount, route: "/sales" });
+    detail: "Sale lines not linked to a product — excluded from product reports.", count: unmappedCount, route: "/sales",
+    action: "Open those sale days and map each line to a product." });
 
   const unreconCount = unrecon.count ?? 0;
   if (unreconCount) issues.push({ key: "unreconciled-sales", title: "Sales days not matching lines", severity: "medium",
-    detail: "Day total differs from the sum of product lines beyond tolerance.", count: unreconCount, route: "/sales" });
+    detail: "Day total differs from the sum of product lines beyond tolerance.", count: unreconCount, route: "/sales",
+    action: "Open each day and adjust lines or the day total until they agree." });
 
   const openOwed = periods.filter((p) => p.status !== "reconciled" && p.netExpected > 0).length;
   if (openOwed) issues.push({ key: "settlements", title: "Unreconciled settlements", severity: "low",
-    detail: "Settlement periods with money expected but not reconciled.", count: openOwed, route: "/cheques" });
+    detail: "Settlement periods with money expected but not reconciled.", count: openOwed, route: "/cheques",
+    action: "Record and reconcile the cheque for each period." });
 
   const order = { high: 0, medium: 1, low: 2 };
   return issues.sort((a, b) => order[a.severity] - order[b.severity]);

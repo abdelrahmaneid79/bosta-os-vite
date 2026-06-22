@@ -1,20 +1,52 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Pill, Ring, GatedButton } from "@/components/ui";
+import { Card, Eyebrow, Pill, Ring, GatedButton, Badge } from "@/components/ui";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
+import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { getCommandCenter } from "@/core/read/dashboard";
 import { getMissingData } from "@/core/read/missing";
+import { getRiskInsights } from "@/core/read/insights";
+import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
 import { getHealthReport } from "@/core/read/health";
+import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
 const dot = (s: string) => s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : "bg-dim";
+const sevDot = (s: Severity) => s === "critical" ? "bg-bad" : s === "warning" ? "bg-warn" : "bg-dim";
+const confLabel: Record<Insight["confidence"], string> = { high: "", estimate: "estimate", "low-data": "needs data" };
+
+const kindGlyph: Record<ActivityEvent["kind"], string> = {
+  sale: "🟢", purchase: "📦", expense: "🧾", cash: "💵", withdrawal: "🏷️", cheque: "🏦",
+};
+
+/** Compact insight row — title, why, action, and an honest confidence chip. */
+export function InsightRow({ i }: { i: Insight }) {
+  return (
+    <Link to={i.route} className="row-hover block rounded-xl border border-line2 p-3">
+      <div className="flex items-start gap-2.5">
+        <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${sevDot(i.severity)}`} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-display text-sm font-semibold text-text">{i.title}</span>
+            {confLabel[i.confidence] && <Badge tone={i.confidence === "low-data" ? "neutral" : "warn"}>{confLabel[i.confidence]}</Badge>}
+            {i.metric && <span className="ml-auto font-mono text-[11px] text-dim">{i.metric}</span>}
+          </div>
+          <div className="mt-1 text-[12.5px] leading-relaxed text-muted">{i.detail}</div>
+          <div className="mt-1.5 text-[12px] text-pink">→ {i.action}</div>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 /* ─ Today / Command Center ─────────────────────────────────────────────── */
 export function DashboardScreen() {
   const cc = useQuery({ queryKey: ["cc"], queryFn: getCommandCenter, enabled: en });
   const miss = useQuery({ queryKey: ["missing"], queryFn: getMissingData, enabled: en });
+  const insights = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
+  const feed = useQuery({ queryKey: ["activity"], queryFn: () => getActivityFeed(30, 8), enabled: en });
   const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
   const c = cc.data;
   if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
@@ -55,6 +87,48 @@ export function DashboardScreen() {
           )}
         </Card>
       </div>
+
+      {/* Risk & intelligence insights */}
+      {en && (insights.isLoading || (insights.data?.length ?? 0) > 0) && (
+        <Card>
+          <div className="mb-2 flex items-center justify-between">
+            <Eyebrow>Risks &amp; signals</Eyebrow>
+            {(insights.data?.length ?? 0) > 3 && <Link to="/missing" className="text-xs text-pink">All {insights.data!.length} →</Link>}
+          </div>
+          {insights.isLoading ? <SkeletonRows rows={2} /> : (
+            <div className="space-y-2">{insights.data!.slice(0, 3).map((i) => <InsightRow key={i.key} i={i} />)}</div>
+          )}
+        </Card>
+      )}
+
+      {/* Activity feed */}
+      <Card className="!p-0">
+        <div className="flex items-center justify-between px-4 pt-4">
+          <Eyebrow>Recent activity</Eyebrow>
+          <span className="text-[11px] text-dim">last 30 days</span>
+        </div>
+        {!en ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Sign in to load.</div>
+          : feed.isLoading ? <div className="px-4 pb-4"><SkeletonRows rows={4} /></div>
+          : (feed.data?.length ?? 0) === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">No events recorded yet.</div>
+          : (
+          <div className="mt-2 divide-y divide-line2">
+            {feed.data!.map((e) => (
+              <Link key={`${e.kind}-${e.id}`} to={e.route} className="row-hover flex items-center gap-3 px-4 py-2.5">
+                <span className="text-base">{kindGlyph[e.kind]}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-text">{e.label}</div>
+                  <div className="text-[11px] text-dim">{fmtDate(e.date)}</div>
+                </div>
+                {e.amount !== 0 && (
+                  <div className={`font-display text-sm font-semibold ${e.amount > 0 ? "text-good" : "text-muted"}`}>
+                    {e.amount > 0 ? "+" : "−"}{egp(Math.abs(e.amount))}
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Health teaser */}
       <Card className="flex items-center gap-4">
@@ -146,30 +220,46 @@ function Col({ title, tone, rows, dotClass }: { title: string; tone: string; row
   );
 }
 
-/* ─ Missing Data ───────────────────────────────────────────────────────── */
+/* ─ Gaps: risks & signals + data gaps ──────────────────────────────────── */
 export function MissingScreen() {
   const q = useQuery({ queryKey: ["missing"], queryFn: getMissingData, enabled: en });
+  const ins = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
   if (!en) return <EmptyState title="Sign in to scan for gaps" />;
-  if (q.isLoading) return <SkeletonRows rows={4} />;
+  if (q.isLoading || ins.isLoading) return <SkeletonRows rows={5} />;
   if (q.isError) return <ErrorState message={String((q.error as Error)?.message)} />;
-  if ((q.data?.length ?? 0) === 0) return <EmptyState title="Nothing missing 🎉" hint="Your data looks complete." />;
+  if (ins.isError) return <ErrorState message={String((ins.error as Error)?.message)} />;
+  const issues = q.data ?? [];
+  const risks = ins.data ?? [];
+  if (issues.length === 0 && risks.length === 0) return <EmptyState title="All clear 🎉" hint="No risks flagged and your data looks complete." />;
   return (
-    <div className="space-y-3">
-      {q.data!.map((i) => (
-        <Card key={i.key}>
-          <div className="flex items-start gap-3">
-            <span className={`mt-1 h-2.5 w-2.5 rounded-full ${dot(i.severity)}`} />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-display font-semibold">{i.title}</span>
-                <Pill tone={i.severity === "high" ? "bad" : i.severity === "medium" ? "warn" : "neutral"}>{i.count}</Pill>
+    <div className="space-y-5">
+      {risks.length > 0 && (
+        <div className="space-y-2">
+          <Eyebrow>Risks &amp; signals · {risks.length}</Eyebrow>
+          {risks.map((i) => <InsightRow key={i.key} i={i} />)}
+        </div>
+      )}
+      {issues.length > 0 && (
+        <div className="space-y-3">
+          <Eyebrow>Data gaps · {issues.length}</Eyebrow>
+          {issues.map((i) => (
+            <Card key={i.key}>
+              <div className="flex items-start gap-3">
+                <span className={`mt-1 h-2.5 w-2.5 rounded-full ${dot(i.severity)}`} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display font-semibold">{i.title}</span>
+                    <Pill tone={i.severity === "high" ? "bad" : i.severity === "medium" ? "warn" : "neutral"}>{i.count}</Pill>
+                  </div>
+                  <div className="mt-1 text-sm text-muted">{i.detail}</div>
+                  <div className="mt-1.5 text-[12px] text-pink">→ {i.action}</div>
+                </div>
+                <Link to={i.route} className="flex-shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs text-text hover:bg-line2">Fix</Link>
               </div>
-              <div className="mt-1 text-sm text-muted">{i.detail}</div>
-            </div>
-            <Link to={i.route} className="flex-shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs text-text hover:bg-line2">Review</Link>
-          </div>
-        </Card>
-      ))}
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

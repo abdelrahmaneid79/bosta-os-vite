@@ -4,6 +4,12 @@ import { reconTolerance } from "@/core/read/sales";
 import { toIso, toNum, parseSalesRows, parseExpenseRows } from "@/core/import/csv";
 import { composeProfit } from "@/core/read/profit";
 import { aggregateProductProfit } from "@/core/read/products";
+import { mergeActivity, type ActivityEvent } from "@/core/read/activity";
+import {
+  buildStockInsights, buildCashInsights, buildSettlementInsights, buildTrendInsights,
+  sortInsights, type StockPositionLite, type Velocity,
+} from "@/core/insights/risk";
+import { reconTolerance as recon } from "@/core/read/sales";
 
 describe("import CSV parsing", () => {
   it("normalizes dates and numbers", () => {
@@ -106,6 +112,107 @@ describe("product profitability aggregation", () => {
     expect(out[0].productId).toBe("__unmapped__");
     expect(out[0].grossProfit).toBeNull();
     expect(out[0].revenue).toBe(100);
+  });
+});
+
+describe("activity feed merge", () => {
+  const e = (id: string, date: string, ts: string, kind: ActivityEvent["kind"] = "sale"): ActivityEvent =>
+    ({ id, kind, date, ts, label: id, amount: 0, route: "/" });
+  it("orders newest day first, then newest timestamp within a day", () => {
+    const out = mergeActivity([
+      e("a", "2026-06-01", "2026-06-01T08:00:00Z"),
+      e("b", "2026-06-03", "2026-06-03T09:00:00Z"),
+      e("c", "2026-06-03", "2026-06-03T12:00:00Z"),
+    ]);
+    expect(out.map((x) => x.id)).toEqual(["c", "b", "a"]);
+  });
+  it("respects the limit", () => {
+    const xs = Array.from({ length: 50 }, (_, i) => e(`e${i}`, "2026-06-01", `2026-06-01T00:00:${String(i).padStart(2, "0")}Z`));
+    expect(mergeActivity(xs, 10)).toHaveLength(10);
+  });
+});
+
+describe("stock risk insights", () => {
+  const pos = (over: Partial<StockPositionLite>): StockPositionLite =>
+    ({ id: "p", nameEn: "Pistachio", baseUnit: "g", onHand: 1000, isNegative: false, isLow: false, hasCost: true, active: true, ...over });
+  const noVel = new Map<string, Velocity>();
+  it("flags negative stock as critical with a purchase fix", () => {
+    const [i] = buildStockInsights([pos({ onHand: -50, isNegative: true })], noVel);
+    expect(i.severity).toBe("critical");
+    expect(i.route).toBe("/purchases");
+  });
+  it("flags out-of-stock when on-hand is zero", () => {
+    const [i] = buildStockInsights([pos({ onHand: 0 })], noVel);
+    expect(i.severity).toBe("warning");
+    expect(i.title).toMatch(/out of stock/);
+  });
+  it("projects days-of-cover only with enough history (estimate)", () => {
+    const vel = new Map([["p", { unitsPerDay: 200, daysObserved: 14 }]]); // 1000/200 = 5 days < 7
+    const [i] = buildStockInsights([pos({ onHand: 1000 })], vel);
+    expect(i.confidence).toBe("estimate");
+    expect(i.title).toMatch(/day.* of stock left/);
+  });
+  it("does NOT project cover from thin history (avoids fake confidence)", () => {
+    const vel = new Map([["p", { unitsPerDay: 200, daysObserved: 3 }]]);
+    expect(buildStockInsights([pos({ onHand: 1000 })], vel)).toHaveLength(0);
+  });
+  it("ignores inactive products", () => {
+    expect(buildStockInsights([pos({ onHand: -1, isNegative: true, active: false })], noVel)).toHaveLength(0);
+  });
+});
+
+describe("cash risk insights", () => {
+  it("flags a negative balance as critical", () => {
+    const [i] = buildCashInsights({ balance: -500, inflow: 0, outflow: 0, withdrawals: 0, hasEverCounted: true });
+    expect(i.severity).toBe("critical");
+  });
+  it("warns when withdrawals exceed inflow", () => {
+    const xs = buildCashInsights({ balance: 100, inflow: 1000, outflow: -200, withdrawals: 1500, hasEverCounted: true });
+    expect(xs.find((i) => i.key === "cash-withdrawals")?.severity).toBe("warning");
+  });
+  it("notes never-counted cash as low-data, not a hard warning", () => {
+    const xs = buildCashInsights({ balance: 100, inflow: 100, outflow: 0, withdrawals: 0, hasEverCounted: false });
+    expect(xs.find((i) => i.key === "cash-uncounted")?.confidence).toBe("low-data");
+  });
+});
+
+describe("settlement intelligence", () => {
+  it("flags expected money with no cheque recorded", () => {
+    const xs = buildSettlementInsights(
+      [{ id: "per1", start: "2026-06-01", netExpected: 5000, status: "open", hasCheque: false }], [], recon);
+    expect(xs[0].title).toMatch(/no cheque recorded/);
+  });
+  it("flags a cheque shortfall beyond tolerance", () => {
+    const xs = buildSettlementInsights([], [{ id: "c1", expected: 10000, received: 9000, difference: -1000, status: "received" }], recon);
+    expect(xs[0].title).toMatch(/under expected/);
+    expect(xs[0].metric).toMatch(/−/);
+  });
+  it("stays silent when a cheque matches within tolerance", () => {
+    const xs = buildSettlementInsights([], [{ id: "c1", expected: 10000, received: 9990, difference: -10, status: "received" }], recon);
+    expect(xs).toHaveLength(0); // tolerance = max(5, 0.5% of 10000)=50
+  });
+});
+
+describe("trend analysis (honest about thin history)", () => {
+  it("computes a month-over-month revenue change", () => {
+    const xs = buildTrendInsights({ thisRevenue: 12000, lastRevenue: 10000, thisExpenses: 0, lastExpenses: 0 });
+    expect(xs[0].title).toMatch(/up 20%/);
+    expect(xs[0].confidence).toBe("high");
+  });
+  it("refuses to invent a trend with no prior month", () => {
+    const xs = buildTrendInsights({ thisRevenue: 12000, lastRevenue: 0, thisExpenses: 0, lastExpenses: 0 });
+    expect(xs[0].confidence).toBe("low-data");
+  });
+});
+
+describe("insight sorting", () => {
+  it("orders critical before warning before info", () => {
+    const order = sortInsights([
+      { key: "i", severity: "info", title: "", detail: "", action: "", route: "/", confidence: "high" },
+      { key: "c", severity: "critical", title: "", detail: "", action: "", route: "/", confidence: "high" },
+      { key: "w", severity: "warning", title: "", detail: "", action: "", route: "/", confidence: "high" },
+    ]).map((x) => x.key);
+    expect(order).toEqual(["c", "w", "i"]);
   });
 });
 

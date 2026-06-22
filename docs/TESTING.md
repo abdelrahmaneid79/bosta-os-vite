@@ -110,3 +110,63 @@ Report any red error toast verbatim (most likely: RLS, or an RPC arg mismatch).
 - [ ] Nothing saves until **Approve** is clicked (no auto-save).
 - [ ] Reports: Stock / P&L / Expenses / Cheques CSV all export.
 - [ ] Header + System badge read "Fully operational".
+
+---
+
+# Cycle — Insights, activity feed & full write-flow QA
+
+The insight/activity **logic is pure and unit-tested** (`src/core/__tests__/logic.test.ts`,
+34 tests). The checklist below is what to verify **locally with Supabase**, since the
+build container can't reach `*.supabase.co`. Each insight on screen names the data it
+uses, why it matters, an action, and an honest confidence chip (`estimate` / `needs data`).
+
+## Risks & signals (Today + Gaps)
+- [ ] **Negative stock** → a **critical** insight "X is at negative stock" linking to Buy. Fix: record the missing purchase → insight clears.
+- [ ] **Out of stock** (on-hand 0) → **warning** linking to Buy.
+- [ ] **Days of cover** → only appears for a product with ≥7 days of sales history and <7 days of stock left; shows an **estimate** chip. Thin history must NOT produce a forecast.
+- [ ] **Cash negative** → **critical** "Cash balance is negative". Counting cash should clear it.
+- [ ] **Withdrawals > inflow** in the period → **warning** on Cash.
+- [ ] **Never counted cash** → **needs data** info, not a hard warning.
+- [ ] **Settlement expects money, no cheque** → **warning** linking to Cheques.
+- [ ] **Cheque differs beyond tolerance** (max(5, 0.5% of expected)) → **warning** with the signed difference.
+- [ ] **Revenue trend** → "up/down N% vs last month" only when last month has data; otherwise "Not enough history" (**needs data**), never a fake %.
+
+## Activity feed (Today)
+- [ ] Shows the last 30 days of events (sales 🟢, purchases 📦, expenses 🧾, cash 💵, withdrawals 🏷️, cheques 🏦), newest first.
+- [ ] Money in is green `+`, money out is muted `−`; tapping a row navigates to the right screen.
+- [ ] Voided records do NOT appear.
+
+## Full operational QA — run each write, confirm the read updates
+| Flow | Action | Expected | Watch for (verbatim error) |
+|---|---|---|---|
+| Goods create | + Product, name+price | appears in Goods; toast "Product added" | RLS: `new row violates row-level security policy for table "products"` |
+| Goods edit | tap product, change price/active | list updates; toast "Product updated" | — |
+| Goods active | toggle Active off | shows "inactive" badge | — |
+| Aliases | add alias via import matcher | future imports match the alias | unique-violation on duplicate alias |
+| Purchase | + Purchase, qty(base)+cost | on-hand ↑, weighted cost shows, "no COGS" clears; toast "stock & cost updated" | RPC: `function create_purchase(...) does not exist` → engine wrappers/arg mismatch |
+| Sale create | + Sale, date+total | appears in Recent; toast "Sale day created" | duplicate day: `A sale already exists for that day — open it to add items.` |
+| Sale line add | open day, + line | on-hand ↓ by qty; COGS captured; toast "stock deducted" | RPC arg mismatch on `create_sale_item` |
+| Sale line edit | ✎, change qty | stock reverses old + applies new (net only) | — |
+| Sale line void | ✕ → confirm | stock restored; line gone | — |
+| Sale day void | "Void whole day" → confirm | day voided; movements reversed; revenue drops | — |
+| Expense add | + Expense, category+amount | appears; total ↑; net profit ↓ | `Pick or name a category.` if neither chosen |
+| Expense void | ✕ → confirm | removed from total, kept for audit | — |
+| Cash in/out | + Cash in / − Cash out | balance recalcs | — |
+| Withdraw | Withdraw | balance ↓, labelled "not an expense", profit unchanged | — |
+| Cash count | Count cash | voidable adjustment lands balance on reality; difference returned | — |
+| Movement void | ✕ → confirm | balance recomputed | — |
+| Settlement open | "Open this month" | period appears (rent + 3% seeded), idempotent on repeat | RPC: `ensure_monthly_settlement_period` missing |
+| Cheque record | + Cheque, status received | needs amount+date | `A received cheque needs an amount received and a received date.` |
+| Cheque reconcile | reconcile → confirm | status → reconciled | — |
+| Cheque void | ✕ → confirm | removed from totals, kept for audit | — |
+| Imports | CSV → preview → Approve | creates rows; dedup skips existing dates; nothing saves before Approve | — |
+| Settings | edit tracking/low-stock/rent/share | persists (app_settings / new location_term) | — |
+| Reports | export each CSV (Stock/P&L/Expenses/Cheques/Products) | downloads real data; P&L CSV includes net profit + opex | — |
+
+## Known edge cases (verified by static audit, confirm locally)
+- Voiding a cash movement before the accounts query resolves passes `accId!`; in
+  practice movements only render once an account exists, so this is unreachable in UI.
+- Purchase allows `unit_cost = 0` (intentional — a free/sample batch keeps WAC honest).
+- Sale line `unit_price = 0` is allowed; COGS still snapshots from product cost.
+- Any red toast you see is the raw Postgres/RPC message — capture it verbatim; the
+  most likely causes are RLS (`permission denied`) or an RPC arg/name mismatch.
