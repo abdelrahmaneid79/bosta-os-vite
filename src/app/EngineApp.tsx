@@ -5,7 +5,7 @@
  * purchases, Money = cash + spend + cheques, Reports = summary + profit,
  * Insights = health + gaps + activity, Settings = general + system + QA).
  */
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/core/utils/cn";
@@ -15,6 +15,9 @@ import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
 import { WRITE_BADGE } from "@/core/capabilities";
+import { NAV_SECTIONS, SETTINGS_SECTION } from "@/core/nav";
+import { usePrefs } from "@/store/prefs";
+import { useFilters } from "@/store/filters";
 
 // Lazy route chunks — split out of the initial bundle.
 const screens = () => import("@/features/engine/screens");
@@ -45,6 +48,7 @@ const SettingsScreen = L(more, "SettingsScreen");
 const ReceiptsScreen = lazy(() => receipts().then((m) => ({ default: m.ReceiptsScreen })));
 const AnalyticsScreen = L(analytics, "AnalyticsScreen");
 const QAScreen = L(qa, "QAScreen");
+const PreferencesScreen = L(more, "PreferencesScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
 
 const I = {
@@ -66,38 +70,20 @@ function Icon({ d, className = "h-5 w-5", w = 1.9 }: { d: string; className?: st
 interface Tab { to: string; label: string; el: React.ReactNode }
 interface Group { id: string; label: string; icon: string; tabs: Tab[] }
 
-const GROUPS: Group[] = [
-  { id: "today", label: "Today", icon: I.today, tabs: [{ to: "/dashboard", label: "Today", el: <DashboardScreen /> }] },
-  { id: "sales", label: "Sales", icon: I.sales, tabs: [
-    { to: "/sales", label: "Sales days", el: <SalesScreen /> },
-    { to: "/sales/import", label: "Import & receipts", el: <ReceiptsScreen fixedKind="sales" /> },
-  ] },
-  { id: "inventory", label: "Inventory", icon: I.inventory, tabs: [
-    { to: "/stock", label: "Stock", el: <StockScreen /> },
-    { to: "/purchases", label: "Purchases", el: <PurchasesScreen /> },
-  ] },
-  { id: "money", label: "Money", icon: I.money, tabs: [
-    { to: "/money", label: "Cash", el: <MoneyScreen /> },
-    { to: "/expenses", label: "Spend", el: <ExpensesScreen /> },
-    { to: "/cheques", label: "Cheques", el: <ChequesScreen /> },
-    { to: "/expenses/import", label: "Import expenses", el: <ReceiptsScreen fixedKind="expenses" /> },
-  ] },
-  { id: "reports", label: "Reports", icon: I.reports, tabs: [
-    { to: "/reports", label: "Overview", el: <AnalyticsScreen /> },
-    { to: "/reconcile", label: "Profit", el: <ReconcileScreen /> },
-    { to: "/reports/tables", label: "Tables & export", el: <ReportsScreen /> },
-  ] },
-  { id: "insights", label: "Insights", icon: I.insights, tabs: [
-    { to: "/health", label: "Health", el: <HealthScreen /> },
-    { to: "/missing", label: "Gaps", el: <MissingScreen /> },
-    { to: "/activity", label: "Activity", el: <ActivityScreen /> },
-  ] },
-];
-const SETTINGS: Group = { id: "settings", label: "Settings", icon: I.settings, tabs: [
-  { to: "/settings", label: "General", el: <SettingsScreen /> },
-  { to: "/system", label: "System", el: <SystemCheckScreen /> },
-  { to: "/qa", label: "QA Mode", el: <QAScreen /> },
-] };
+// Map each route to its screen; nav structure/labels/icons come from core/nav.
+const EL: Record<string, React.ReactNode> = {
+  "/dashboard": <DashboardScreen />,
+  "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />,
+  "/stock": <StockScreen />, "/purchases": <PurchasesScreen />,
+  "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
+  "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
+  "/health": <HealthScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
+  "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
+};
+const build = (s: { id: string; label: string; icon: string; tabs: { to: string; label: string }[] }): Group =>
+  ({ id: s.id, label: s.label, icon: s.icon, tabs: s.tabs.map((t) => ({ ...t, el: EL[t.to] })) });
+const GROUPS: Group[] = NAV_SECTIONS.map(build);
+const SETTINGS: Group = build(SETTINGS_SECTION);
 const ALL_GROUPS = [...GROUPS, SETTINGS];
 
 function groupForPath(pathname: string): Group | undefined {
@@ -160,6 +146,12 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
+/** Visible primary sections, honoring the owner's hidden-section preferences. */
+function useVisibleGroups(): Group[] {
+  const hidden = usePrefs((s) => s.hiddenSections);
+  return GROUPS.filter((g) => !hidden.includes(g.id));
+}
+
 function Rail({ onAdd }: { onAdd: () => void }) {
   return (
     <aside className="no-scrollbar sticky top-0 hidden h-screen w-[212px] flex-shrink-0 flex-col overflow-y-auto border-r border-line2 bg-rail md:flex">
@@ -175,7 +167,7 @@ function Rail({ onAdd }: { onAdd: () => void }) {
           <Icon d={I.plus} w={2.6} className="h-4 w-4" /> Quick add
         </button>
       </div>
-      <nav className="flex-1 px-2.5 pb-2">{GROUPS.map((g) => <RailGroup key={g.id} group={g} />)}</nav>
+      <nav className="flex-1 px-2.5 pb-2">{useVisibleGroups().map((g) => <RailGroup key={g.id} group={g} />)}</nav>
       <div className="border-t border-line2 px-2.5 py-2"><RailGroup group={SETTINGS} /></div>
     </aside>
   );
@@ -235,7 +227,7 @@ function MobileNav() {
   const { pathname } = useLocation();
   const active = groupForPath(pathname);
   const [open, setOpen] = useState(false);
-  const primary = GROUPS.slice(0, 5);
+  const primary = useVisibleGroups().slice(0, 5);
   return (
     <>
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line2 bg-rail px-1 py-2 md:hidden">
@@ -277,6 +269,10 @@ function MobileNav() {
 
 function Shell() {
   const [add, setAdd] = useState(false);
+  // Apply the owner's default period once on launch.
+  const defaultRange = usePrefs((s) => s.defaultRange);
+  const landing = usePrefs((s) => s.landing);
+  useEffect(() => { useFilters.getState().setRangeKey(defaultRange); }, [defaultRange]);
   return (
     <div className="flex min-h-screen bg-bg text-text" style={{ backgroundImage: "radial-gradient(circle at 82% -8%, rgba(248,104,200,0.12), transparent 42%)" }}>
       <Rail onAdd={() => setAdd(true)} />
@@ -285,13 +281,13 @@ function Shell() {
         <main className="mx-auto w-full max-w-[1080px] flex-1 px-4 pb-28 pt-6 sm:px-7 md:pb-10">
           <Suspense fallback={<SkeletonRows rows={6} />}>
             <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Navigate to={landing} replace />} />
               {ALL_GROUPS.flatMap((g) => g.tabs.map((t) => (
                 <Route key={t.to} path={t.to} element={<Page group={g}>{t.el}</Page>} />
               )))}
               <Route path="/imports" element={<Navigate to="/sales/import" replace />} />
               <Route path="/product/:id" element={<ProductDetailScreen />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to={landing} replace />} />
             </Routes>
           </Suspense>
         </main>

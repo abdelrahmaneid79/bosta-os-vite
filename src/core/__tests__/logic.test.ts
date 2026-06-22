@@ -68,6 +68,24 @@ describe("receipt OCR text scanning (best-guess date + total)", () => {
     expect(scanReceiptRows("TOTAL 500\n2026-06-09")).toEqual([{ date: "2026-06-09", amount: 500 }]);
     expect(scanReceiptRows("garbage")).toEqual([]);
   });
+  it("reads an Arabic POS daily report → one day, grand total (ignores barcodes & print date)", () => {
+    const sheet = [
+      "تاريخ الطباعة 2024/12/04 16:13",
+      "الفرع : جاردينيا مول",
+      "المورد : [351] مؤجر موكارا استريت",
+      "خلال الفترة من 2024/12/03 الى 2024/12/03",
+      "كود الصنف الباركود اسم الصنف متوسط سعر البيع الكمية المباعة المبيعات",
+      "00021043 2301606000000004 جامى طوفى فواكه وزن 149.99 1.115 167.24",
+      "00021045 2301608000000002 جامى جيلى كاندى وزن 275.00 1.965 540.38",
+      "اجمالي المورد 3403.17 0.00 3403.17",
+      "اجمالي الفرع 3403.17 0.00 3403.17",
+    ].join("\n");
+    expect(scanReceiptText(sheet)).toEqual({ date: "2024-12-03", total: 3403.17 });
+    expect(scanReceiptRows(sheet)).toEqual([{ date: "2024-12-03", amount: 3403.17 }]);
+  });
+  it("parses YYYY/MM/DD dates", () => {
+    expect(toIso("2024/12/03")).toBe("2024-12-03");
+  });
 });
 
 describe("reconciliation tolerance = max(5, 0.5% of total)", () => {
@@ -499,6 +517,20 @@ describe("Ask Bosta proactive briefing", () => {
       cash: 50, owed: 0, rentMonthly: null, topProduct: null, bestDay: null, lowStock: [],
     });
     expect(lines).toEqual([]);
+  });
+});
+
+describe("navigation metadata", () => {
+  it("landing options cover every section tab and have unique routes", async () => {
+    const { LANDING_OPTIONS, ALL_SECTIONS } = await import("@/core/nav");
+    const tabCount = ALL_SECTIONS.reduce((n, s) => n + s.tabs.length, 0);
+    expect(LANDING_OPTIONS).toHaveLength(tabCount);
+    expect(new Set(LANDING_OPTIONS.map((o) => o.value)).size).toBe(tabCount);
+  });
+  it("Today is never hideable; other sections are", async () => {
+    const { HIDEABLE_SECTIONS } = await import("@/core/nav");
+    expect(HIDEABLE_SECTIONS.some((s) => s.id === "today")).toBe(false);
+    expect(HIDEABLE_SECTIONS.map((s) => s.id)).toContain("money");
   });
 });
 

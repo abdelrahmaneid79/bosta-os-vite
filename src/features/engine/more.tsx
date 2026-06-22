@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
-import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge } from "@/components/ui";
+import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge, Select } from "@/components/ui";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState } from "@/components/feedback";
+import { usePrefs } from "@/store/prefs";
+import { LANDING_OPTIONS, HIDEABLE_SECTIONS } from "@/core/nav";
+import { RANGE_PRESETS } from "@/core/range";
 import { parseSalesRows, parseExpenseRows, type Row } from "@/core/import/csv";
 import { getChannels } from "@/core/read/common";
 import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
@@ -420,4 +423,48 @@ export function SettingsScreen() {
 }
 function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
   return <div className={`flex items-center justify-between py-2.5 ${last ? "" : "border-b border-line2"}`}><span className="text-sm text-muted">{label}</span><span className="text-sm text-text">{value}</span></div>;
+}
+
+// ── Preferences (app-wide customization) ─────────────────────────────────────
+export function PreferencesScreen() {
+  const { landing, defaultRange, hiddenSections, set, toggleSection, reset } = usePrefs();
+  return (
+    <div className="mx-auto max-w-xl space-y-4">
+      <Card>
+        <Eyebrow>How BostaOS opens</Eyebrow>
+        <div className="mt-2 space-y-3">
+          <Field label="Default landing page">
+            <Select value={landing} onChange={(e) => set({ landing: e.target.value })}>
+              {LANDING_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
+          </Field>
+          <Field label="Default period (global date range)">
+            <Select value={defaultRange} onChange={(e) => set({ defaultRange: e.target.value as typeof defaultRange })}>
+              {RANGE_PRESETS.filter((p) => p.key !== "custom").map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+            </Select>
+          </Field>
+        </div>
+        <p className="mt-2 text-[11px] text-dim">Applied each time you open the app. Saved in this browser.</p>
+      </Card>
+
+      <Card>
+        <Eyebrow>Visible sections</Eyebrow>
+        <p className="mt-1 text-[12px] text-dim">Hide sections you don't use from the sidebar. They stay reachable by link — nothing is deleted.</p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {HIDEABLE_SECTIONS.map((s) => {
+            const visible = !hiddenSections.includes(s.id);
+            return (
+              <button key={s.id} onClick={() => toggleSection(s.id)}
+                className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm ${visible ? "border-pink/40 bg-pink/10 text-text" : "border-line bg-panel2 text-dim"}`}>
+                <span className="font-display font-semibold">{s.label}</span>
+                <span className={`text-[11px] ${visible ? "text-pink" : "text-faint"}`}>{visible ? "shown" : "hidden"}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
+      <div className="flex justify-end"><Button variant="ghost" onClick={reset}>Reset preferences</Button></div>
+    </div>
+  );
 }

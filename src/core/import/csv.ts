@@ -21,6 +21,10 @@ export function toIso(v: unknown): string | null {
   if (v == null || v === "") return null;
   const s = String(v).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // YYYY/MM/DD (Arabic POS reports use this, e.g. 2024/12/03)
+  const ymd = s.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})$/);
+  if (ymd) { const [, y, mo, d] = ymd; return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`; }
+  // D/M/Y or D-M-Y
   const m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})$/);
   if (m) {
     let [, d, mo, y] = m;
@@ -116,46 +120,66 @@ export function parseExpenseRows(rows: Row[]): ExpenseRowParsed[] {
  *  total) guess. Picks the first parseable date and the amount on a line that
  *  mentions "total" (falling back to the largest money number). The owner
  *  always edits before approving, so this only needs to get close. Pure. */
-const DATE_RE = /(\d{4}-\d{2}-\d{2})|(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/;
+const DATE_RE = /(\d{4}-\d{2}-\d{2})|(\d{4}[/\-.]\d{1,2}[/\-.]\d{1,2})|(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/;
 const MONEY_RE = /\d[\d,]*\.?\d*/g;
-/** Money numbers on a line, after stripping any date token so date digits
- *  (e.g. 2026) never masquerade as amounts. */
+/** True for item-codes / barcodes that must NOT be read as money: a long pure
+ *  integer (>=7 digits, e.g. a 16-digit barcode) or a leading-zero code
+ *  (e.g. 00021043). */
+function isCodeLike(token: string): boolean {
+  const t = token.replace(/,/g, "");
+  return /^0\d{3,}$/.test(t) || /^\d{7,}$/.test(t);
+}
+/** Money numbers on a line, after stripping any date token and ignoring
+ *  codes/barcodes, so a 16-digit barcode never masquerades as the total. */
 function moneyOnLine(line: string): number[] {
   const m = line.replace(DATE_RE, " ").match(MONEY_RE);
-  return m ? m.map(toNum).filter((x): x is number => x != null && x > 0) : [];
+  return m ? m.filter((t) => !isCodeLike(t)).map(toNum).filter((x): x is number => x != null && x > 0) : [];
+}
+
+/** All ISO dates found on a line (left→right). */
+function datesOnLine(line: string): string[] {
+  const ds = line.match(new RegExp(DATE_RE.source, "g"));
+  if (!ds) return [];
+  return ds.map((t) => toIso(t)).filter((x): x is string => !!x);
 }
 
 export function scanReceiptText(text: unknown): { date: string | null; total: number | null } {
   const lines = String(text ?? "").split(/\r?\n/);
+  // Date: prefer the reporting-PERIOD line (so a print timestamp isn't used);
+  // take the last date on it (the "to" date). Else first date anywhere.
   let date: string | null = null;
+  const periodLine = lines.find((l) => /الفترة|الفتره|period|reporting/i.test(l));
+  if (periodLine) { const ds = datesOnLine(periodLine); if (ds.length) date = ds[ds.length - 1]; }
+  if (!date) for (const line of lines) { const ds = datesOnLine(line); if (ds.length) { date = ds[0]; break; } }
+
   const amounts: number[] = [];
-  for (const line of lines) {
-    if (!date) { const dm = line.match(DATE_RE); if (dm) { const iso = toIso(dm[0]); if (iso) date = iso; } }
-    amounts.push(...moneyOnLine(line));
-  }
+  for (const line of lines) amounts.push(...moneyOnLine(line));
+  // Total: the "grand total" line (اجمالي / total / net), else the largest amount.
   let total: number | null = null;
-  const totalLine = lines.find((l) => /total|الاجمالي|الإجمالي|اجمالي|net/i.test(l));
+  const totalLine = lines.find((l) => /grand total|\btotal\b|الاجمالي|الإجمالي|اجمالي|\bnet\b/i.test(l));
   if (totalLine) { const vals = moneyOnLine(totalLine); if (vals.length) total = Math.max(...vals); }
   if (total == null && amounts.length) total = Math.max(...amounts);
   return { date, total };
 }
 
-/** Multi-row reader for a sales sheet/screenshot: any line that has BOTH a date
- *  and a money number becomes a {date, amount} row (largest number on the line
- *  wins, e.g. the day's grand total). Falls back to a single best-guess row from
- *  scanReceiptText when no date-bearing lines are found. Pure + unit-tested. */
+/** Reader for a sales sheet/screenshot. A POS daily report (has a grand-total or
+ *  reporting period) is one day with one total → a single row. Otherwise every
+ *  dated line becomes its own {date, amount} day. Pure + unit-tested. */
 export function scanReceiptRows(text: unknown): { date: string; amount: number }[] {
-  const lines = String(text ?? "").split(/\r?\n/);
+  const s = String(text ?? "");
+  const single = (): { date: string; amount: number }[] => {
+    const one = scanReceiptText(s);
+    return one.date && one.total != null ? [{ date: one.date, amount: one.total }] : [];
+  };
+  if (/grand total|الاجمالي|الإجمالي|اجمالي|الفترة|الفتره/i.test(s)) return single();
+
   const rows: { date: string; amount: number }[] = [];
-  for (const line of lines) {
-    const dm = line.match(DATE_RE);
-    if (!dm) continue;
-    const iso = toIso(dm[0]);
-    if (!iso) continue;
+  for (const line of s.split(/\r?\n/)) {
+    if (/طباعة|\bprint/i.test(line) || /\d{1,2}:\d{2}/.test(line)) continue; // skip print-timestamp lines
+    const ds = datesOnLine(line);
+    if (!ds.length) continue;
     const vals = moneyOnLine(line);
-    if (vals.length) rows.push({ date: iso, amount: Math.max(...vals) });
+    if (vals.length) rows.push({ date: ds[0], amount: Math.max(...vals) });
   }
-  if (rows.length) return rows;
-  const one = scanReceiptText(text);
-  return one.date && one.total != null ? [{ date: one.date, amount: one.total }] : [];
+  return rows.length ? rows : single();
 }
