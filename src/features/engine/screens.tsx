@@ -4,9 +4,10 @@
  * the connection isn't configured a Connect panel shows instead of fake numbers.
  */
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, Eyebrow, Stat, Badge, Tabs, Button, Input } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
+import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort, num, pct } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -15,10 +16,13 @@ import { monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, todayCairo } from "
 import type { DateRange } from "@/core/read/common";
 import { getStockSummary } from "@/core/read/stock";
 import { getProducts } from "@/core/read/common";
-import { getRecentSales, getSalesStats } from "@/core/read/sales";
+import { getRecentSales, getSalesStats, getSaleItems, type SaleRow as SaleRowVM, type SaleLine } from "@/core/read/sales";
 import { getPurchases, getPurchaseTotal } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
-import { ProductForm, PurchaseForm } from "./forms";
+import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
+import { voidSaleItem, voidSale } from "@/core/db/mutations";
+import { useUI } from "@/store/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Tables } from "@/core/db/tables";
 
 type RangeKey = "30d" | "month" | "last";
@@ -114,29 +118,33 @@ export function StockScreen() {
   );
 }
 
-// ── Sales ─────────────────────────────────────────────────────────────────────
+// ── Sales (operational: create day, add/edit/void lines, void day) ───────────
 export function SalesScreen() {
   const [range, key, setKey] = useRange();
+  const [addOpen, setAddOpen] = useState(false);
+  const [detail, setDetail] = useState<SaleRowVM | null>(null);
   const stats = useQuery({ queryKey: ["salesStats", range], queryFn: () => getSalesStats(range), enabled: isEngineConfigured });
   const recent = useQuery({ queryKey: ["recentSales"], queryFn: () => getRecentSales(60), enabled: isEngineConfigured });
   const s = stats.data;
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Revenue = Σ daily totals (canonical)</Eyebrow>
+        <div className="flex-1" />
         <RangeTabs value={key} onChange={setKey} />
+        <Button onClick={() => setAddOpen(true)}>+ Sale</Button>
       </div>
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Revenue" value={s ? egp(s.total) : "—"} />
         <Stat label="Sales days" value={s ? s.days : "—"} />
         <Stat label="Unreconciled" value={s ? s.unreconciled : "—"} accent={s?.unreconciled ? "text-warn" : "text-text"} />
       </div>
-      <Eyebrow>Recent sales</Eyebrow>
+      <Eyebrow>Recent sales · tap to open</Eyebrow>
       <Guarded q={recent} empty={!!recent.data && recent.data.length === 0}>
         <Card className="!p-0">
           <div className="divide-y divide-line2">
             {recent.data?.map((r) => (
-              <div key={r.id} className="row-hover flex items-center gap-3 px-4 py-3">
+              <button key={r.id} onClick={() => setDetail(r)} className="row-hover flex w-full items-center gap-3 px-4 py-3 text-left">
                 <span className={`h-2.5 w-2.5 rounded-full ${r.reconciled ? "bg-good" : "bg-warn"}`} />
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-text">{fmtDate(r.date)}</div>
@@ -144,11 +152,74 @@ export function SalesScreen() {
                 </div>
                 {!r.reconciled && <Badge tone="warn">mismatch</Badge>}
                 <div className="font-display text-sm font-semibold text-good">{egp(r.total)}</div>
-              </div>
+              </button>
             ))}
           </div>
         </Card>
       </Guarded>
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="New sale day"><SaleForm onDone={() => setAddOpen(false)} /></Modal>
+      {detail && <Modal open onClose={() => setDetail(null)} title={`Sale · ${fmtDate(detail.date)}`}><SaleDetail sale={detail} onClose={() => setDetail(null)} /></Modal>}
+    </div>
+  );
+}
+
+function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void }) {
+  const { toast } = useUI();
+  const qc = useQueryClient();
+  const items = useQuery({ queryKey: ["saleItems", sale.id], queryFn: () => getSaleItems(sale.id), enabled: isEngineConfigured });
+  const [addLine, setAddLine] = useState(false);
+  const [editItem, setEditItem] = useState<SaleLine | null>(null);
+  const [confirm, setConfirm] = useState<null | { kind: "line"; item: SaleLine } | { kind: "day" }>(null);
+
+  const refresh = () => { qc.invalidateQueries(); items.refetch(); };
+  const voidLine = useMutation({ mutationFn: (id: string) => voidSaleItem(id), onSuccess: () => { toast("Line voided · stock restored", "success"); setConfirm(null); refresh(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
+  const voidDay = useMutation({ mutationFn: () => voidSale(sale.id), onSuccess: () => { toast("Sale day voided · stock restored", "success"); setConfirm(null); onClose(); qc.invalidateQueries(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
+
+  const lineSum = (items.data ?? []).reduce((a, l) => a + l.lineTotal, 0);
+  const missingCogs = (items.data ?? []).filter((l) => l.productId && !l.hasCogs).length;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between rounded-xl bg-panel p-3">
+        <div><div className="text-[11px] text-dim">Day total</div><div className="font-display text-lg font-semibold">{egp(sale.total)}</div></div>
+        <div className="text-right"><div className="text-[11px] text-dim">Lines</div><div className="font-display text-lg font-semibold">{egp(lineSum)}</div></div>
+        <Badge tone={sale.reconciled ? "good" : "warn"}>{sale.reconciled ? "reconciled" : "mismatch"}</Badge>
+      </div>
+      {missingCogs > 0 && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">{missingCogs} line(s) have no cost yet — add a purchase for those products so profit is exact.</div>}
+
+      {items.isLoading ? <SkeletonRows rows={3} /> : (items.data?.length ?? 0) === 0 ? (
+        <p className="py-2 text-sm text-dim">No product lines yet. Add lines to deduct stock and track COGS.</p>
+      ) : (
+        <div className="divide-y divide-line2 rounded-xl border border-line">
+          {items.data!.map((l) => (
+            <div key={l.id} className="flex items-center gap-2 px-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm text-text">{l.name}</div>
+                <div className="text-[11px] text-dim">{num(l.qty)} × {egp(l.unitPrice ?? 0)} {l.hasCogs ? "" : "· no COGS"}</div>
+              </div>
+              <div className="font-display text-sm font-semibold">{egp(l.lineTotal)}</div>
+              <button onClick={() => setEditItem(l)} className="px-1.5 text-dim hover:text-text" title="Edit">✎</button>
+              <button onClick={() => setConfirm({ kind: "line", item: l })} className="px-1.5 text-dim hover:text-bad" title="Void">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {addLine ? (
+        <div className="rounded-xl border border-line p-3"><SaleItemForm saleId={sale.id} onDone={() => { setAddLine(false); refresh(); }} /></div>
+      ) : (
+        <Button variant="outline" className="w-full" onClick={() => setAddLine(true)}>+ Add product line</Button>
+      )}
+
+      <button onClick={() => setConfirm({ kind: "day" })} className="w-full pt-1 text-center text-xs text-bad hover:underline">Void this whole sale day</button>
+
+      {editItem && <Modal open onClose={() => setEditItem(null)} title="Edit line"><SaleItemForm saleId={sale.id} item={editItem} onDone={() => { setEditItem(null); refresh(); }} /></Modal>}
+      <Confirm open={confirm?.kind === "line"} title="Void this line?" danger busy={voidLine.isPending}
+        message="This restores the product's stock and removes the line. The day's revenue total is unchanged." confirmLabel="Void line"
+        onConfirm={() => confirm?.kind === "line" && voidLine.mutate(confirm.item.id)} onClose={() => setConfirm(null)} />
+      <Confirm open={confirm?.kind === "day"} title="Void the whole sale day?" danger busy={voidDay.isPending}
+        message="This voids the day's sale and reverses every inventory movement it created. It's reversible only by re-entering the day." confirmLabel="Void day"
+        onConfirm={() => voidDay.mutate()} onClose={() => setConfirm(null)} />
     </div>
   );
 }

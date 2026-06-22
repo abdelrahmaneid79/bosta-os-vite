@@ -33,3 +33,11 @@ export async function getLocations(): Promise<{ id: string; name: string }[]> {
   if (error) throw error;
   return data;
 }
+
+/** Active sales channels (counter, delivery, …). Needed for the sale header. */
+export async function getChannels(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await requireEngine()
+    .from("channels").select("id,name").eq("active", true).order("name");
+  if (error) throw error;
+  return data;
+}

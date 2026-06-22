@@ -40,3 +40,34 @@ npm run dev           # Vite → http://localhost:5173
 
 ## Report back
 Any RLS "permission denied" / empty tables / schema-mismatch errors, and any screen where the layout diverges from the design reference.
+
+---
+
+# Operational write tests (Phases 1–2) — run locally with Supabase
+
+Capabilities: **enabled** = Goods, Purchases, Sales (create/add-line). **risky** (confirm) = edit/void sale line, void day. **not-built** = Expenses, Cash, Cheques, Imports, Settings.
+
+## Goods
+- [ ] Goods → **+ Product** → name + price → Save → appears in list; toast "Product added".
+- [ ] Tap a product → edit price/active → Save → updates.
+
+## Purchases (proves stock-in + WAC)
+- [ ] Buy → **+ Purchase** → product, qty (base units), unit cost → Save → toast "stock & cost updated".
+- [ ] Goods: that product's **on-hand increases**, weighted cost shows, "no COGS" badge clears.
+
+## Sales (proves deduction + COGS + reversal)
+- [ ] Sales → **+ Sale** → date + day total → Save → appears in Recent sales.
+- [ ] Tap the sale → **+ Add product line** → product + qty + price → Save → toast "stock deducted".
+- [ ] Goods: that product's **on-hand decreases** by the qty.
+- [ ] Sale detail: line shows COGS captured (no "no COGS" if the product had cost).
+- [ ] **Edit line** (✎) → change qty → Save → stock reverses old, applies new (net change only).
+- [ ] **Void line** (✕) → confirm → stock restored; line removed.
+- [ ] **Void whole day** → confirm → day voided, all its movements reversed, revenue drops.
+- [ ] Profit (P&L): updates; shows **"unknown"** if any sold line lacks cost.
+
+## Safety
+- [ ] Voids require a confirmation dialog (no accidental data loss).
+- [ ] Duplicate sale day for same date is blocked with a clear toast.
+- [ ] Personal withdrawals (when Expenses ships) must NOT reduce profit — tracked as cash.
+
+Report any red error toast verbatim (most likely: RLS, or an RPC arg mismatch).

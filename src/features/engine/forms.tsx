@@ -3,9 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Field, Input, Select } from "@/components/ui";
 import { useUI } from "@/store/ui";
 import { todayCairo } from "@/core/time";
-import { getProducts, getLocations } from "@/core/read/common";
+import { getProducts, getLocations, getChannels } from "@/core/read/common";
 import type { Tables } from "@/core/db/tables";
-import { createProduct, updateProduct, addPurchase, type ProductInput } from "@/core/db/mutations";
+import type { SaleLine } from "@/core/read/sales";
+import {
+  createProduct, updateProduct, addPurchase, createSale, addSaleItem, editSaleItem,
+  type ProductInput,
+} from "@/core/db/mutations";
 
 function useWrite(onDone?: () => void) {
   const qc = useQueryClient();
@@ -104,6 +108,71 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
       </div>
       <p className="text-[11px] text-dim">Quantity is in base units ({(products.data ?? []).find((p) => p.id === productId)?.base_unit ?? "g"}). This increases stock and recomputes weighted-average cost.</p>
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Add purchase"}</Button>
+    </form>
+  );
+}
+
+/* ─ Sale: create the day's header ──────────────────────────────────────── */
+export function SaleForm({ onDone }: { onDone?: () => void }) {
+  const w = useWrite(onDone);
+  const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations });
+  const channels = useQuery({ queryKey: ["channels"], queryFn: getChannels });
+  const [date, setDate] = useState(todayCairo());
+  const [total, setTotal] = useState("");
+  const loc = locations.data?.[0];
+  const ch = channels.data?.[0];
+  const m = useMutation({
+    mutationFn: () => createSale({ date, total: num(total) ?? 0, locationId: loc!.id, channelId: ch!.id }),
+    onSuccess: () => w.ok("Sale day created — add product lines to track stock & profit"),
+    onError: w.fail,
+  });
+  const ready = !!loc && !!ch && !!date && (num(total) ?? -1) >= 0;
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
+      {(!loc || !ch) && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No active location/channel found — set one up in Supabase first.</div>}
+      <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      <Field label="Day's total sales (EGP, from POS)"><Input type="number" step="any" value={total} onChange={(e) => setTotal(e.target.value)} placeholder="e.g. 4200" /></Field>
+      <p className="text-[11px] text-dim">This is the day's grand total (revenue). After saving, open the day to add product lines — those deduct stock and snapshot COGS.</p>
+      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Create sale day"}</Button>
+    </form>
+  );
+}
+
+/* ─ Sale line: add or edit a product line (deducts stock + COGS) ────────── */
+export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: SaleLine; onDone?: () => void }) {
+  const w = useWrite(onDone);
+  const products = useQuery({ queryKey: ["products-list"], queryFn: getProducts });
+  const [productId, setProductId] = useState(item?.productId ?? "");
+  const [qty, setQty] = useState(item ? String(item.qty) : "");
+  const [price, setPrice] = useState(item?.unitPrice != null ? String(item.unitPrice) : "");
+  const [lineTotal, setLineTotal] = useState(item ? String(item.lineTotal) : "");
+
+  const computed = (num(qty) ?? 0) * (num(price) ?? 0);
+  const m = useMutation({
+    mutationFn: () => {
+      const payload = { productId, qty: num(qty) ?? 0, unitPrice: num(price) ?? 0, lineTotal: num(lineTotal) || computed, notes: null };
+      return item ? editSaleItem(item.id, payload) : addSaleItem({ saleId, ...payload });
+    },
+    onSuccess: () => w.ok(item ? "Line updated · stock reapplied" : "Line added · stock deducted"),
+    onError: w.fail,
+  });
+  const ready = !!productId && (num(qty) ?? 0) > 0;
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
+      <Field label="Product">
+        <Select value={productId} onChange={(e) => setProductId(e.target.value)} required>
+          <option value="">Select a product…</option>
+          {(products.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name_en}{p.name_ar ? ` · ${p.name_ar}` : ""}</option>)}
+        </Select>
+      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Quantity (base units)"><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
+        <Field label="Unit price"><Input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
+      </div>
+      <Field label={`Line total (EGP)${computed ? ` · auto ${Math.round(computed)}` : ""}`}>
+        <Input type="number" step="any" value={lineTotal} onChange={(e) => setLineTotal(e.target.value)} placeholder={computed ? String(Math.round(computed)) : ""} />
+      </Field>
+      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : item ? "Save line" : "Add line"}</Button>
     </form>
   );
 }

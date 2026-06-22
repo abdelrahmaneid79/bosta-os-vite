@@ -12,7 +12,8 @@ import { monthBoundsCairo } from "@/core/time";
 import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { GatedButton } from "@/components/ui";
 import { Toaster } from "@/components/feedback";
-import { ProductForm, PurchaseForm } from "@/features/engine/forms";
+import { ProductForm, PurchaseForm, SaleForm } from "@/features/engine/forms";
+import { WRITE_BADGE } from "@/core/capabilities";
 import { StockScreen, SalesScreen, PurchasesScreen, ReconcileScreen } from "@/features/engine/screens";
 import { DashboardScreen, HealthScreen, MissingScreen } from "@/features/engine/dashboard";
 import { MoneyScreen, ChequesScreen } from "@/features/engine/money";
@@ -65,26 +66,30 @@ const FULLTITLE: Record<string, string> = {
 };
 
 function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [view, setView] = useState<null | "product" | "purchase">(null);
+  const [view, setView] = useState<null | "product" | "purchase" | "sale">(null);
   if (!open) return null;
   const close = () => { setView(null); onClose(); };
+  const titles = { product: "Add product", purchase: "Add purchase", sale: "New sale day" } as const;
   return (
     <div onClick={close} className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
       <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-md animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 shadow-sheet sm:rounded-3xl">
         <div className="mb-3 flex items-center justify-between">
-          <div className="font-display text-lg font-semibold">{view === "product" ? "Add product" : view === "purchase" ? "Add purchase" : "Quick add"}</div>
+          <div className="font-display text-lg font-semibold">{view ? titles[view] : "Quick add"}</div>
           <button onClick={close} className="flex h-8 w-8 items-center justify-center rounded-lg bg-line2 text-muted hover:text-text">✕</button>
         </div>
-        {view === "product" ? <ProductForm onDone={close} /> : view === "purchase" ? <PurchaseForm onDone={close} /> : (
+        {view === "product" ? <ProductForm onDone={close} />
+          : view === "purchase" ? <PurchaseForm onDone={close} />
+          : view === "sale" ? <SaleForm onDone={close} />
+          : (
           <div className="space-y-2">
-            <button onClick={() => setView("product")} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
-              <span className="font-display text-sm font-semibold text-text">Add product</span><span className="ml-auto rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-semibold text-good">enabled</span>
-            </button>
-            <button onClick={() => setView("purchase")} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
-              <span className="font-display text-sm font-semibold text-text">Add purchase</span><span className="ml-auto rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-semibold text-good">enabled</span>
-            </button>
+            {([["sale", "New sale"], ["purchase", "Add purchase"], ["product", "Add product"]] as const).map(([v, label]) => (
+              <button key={v} onClick={() => setView(v)} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
+                <span className="font-display text-sm font-semibold text-text">{label}</span>
+                <span className="ml-auto rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-semibold text-good">enabled</span>
+              </button>
+            ))}
             <div className="pt-2 font-mono text-[10px] uppercase tracking-wider text-dim">Coming soon</div>
-            {["New sale", "New expense", "Count cash", "Upload screenshot"].map((a) => <GatedButton key={a}>{a}</GatedButton>)}
+            {["New expense", "Count cash", "Upload screenshot"].map((a) => <GatedButton key={a}>{a}</GatedButton>)}
           </div>
         )}
       </div>
@@ -119,7 +124,7 @@ function Header({ onAdd }: { onAdd: () => void }) {
         <div className="font-display text-xl font-semibold leading-tight sm:text-2xl">{FULLTITLE[pathname] ?? "BostaOS"}</div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-dim">
           <span>Bosta Bites · {monthLabel}</span>
-          <span className="rounded-full bg-good/15 px-2 py-0.5 font-display text-[10px] font-semibold text-good">Write-enabled: Goods + Purchases</span>
+          <span className="rounded-full bg-good/15 px-2 py-0.5 font-display text-[10px] font-semibold text-good">{WRITE_BADGE}</span>
         </div>
       </div>
       <div className="flex-1" />

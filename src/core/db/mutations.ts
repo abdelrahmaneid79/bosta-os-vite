@@ -5,7 +5,11 @@
  * run under the owner's authenticated session (RLS `admin_all`). READ paths
  * stay in src/core/read/*.
  */
-import { requireEngine, createPurchase as rpcCreatePurchase } from "@/core/db/engine";
+import {
+  requireEngine, createPurchase as rpcCreatePurchase,
+  createSaleItem as rpcCreateSaleItem, updateSaleItem as rpcUpdateSaleItem,
+  deleteSaleItem as rpcDeleteSaleItem, voidSaleMovements as rpcVoidSaleMovements,
+} from "@/core/db/engine";
 import type { Enums } from "@/core/db/tables";
 import type { Database } from "@/core/db/database.types";
 
@@ -91,4 +95,58 @@ export async function addPurchase(input: PurchaseInput): Promise<void> {
     source: "manual",
     verification: "verified",
   });
+}
+
+// ── Sales (header = safe insert; lines + reversal = verified RPCs) ───────────
+export interface SaleInput { date: string; total: number; locationId: string; channelId: string; }
+
+/** One canonical sale per (location, day). Guarded against duplicates. */
+export async function createSale(input: SaleInput): Promise<string> {
+  const sb = requireEngine();
+  const existing = await sb.from("sales").select("id").is("voided_at", null)
+    .eq("location_id", input.locationId).eq("sale_date", input.date).limit(1);
+  if (existing.error) throw existing.error;
+  if (existing.data.length) throw new Error("A sale already exists for that day — open it to add items.");
+  const { data, error } = await sb.from("sales").insert({
+    sale_date: input.date, location_id: input.locationId, channel_id: input.channelId,
+    total_amount: input.total, source_type: "manual", verification: "verified",
+  }).select("id").single();
+  if (error) throw error;
+  return data.id;
+}
+
+export async function updateSaleTotal(saleId: string, total: number): Promise<void> {
+  const { error } = await requireEngine().from("sales").update({ total_amount: total }).eq("id", saleId);
+  if (error) throw error;
+}
+
+export interface SaleItemInput { saleId: string; productId: string; qty: number; unitPrice: number; lineTotal: number; notes: string | null; }
+
+/** Add a product line → deducts stock + snapshots COGS + reconciles the day (RPC). */
+export async function addSaleItem(i: SaleItemInput): Promise<void> {
+  await rpcCreateSaleItem({
+    p_sale_id: i.saleId, p_product_id: i.productId, p_raw_product_name: "",
+    p_quantity: i.qty, p_unit_price: i.unitPrice, p_line_total: i.lineTotal, p_notes: i.notes ?? "",
+  });
+}
+
+/** Edit a line → reverses old movement, reapplies new at current weighted cost (RPC). */
+export async function editSaleItem(itemId: string, i: Omit<SaleItemInput, "saleId">): Promise<void> {
+  await rpcUpdateSaleItem({
+    p_id: itemId, p_product_id: i.productId, p_raw_product_name: "",
+    p_quantity: i.qty, p_unit_price: i.unitPrice, p_line_total: i.lineTotal, p_notes: i.notes ?? "",
+  });
+}
+
+/** Void a line → restores stock (RPC). Reversible, never a hard money delete. */
+export async function voidSaleItem(itemId: string): Promise<void> {
+  await rpcDeleteSaleItem(itemId);
+}
+
+/** Void the whole day → soft-void header + void all its inventory movements (RPC). */
+export async function voidSale(saleId: string): Promise<void> {
+  await rpcVoidSaleMovements(saleId);
+  const { error } = await requireEngine().from("sales")
+    .update({ voided_at: new Date().toISOString(), void_reason: "Voided by owner" }).eq("id", saleId);
+  if (error) throw error;
 }

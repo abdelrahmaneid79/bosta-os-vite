@@ -57,6 +57,28 @@ export async function getRecentSales(limit = 60): Promise<SaleRow[]> {
   }));
 }
 
+export interface SaleLine {
+  id: string; productId: string | null; name: string;
+  qty: number; unitPrice: number | null; lineTotal: number;
+  cogs: number | null; hasCogs: boolean;
+}
+export async function getSaleItems(saleId: string): Promise<SaleLine[]> {
+  const sb = requireEngine();
+  const [{ data, error }, products] = await Promise.all([
+    sb.from("sale_items").select("id,product_id,raw_product_name,quantity,unit_price,line_total,cogs_at_sale")
+      .eq("sale_id", saleId).is("voided_at", null).order("created_at"),
+    sb.from("products").select("id,name_en"),
+  ]);
+  if (error) throw error;
+  const names = new Map((products.data ?? []).map((p) => [p.id, p.name_en]));
+  return data.map((r) => ({
+    id: r.id, productId: r.product_id,
+    name: r.product_id ? (names.get(r.product_id) ?? "Unknown") : (r.raw_product_name || "Unmapped"),
+    qty: Number(r.quantity), unitPrice: r.unit_price, lineTotal: Number(r.line_total),
+    cogs: r.cogs_at_sale, hasCogs: r.cogs_at_sale != null,
+  }));
+}
+
 export async function getSalesStats(range: DateRange) {
   const { data, error } = await requireEngine()
     .from("sales")
