@@ -87,7 +87,7 @@ export function SystemCheckScreen() {
   const env: Chk[] = [
     { name: "Supabase configured", ok: isEngineConfigured, detail: isEngineConfigured ? "URL + anon key present" : "missing env" },
     { name: "Authenticated session", ok: !!session, detail: session ? (email ?? "signed in") : "not signed in" },
-    { name: "Write mode", ok: true, detail: "READ-ONLY (writes gated)" },
+    { name: "Write mode", ok: true, detail: "Write-enabled: Goods + Purchases (others gated)" },
   ];
   return (
     <div className="space-y-4">
@@ -138,7 +138,7 @@ export function SettingsScreen() {
       <Card>
         <Eyebrow>Account</Eyebrow>
         <Row label="Signed in" value={email ?? "—"} />
-        <Row label="Mode" value="Read-only (writes gated)" />
+        <Row label="Mode" value="Write-enabled: Goods + Purchases" />
         <Row label="Backend" value="Verified Supabase engine" last />
         <div className="mt-3"><SignOutButton /></div>
       </Card>

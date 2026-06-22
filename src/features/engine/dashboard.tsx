@@ -70,9 +70,11 @@ export function DashboardScreen() {
       </Card>
 
       <Card>
-        <Eyebrow>Quick actions · read-only</Eyebrow>
+        <Eyebrow>Quick actions</Eyebrow>
         <div className="mt-2 flex flex-wrap gap-2">
-          {["New sale", "Add purchase", "Add expense", "Count cash", "Upload screenshot"].map((a) => <GatedButton key={a}>{a}</GatedButton>)}
+          <Link to="/stock" className="lift rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">+ Product</Link>
+          <Link to="/purchases" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">+ Purchase</Link>
+          {["New sale", "Add expense", "Count cash"].map((a) => <GatedButton key={a}>{a}</GatedButton>)}
         </div>
       </Card>
     </div>
