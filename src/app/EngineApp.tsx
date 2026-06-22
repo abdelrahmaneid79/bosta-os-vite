@@ -41,7 +41,7 @@ const ExpensesScreen = L(money, "ExpensesScreen");
 const ReportsScreen = L(more, "ReportsScreen");
 const SystemCheckScreen = L(more, "SystemCheckScreen");
 const SettingsScreen = L(more, "SettingsScreen");
-const ReceiptsScreen = L(receipts, "ReceiptsScreen");
+const ReceiptsScreen = lazy(() => receipts().then((m) => ({ default: m.ReceiptsScreen })));
 const QAScreen = L(qa, "QAScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
 
@@ -68,7 +68,7 @@ const GROUPS: Group[] = [
   { id: "today", label: "Today", icon: I.today, tabs: [{ to: "/dashboard", label: "Today", el: <DashboardScreen /> }] },
   { id: "sales", label: "Sales", icon: I.sales, tabs: [
     { to: "/sales", label: "Sales days", el: <SalesScreen /> },
-    { to: "/sales/import", label: "Import & receipts", el: <ReceiptsScreen /> },
+    { to: "/sales/import", label: "Import & receipts", el: <ReceiptsScreen fixedKind="sales" /> },
   ] },
   { id: "inventory", label: "Inventory", icon: I.inventory, tabs: [
     { to: "/stock", label: "Stock", el: <StockScreen /> },
@@ -78,6 +78,7 @@ const GROUPS: Group[] = [
     { to: "/money", label: "Cash", el: <MoneyScreen /> },
     { to: "/expenses", label: "Spend", el: <ExpensesScreen /> },
     { to: "/cheques", label: "Cheques", el: <ChequesScreen /> },
+    { to: "/expenses/import", label: "Import expenses", el: <ReceiptsScreen fixedKind="expenses" /> },
   ] },
   { id: "reports", label: "Reports", icon: I.reports, tabs: [
     { to: "/reports", label: "Summary", el: <ReportsScreen /> },
@@ -157,29 +158,52 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 function Rail({ onAdd }: { onAdd: () => void }) {
-  const { pathname } = useLocation();
-  const active = groupForPath(pathname);
   return (
-    <aside className="no-scrollbar sticky top-0 hidden h-screen w-[84px] flex-shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-line2 bg-rail py-4 md:flex">
-      <NavLink to="/dashboard" className="flex h-12 w-12 items-center justify-center rounded-2xl border border-line2 bg-panel2" title="Bosta Bites">
-        <img src="/mascot-96.png" alt="Bosta Bites" className="h-9 w-9 object-contain" />
-      </NavLink>
-      <button onClick={onAdd} className="lift mt-1 flex h-11 w-11 items-center justify-center rounded-full bg-pink text-ink shadow-pink" aria-label="Quick add">
-        <Icon d={I.plus} w={2.8} className="h-5 w-5" />
-      </button>
-      <div className="my-1 h-px w-9 bg-line2" />
-      {GROUPS.map((g) => <RailLink key={g.id} group={g} active={active?.id === g.id} />)}
-      <div className="mt-auto flex flex-col items-center gap-1.5 pt-2"><RailLink group={SETTINGS} active={active?.id === SETTINGS.id} /></div>
+    <aside className="no-scrollbar sticky top-0 hidden h-screen w-[212px] flex-shrink-0 flex-col overflow-y-auto border-r border-line2 bg-rail md:flex">
+      <div className="px-3 pb-3 pt-4">
+        <NavLink to="/dashboard" className="flex items-center gap-2.5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-line2 bg-panel2"><img src="/mascot-96.png" alt="Bosta Bites" className="h-7 w-7 object-contain" /></div>
+          <div>
+            <div className="font-display text-base font-semibold leading-none">BostaOS</div>
+            <div className="text-[10px] text-dim">Bosta Bites</div>
+          </div>
+        </NavLink>
+        <button onClick={onAdd} className="lift mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-pink py-2 font-display text-sm font-semibold text-ink shadow-pink">
+          <Icon d={I.plus} w={2.6} className="h-4 w-4" /> Quick add
+        </button>
+      </div>
+      <nav className="flex-1 px-2.5 pb-2">{GROUPS.map((g) => <RailGroup key={g.id} group={g} />)}</nav>
+      <div className="border-t border-line2 px-2.5 py-2"><RailGroup group={SETTINGS} /></div>
     </aside>
   );
 }
-function RailLink({ group, active }: { group: Group; active: boolean }) {
+
+function RailGroup({ group }: { group: Group }) {
+  const { pathname } = useLocation();
+  const isHere = (to: string) => pathname === to || pathname.startsWith(to + "/");
+  if (group.tabs.length === 1) {
+    const t = group.tabs[0];
+    return (
+      <NavLink to={t.to} end
+        className={cn("relative mb-0.5 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition", isHere(t.to) ? "bg-panel2 font-semibold text-pink" : "text-muted hover:bg-line2/50 hover:text-text")}>
+        {isHere(t.to) && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-pink" />}
+        <Icon d={group.icon} className="h-[18px] w-[18px]" /><span className="font-display">{group.label}</span>
+      </NavLink>
+    );
+  }
   return (
-    <NavLink to={group.tabs[0].to}
-      className={cn("navbtn relative flex w-[68px] flex-col items-center gap-1 rounded-xl py-2 transition", active ? "text-pink" : "text-faint hover:text-muted")}>
-      {active && <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r bg-pink" />}
-      <Icon d={group.icon} /><span className="text-[9px] font-semibold">{group.label}</span>
-    </NavLink>
+    <div className="mb-1.5 mt-0.5">
+      <div className="flex items-center gap-2 px-2.5 pb-1 pt-1.5 text-faint">
+        <Icon d={group.icon} className="h-[15px] w-[15px]" /><span className="font-mono text-[10px] uppercase tracking-wider">{group.label}</span>
+      </div>
+      {group.tabs.map((t) => (
+        <NavLink key={t.to} to={t.to} end
+          className={cn("relative ml-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] transition", isHere(t.to) ? "font-semibold text-pink" : "text-muted hover:text-text")}>
+          {isHere(t.to) && <span className="absolute -left-2 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r bg-pink" />}
+          {t.label}
+        </NavLink>
+      ))}
+    </div>
   );
 }
 
@@ -207,18 +231,44 @@ function Header({ onAdd }: { onAdd: () => void }) {
 function MobileNav() {
   const { pathname } = useLocation();
   const active = groupForPath(pathname);
+  const [open, setOpen] = useState(false);
   const primary = GROUPS.slice(0, 5);
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line2 bg-rail px-1 py-2 md:hidden">
-      {primary.map((g) => (
-        <NavLink key={g.id} to={g.tabs[0].to} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active?.id === g.id ? "text-pink" : "text-faint")}>
-          <Icon d={g.icon} className="h-5 w-5" /><span className="text-[9px] font-semibold">{g.label}</span>
-        </NavLink>
-      ))}
-      <NavLink to={SETTINGS.tabs[0].to} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active?.id === "settings" || active?.id === "insights" ? "text-pink" : "text-faint")}>
-        <Icon d={I.settings} className="h-5 w-5" /><span className="text-[9px] font-semibold">More</span>
-      </NavLink>
-    </nav>
+    <>
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line2 bg-rail px-1 py-2 md:hidden">
+        {primary.map((g) => (
+          <NavLink key={g.id} to={g.tabs[0].to} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active?.id === g.id ? "text-pink" : "text-faint")}>
+            <Icon d={g.icon} className="h-5 w-5" /><span className="text-[9px] font-semibold">{g.label}</span>
+          </NavLink>
+        ))}
+        <button onClick={() => setOpen(true)} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active && !primary.includes(active) ? "text-pink" : "text-faint")}>
+          <Icon d={I.insights} className="h-5 w-5" /><span className="text-[9px] font-semibold">More</span>
+        </button>
+      </nav>
+      {open && (
+        <div onClick={() => setOpen(false)} className="fixed inset-0 z-[60] flex items-end bg-black/70 md:hidden">
+          <div onClick={(e) => e.stopPropagation()} className="max-h-[80vh] w-full animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 pb-8 shadow-sheet">
+            <div className="mb-3 flex items-center justify-between"><div className="font-display text-lg font-semibold">All sections</div>
+              <button onClick={() => setOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-line2 text-muted">✕</button></div>
+            <div className="space-y-3">
+              {[...GROUPS, SETTINGS].map((g) => (
+                <div key={g.id}>
+                  <div className="mb-1 flex items-center gap-2 text-faint"><Icon d={g.icon} className="h-4 w-4" /><span className="font-mono text-[10px] uppercase tracking-wider">{g.label}</span></div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {g.tabs.map((t) => (
+                      <NavLink key={t.to} to={t.to} end onClick={() => setOpen(false)}
+                        className={({ isActive }) => cn("rounded-lg border px-3 py-1.5 text-[13px]", isActive ? "border-pink bg-pink/15 text-pink" : "border-line bg-panel text-muted")}>
+                        {t.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

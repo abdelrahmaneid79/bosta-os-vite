@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, Eyebrow, Stat, Badge, Button, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
@@ -112,6 +113,7 @@ export function ExpensesScreen() {
         <Eyebrow>Operating expenses · withdrawals are on Cash</Eyebrow>
         <div className="flex-1" />
         <DateRangePicker />
+        <Link to="/expenses/import" className="rounded-xl border border-line bg-panel2 px-3 py-2 font-display text-sm font-semibold text-text hover:bg-line2">Import</Link>
         <Button onClick={() => setAddOpen(true)}>+ Expense</Button>
       </div>
       <div className="flex flex-wrap items-center gap-2">

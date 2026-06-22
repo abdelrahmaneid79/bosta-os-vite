@@ -1,15 +1,15 @@
-/** Sales import & receipts — accepts CSV, Excel (.xlsx/.xls) and images
- *  (PNG/JPG). CSV/Excel are parsed by columns; images are read with in-browser
- *  OCR (tesseract.js) into a best-guess (date, total). Everything lands in an
- *  EDITABLE preview so you fix anything before approving — nothing saves until
- *  you click Approve, and duplicate sale days are skipped. Heavy libs are loaded
- *  on demand so they never bloat the initial app. */
+/** Import & receipts — accepts CSV, Excel (.xlsx/.xls) and images (PNG/JPG).
+ *  CSV/Excel parse by columns; images are read with in-browser OCR (tesseract.js)
+ *  into one or many {date, total} rows. Everything lands in an EDITABLE table so
+ *  you fix anything before approving; nothing saves until Approve and duplicate
+ *  sale days are skipped. `fixedKind` locks the screen to sales or expenses so
+ *  the Sales area never shows expense controls. Heavy libs load on demand. */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import { Card, Eyebrow, Button, Tabs, Input, Badge } from "@/components/ui";
 import { EmptyState } from "@/components/feedback";
-import { parseSalesRows, parseExpenseRows, scanReceiptText, toIso, toNum, type Row } from "@/core/import/csv";
+import { parseSalesRows, parseExpenseRows, scanReceiptRows, scanReceiptText, toIso, toNum, type Row } from "@/core/import/csv";
 import { getChannels, getLocations } from "@/core/read/common";
 import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
 import { egp } from "@/core/utils/format";
@@ -22,7 +22,7 @@ interface SaleEdit { date: string; total: string }
 interface ExpenseEdit { date: string; category: string; amount: string }
 
 const en = isEngineConfigured;
-const isImage = (f: File) => /\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name) || f.type.startsWith("image/");
+const isImage = (f: File) => /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(f.name) || f.type.startsWith("image/");
 const isExcel = (f: File) => /\.(xlsx|xls)$/i.test(f.name);
 
 async function readSpreadsheet(file: File): Promise<Row[]> {
@@ -33,15 +33,16 @@ async function readSpreadsheet(file: File): Promise<Row[]> {
   return XLSX.utils.sheet_to_json<Row>(sheet, { defval: "", raw: false });
 }
 
-export function ReceiptsScreen() {
+export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
   const { reportSuccess, reportError, toast } = useUI();
   const qc = useQueryClient();
-  const [kind, setKind] = useState<Kind>("sales");
+  const [kind, setKind] = useState<Kind>(fixedKind ?? "sales");
   const [sales, setSales] = useState<SaleEdit[] | null>(null);
   const [exps, setExps] = useState<ExpenseEdit[] | null>(null);
   const [fileName, setFileName] = useState("");
   const [imgUrl, setImgUrl] = useState<string | null>(null);
-  const [ocr, setOcr] = useState<string>(""); // OCR progress / status
+  const [status, setStatus] = useState("");       // OCR progress
+  const [rawText, setRawText] = useState("");      // what OCR actually read
 
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
   const channels = useQuery({ queryKey: ["channels"], queryFn: getChannels, enabled: en });
@@ -50,70 +51,65 @@ export function ReceiptsScreen() {
     queryFn: async () => { const { data, error } = await sb!.from("sales").select("sale_date").is("voided_at", null); if (error) throw error; return new Set((data ?? []).map((r) => r.sale_date)); },
   });
 
-  const reset = () => { setSales(null); setExps(null); setFileName(""); setImgUrl(null); setOcr(""); };
+  const reset = () => { setSales(null); setExps(null); setFileName(""); setImgUrl(null); setStatus(""); setRawText(""); };
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
-    e.target.value = ""; // allow re-pick of same file
+    e.target.value = "";
     if (!f) return;
     reset();
     setFileName(f.name);
     try {
       if (isImage(f)) {
         setImgUrl(URL.createObjectURL(f));
-        setOcr("Reading image…");
+        setStatus("Loading reader…");
         const Tesseract = (await import("tesseract.js")).default;
+        setStatus("Reading image…");
         const { data } = await Tesseract.recognize(f, "eng", {
-          logger: (m: { status: string; progress: number }) => { if (m.status === "recognizing text") setOcr(`Reading image… ${Math.round(m.progress * 100)}%`); },
-        });
-        setOcr("");
+          logger: (m: { status?: string; progress?: number }) => {
+            if (m.status === "recognizing text" && typeof m.progress === "number") setStatus(`Reading image… ${Math.round(m.progress * 100)}%`);
+          },
+        } as Parameters<typeof Tesseract.recognize>[2]);
+        setStatus("");
+        setRawText(data.text || "");
         if (kind === "sales") {
-          const g = scanReceiptText(data.text);
-          setSales([{ date: g.date ?? todayCairo(), total: g.total != null ? String(g.total) : "" }]);
-          toast("Image read — check the values, then Approve", "info");
+          const rows = scanReceiptRows(data.text);
+          setSales(rows.length ? rows.map((r) => ({ date: r.date, total: String(r.amount) })) : [{ date: todayCairo(), total: "" }]);
+          toast(rows.length ? `Read ${rows.length} row(s) — check & Approve` : "Couldn't auto-read — type the totals from the image", rows.length ? "info" : "error");
         } else {
           const g = scanReceiptText(data.text);
           setExps([{ date: g.date ?? todayCairo(), category: "Other", amount: g.total != null ? String(g.total) : "" }]);
           toast("Image read — check the values, then Approve", "info");
         }
       } else if (isExcel(f)) {
-        const rows = await readSpreadsheet(f);
-        loadRows(rows);
+        loadRows(await readSpreadsheet(f));
       } else {
-        Papa.parse<Row>(f, { header: true, skipEmptyLines: true, complete: (res) => loadRows(res.data), error: () => toast("Could not parse CSV", "error") });
+        Papa.parse<Row>(f, { header: true, skipEmptyLines: true, complete: (res) => loadRows(res.data), error: (err) => reportError("Read CSV", err) });
       }
     } catch (err) {
-      setOcr("");
+      setStatus("");
       reportError("Import file", err);
     }
   }
 
   function loadRows(rows: Row[]) {
-    if (kind === "sales") {
-      setSales(parseSalesRows(rows).map((r) => ({ date: r.date ?? "", total: r.total != null ? String(r.total) : "" })));
-    } else {
-      setExps(parseExpenseRows(rows).map((r) => ({ date: r.date ?? "", category: r.category, amount: r.amount != null ? String(r.amount) : "" })));
-    }
+    if (!rows.length) { toast("No rows found in that file", "error"); return; }
+    if (kind === "sales") setSales(parseSalesRows(rows).map((r) => ({ date: r.date ?? "", total: r.total != null ? String(r.total) : "" })));
+    else setExps(parseExpenseRows(rows).map((r) => ({ date: r.date ?? "", category: r.category, amount: r.amount != null ? String(r.amount) : "" })));
   }
 
-  // validation helpers on the editable rows
   const dupSet = existingDays.data ?? new Set<string>();
   const salesView = (sales ?? []).map((r) => {
     const iso = toIso(r.date); const totalNum = toNum(r.total);
-    const issues: string[] = [];
-    if (!iso) issues.push("date"); if (totalNum == null) issues.push("total");
-    const dup = !!iso && dupSet.has(iso);
-    return { ...r, iso, totalNum, issues, dup };
+    const issues: string[] = []; if (!iso) issues.push("date"); if (totalNum == null) issues.push("total");
+    return { ...r, iso, totalNum, issues, dup: !!iso && dupSet.has(iso) };
   });
   const expView = (exps ?? []).map((r) => {
     const iso = toIso(r.date); const amountNum = toNum(r.amount);
-    const issues: string[] = [];
-    if (!iso) issues.push("date"); if (amountNum == null) issues.push("amount"); if (!r.category.trim()) issues.push("category");
+    const issues: string[] = []; if (!iso) issues.push("date"); if (amountNum == null) issues.push("amount"); if (!r.category.trim()) issues.push("category");
     return { ...r, iso, amountNum, issues };
   });
-  const salesReady = salesView.filter((r) => !r.issues.length && !r.dup).length;
-  const expReady = expView.filter((r) => !r.issues.length).length;
-  const readyCount = kind === "sales" ? salesReady : expReady;
+  const readyCount = kind === "sales" ? salesView.filter((r) => !r.issues.length && !r.dup).length : expView.filter((r) => !r.issues.length).length;
 
   const approve = useMutation({
     mutationFn: async () => {
@@ -124,8 +120,7 @@ export function ReceiptsScreen() {
         const seen = new Set(dupSet);
         for (const r of salesView) {
           if (r.issues.length || !r.iso || r.totalNum == null || seen.has(r.iso)) { skipped++; continue; }
-          try { await createSale({ date: r.iso, total: r.totalNum, locationId: loc.id, channelId: ch.id }); seen.add(r.iso); imported++; }
-          catch { failed++; }
+          try { await createSale({ date: r.iso, total: r.totalNum, locationId: loc.id, channelId: ch.id }); seen.add(r.iso); imported++; } catch { failed++; }
         }
       } else {
         const loc = locations.data?.[0];
@@ -150,28 +145,29 @@ export function ReceiptsScreen() {
 
   if (!en) return <EmptyState title="Sign in to import" />;
   const hasRows = kind === "sales" ? sales != null : exps != null;
+  const noun = kind === "sales" ? "daily sales" : "expenses";
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Upload CSV · Excel · or a photo/screenshot → review → approve</Eyebrow>
         <div className="flex-1" />
-        <Tabs value={kind} onChange={(v) => { setKind(v); reset(); }} options={[{ value: "sales", label: "Daily sales" }, { value: "expenses", label: "Expenses" }]} />
+        {!fixedKind && <Tabs value={kind} onChange={(v) => { setKind(v); reset(); }} options={[{ value: "sales", label: "Daily sales" }, { value: "expenses", label: "Expenses" }]} />}
       </div>
 
       {!hasRows ? (
         <Card className="border-dashed">
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <div className="font-display text-base font-semibold">Add {kind === "sales" ? "daily sales" : "expenses"}</div>
+            <div className="font-display text-base font-semibold">Add {noun}</div>
             <div className="max-w-md text-sm text-dim">
-              Upload a <b>CSV</b>, <b>Excel</b> file, or a <b>photo / screenshot</b> of your sales sheet or receipt.
-              {kind === "sales" ? " Images are read automatically and you confirm the totals." : " Columns: date, category, amount."}
+              Upload a <b>CSV</b>, <b>Excel</b> file, or a <b>photo / screenshot</b> of your {kind === "sales" ? "sales sheet" : "receipt"}.
+              {kind === "sales" ? " Each dated row becomes a day; you confirm the totals." : " Columns: date, category, amount."}
             </div>
             <label className="lift cursor-pointer rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">
               Choose file
               <input type="file" accept=".csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,image/*" className="hidden" onChange={onFile} />
             </label>
-            <div className="text-[11px] text-dim">or type rows manually below</div>
+            <div className="text-[11px] text-dim">or</div>
             <Button variant="outline" onClick={() => kind === "sales" ? setSales([{ date: todayCairo(), total: "" }]) : setExps([{ date: todayCairo(), category: "Other", amount: "" }])}>Enter manually</Button>
           </div>
         </Card>
@@ -179,11 +175,17 @@ export function ReceiptsScreen() {
         <>
           {imgUrl && (
             <Card className="!p-3">
-              <div className="flex items-start gap-3">
-                <img src={imgUrl} alt="receipt" className="max-h-48 rounded-lg border border-line2 object-contain" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                <img src={imgUrl} alt="receipt" className="max-h-56 rounded-lg border border-line2 object-contain" />
                 <div className="min-w-0 flex-1 text-[12px] text-dim">
                   <div className="font-display text-sm font-semibold text-text">{fileName}</div>
-                  {ocr ? <div className="mt-1 text-pink">{ocr}</div> : <div className="mt-1">Read the photo and confirm the values on the right. Add more rows if the sheet has several days.</div>}
+                  {status ? <div className="mt-1 text-pink">{status}</div> : <div className="mt-1">Confirm the values on the right. Add rows if the sheet has more days.</div>}
+                  {rawText && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-pink">What the reader saw</summary>
+                      <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-panel p-2 font-mono text-[10px] text-muted">{rawText.slice(0, 1200)}</pre>
+                    </details>
+                  )}
                 </div>
               </div>
             </Card>

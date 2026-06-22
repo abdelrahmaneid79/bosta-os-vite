@@ -64,16 +64,28 @@ export function Ring({ value, size = 128, stroke = 11, color, children }: {
 }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const v = value ?? 0;
-  const col = color ?? (v >= 80 ? "#54D69A" : v >= 55 ? "#F2B33D" : v >= 1 ? "#FF5C5C" : "#3A2230");
+  const v = Math.max(0, Math.min(100, value ?? 0));
+  // gradient pair per tier (kept in-family for a premium look)
+  const tier: [string, string, string] = color ? [color, color, color]
+    : v >= 80 ? ["#5CE5A8", "#2BD4C4", "#54D69A"]
+    : v >= 55 ? ["#FFD166", "#F7A23B", "#F2B33D"]
+    : v >= 1 ? ["#FF9A8B", "#FF4D6D", "#FF5C5C"]
+    : ["#3A2230", "#3A2230", "#3A2230"];
+  const gid = `ring-${tier[0].slice(1)}-${size}`;
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <defs>
+          <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={tier[0]} /><stop offset="100%" stopColor={tier[1]} />
+          </linearGradient>
+        </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#241019" strokeWidth={stroke} />
         {value != null && (
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={col} strokeWidth={stroke}
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`url(#${gid})`} strokeWidth={stroke}
             strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)}
-            transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ transition: "stroke-dashoffset .6s ease" }} />
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            style={{ transition: "stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)", filter: `drop-shadow(0 0 ${stroke / 2}px ${tier[2]}66)` }} />
         )}
       </svg>
       <div className="absolute flex flex-col items-center">{children}</div>

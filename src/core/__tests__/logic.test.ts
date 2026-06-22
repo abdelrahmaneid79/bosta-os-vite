@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { CAP, isEnabled, cap } from "@/core/capabilities";
 import { reconTolerance } from "@/core/read/sales";
-import { toIso, toNum, parseSalesRows, parseExpenseRows, scanReceiptText } from "@/core/import/csv";
+import { toIso, toNum, parseSalesRows, parseExpenseRows, scanReceiptText, scanReceiptRows } from "@/core/import/csv";
 import { composeProfit } from "@/core/read/profit";
 import { aggregateProductProfit } from "@/core/read/products";
 import { mergeActivity, type ActivityEvent } from "@/core/read/activity";
@@ -55,6 +55,18 @@ describe("receipt OCR text scanning (best-guess date + total)", () => {
   it("returns nulls on unreadable text without inventing data", () => {
     expect(scanReceiptText("no useful content here")).toEqual({ date: null, total: null });
     expect(scanReceiptText("")).toEqual({ date: null, total: null });
+  });
+  it("reads MANY day rows from a multi-day sales sheet", () => {
+    const sheet = "Daily sales\n01/06/2026  1,200\n02/06/2026  980.50\n03/06/2026  2050\nTotal 4230";
+    expect(scanReceiptRows(sheet)).toEqual([
+      { date: "2026-06-01", amount: 1200 },
+      { date: "2026-06-02", amount: 980.5 },
+      { date: "2026-06-03", amount: 2050 },
+    ]);
+  });
+  it("falls back to a single best-guess row when no dated lines", () => {
+    expect(scanReceiptRows("TOTAL 500\n2026-06-09")).toEqual([{ date: "2026-06-09", amount: 500 }]);
+    expect(scanReceiptRows("garbage")).toEqual([]);
   });
 });
 

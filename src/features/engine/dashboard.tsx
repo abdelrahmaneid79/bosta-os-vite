@@ -10,11 +10,33 @@ import { getMissingData } from "@/core/read/missing";
 import { getRiskInsights } from "@/core/read/insights";
 import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
 import { getHealthReport } from "@/core/read/health";
+import { getDailyRevenue } from "@/core/read/sales";
+import { getProfitReadout } from "@/core/read/profit";
+import { todayCairo, monthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { useActiveRange } from "@/store/filters";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
+
+/** 14-day sales bar chart — pure SVG, no deps. Highlights today and the peak. */
+function Sparkbars({ series }: { series: { date: string; total: number }[] }) {
+  const max = Math.max(1, ...series.map((p) => p.total));
+  const today = todayCairo();
+  return (
+    <div className="flex h-24 items-end gap-1">
+      {series.map((p) => {
+        const h = Math.max(3, (p.total / max) * 100);
+        const isToday = p.date === today;
+        return (
+          <div key={p.date} className="group relative flex flex-1 flex-col items-center justify-end" title={`${fmtDate(p.date)} · ${egp(p.total)}`}>
+            <div className={`w-full rounded-t-md transition-all ${isToday ? "bg-pink" : p.total > 0 ? "bg-pink/35 group-hover:bg-pink/60" : "bg-line2"}`} style={{ height: `${h}%` }} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 const dot = (s: string) => s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : "bg-dim";
 const sevDot = (s: Severity) => s === "critical" ? "bg-bad" : s === "warning" ? "bg-warn" : "bg-dim";
 const confLabel: Record<Insight["confidence"], string> = { high: "", estimate: "estimate", "low-data": "needs data" };
@@ -45,50 +67,74 @@ export function InsightRow({ i }: { i: Insight }) {
 
 /* ─ Today / Command Center ─────────────────────────────────────────────── */
 export function DashboardScreen() {
+  const month = monthBoundsCairo();
+  const today = todayCairo();
+  const chartFrom = isoDaysAgo(today, 13);
   const cc = useQuery({ queryKey: ["cc"], queryFn: getCommandCenter, enabled: en });
   const miss = useQuery({ queryKey: ["missing"], queryFn: getMissingData, enabled: en });
   const insights = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
   const feed = useQuery({ queryKey: ["activity"], queryFn: () => getActivityFeed(30, 8), enabled: en });
   const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
+  const daily = useQuery({ queryKey: ["daily14", chartFrom], queryFn: () => getDailyRevenue({ from: chartFrom, to: today }), enabled: en });
+  const profit = useQuery({ queryKey: ["profit", month], queryFn: () => getProfitReadout(month), enabled: en });
   const c = cc.data;
   if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
 
+  const byDay = new Map((daily.data ?? []).map((p) => [p.date, p.total]));
+  const series = isoRange(chartFrom, today).map((d) => ({ date: d, total: byDay.get(d) ?? 0 }));
+  const p = profit.data;
+  const attention = (miss.data?.length ?? 0) + (insights.data?.filter((i) => i.severity !== "info").length ?? 0);
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        {/* Today + 14-day trend */}
         <Card glow>
-          <Eyebrow>Today</Eyebrow>
-          <div className="mt-1 flex items-end gap-3">
-            <div className="font-display text-4xl font-semibold leading-none text-white">{c ? egp(c.todayRevenue) : "—"}</div>
-            <div className="pb-1 text-sm text-muted">sold today</div>
+          <div className="flex items-start justify-between">
+            <div>
+              <Eyebrow>Today · {fmtDate(today, "EEE d MMM")}</Eyebrow>
+              <div className="mt-1 flex items-end gap-3">
+                <div className="font-display text-4xl font-semibold leading-none text-white">{c ? egp(c.todayRevenue) : "—"}</div>
+                <div className="pb-1 text-sm text-muted">sold today</div>
+              </div>
+              <div className="mt-1 text-sm text-good">{c ? `${egp(c.monthRevenue)} this month` : "—"}</div>
+            </div>
+            <Link to="/sales" className="rounded-lg bg-pink px-3 py-1.5 font-display text-xs font-semibold text-ink shadow-pink">+ Sale</Link>
           </div>
-          <div className="mt-2 text-sm text-good">{c ? `${egp(c.monthRevenue)} this month` : "—"}</div>
-          <div className="mt-5 grid grid-cols-3 gap-3 border-t border-line2 pt-4">
-            <Mini label="Stock value" value={c ? egpShort(c.stockValue) : "—"} />
-            <Mini label="Cash" value={c ? (c.cashBalance == null ? "—" : egpShort(c.cashBalance)) : "—"} />
-            <Mini label="Owed" value={c ? egpShort(c.owed) : "—"} />
+          <div className="mt-4">
+            {daily.isLoading ? <div className="h-24 animate-pulse rounded-lg bg-line2" /> : <Sparkbars series={series} />}
+            <div className="mt-1.5 flex justify-between text-[10px] text-dim"><span>{fmtDate(chartFrom, "d MMM")}</span><span>last 14 days</span><span>today</span></div>
           </div>
         </Card>
 
-        <Card>
-          <div className="mb-2 flex items-center justify-between">
-            <Eyebrow>Needs attention</Eyebrow>
-            {(miss.data?.length ?? 0) > 0 && <Link to="/missing" className="text-xs text-pink">All →</Link>}
-          </div>
-          {!en ? <Note>Sign in to load.</Note> : miss.isLoading ? <SkeletonRows rows={3} /> :
-            (miss.data?.length ?? 0) === 0 ? <div className="py-2 text-sm text-good">● All clear.</div> : (
-            <div className="space-y-1">
-              {miss.data!.slice(0, 4).map((i) => (
-                <Link key={i.key} to={i.route} className="row-hover flex items-center gap-2.5 rounded-lg p-2">
-                  <span className={`h-2 w-2 rounded-full ${dot(i.severity)}`} />
-                  <span className="flex-1 text-sm text-text">{i.title}</span>
-                  <span className="text-[11px] text-dim">{i.count}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </Card>
+        {/* KPI tiles */}
+        <div className="grid grid-cols-2 gap-3">
+          <Kpi label="Net profit · month" value={p ? (p.netProfit == null ? "unknown" : egpShort(p.netProfit)) : "—"} accent="text-good" to="/reports" />
+          <Kpi label="Cash on hand" value={c ? (c.cashBalance == null ? "—" : egpShort(c.cashBalance)) : "—"} to="/money" />
+          <Kpi label="Stock value" value={c ? egpShort(c.stockValue) : "—"} to="/stock" />
+          <Kpi label="Owed to you" value={c ? egpShort(c.owed) : "—"} accent={c && c.owed > 0 ? "text-warn" : "text-text"} to="/cheques" />
+        </div>
       </div>
+
+      {/* Needs attention */}
+      <Card>
+        <div className="mb-2 flex items-center justify-between">
+          <Eyebrow>Needs attention{attention > 0 ? ` · ${attention}` : ""}</Eyebrow>
+          <Link to="/missing" className="text-xs text-pink">Open Gaps →</Link>
+        </div>
+        {!en ? <Note>Sign in to load.</Note> : miss.isLoading ? <SkeletonRows rows={3} /> :
+          (miss.data?.length ?? 0) === 0 ? <div className="py-2 text-sm text-good">● All clear — nothing needs you right now.</div> : (
+          <div className="grid gap-1 sm:grid-cols-2">
+            {miss.data!.slice(0, 6).map((i) => (
+              <Link key={i.key} to={i.route} className="row-hover flex items-center gap-2.5 rounded-lg p-2">
+                <span className={`h-2 w-2 rounded-full ${dot(i.severity)}`} />
+                <span className="flex-1 text-sm text-text">{i.title}</span>
+                <span className="text-[11px] text-dim">{i.count}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Card>
 
       {/* Risk & intelligence insights */}
       {en && (insights.isLoading || (insights.data?.length ?? 0) > 0) && (
@@ -133,16 +179,20 @@ export function DashboardScreen() {
       </Card>
 
       {/* Health teaser */}
-      <Card className="flex items-center gap-4">
-        <Ring value={health.data?.overall ?? null} size={88} stroke={9}>
+      <Card glow className="flex items-center gap-5">
+        <Ring value={health.data?.overall ?? null} size={96} stroke={11}>
           <span className="font-display text-2xl font-semibold text-white">{health.data?.overall ?? "—"}</span>
+          <span className="text-[10px] text-dim">/ 100</span>
         </Ring>
         <div className="flex-1">
-          <Eyebrow>Health</Eyebrow>
+          <Eyebrow>Business health</Eyebrow>
           <div className="font-display text-lg font-semibold text-good">{health.data?.status ?? "—"}</div>
-          {health.data && health.data.streakDays > 0 && <div className="text-xs text-dim">🔥 {health.data.streakDays}-day sales streak</div>}
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {health.data?.level != null && <Pill tone="warn">⚡ Level {health.data.level}</Pill>}
+            {health.data && health.data.streakDays > 0 && <Pill tone="pink">🔥 {health.data.streakDays}-day streak</Pill>}
+          </div>
         </div>
-        <Link to="/health" className="text-xs text-pink">Open →</Link>
+        <Link to="/health" className="rounded-lg border border-line px-3 py-1.5 text-xs text-text hover:bg-line2">Open →</Link>
       </Card>
 
       <Card>
@@ -159,8 +209,13 @@ export function DashboardScreen() {
     </div>
   );
 }
-function Mini({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-[11px] text-dim">{label}</div><div className="font-display text-base font-semibold">{value}</div></div>;
+function Kpi({ label, value, accent = "text-text", to }: { label: string; value: string; accent?: string; to: string }) {
+  return (
+    <Link to={to} className="lift flex flex-col justify-between rounded-2xl border border-line bg-panel2 p-3.5 transition hover:border-pink/40">
+      <div className="text-[11px] text-dim">{label}</div>
+      <div className={`mt-2 font-display text-xl font-semibold ${accent}`}>{value}</div>
+    </Link>
+  );
 }
 function Note({ children }: { children: React.ReactNode }) { return <div className="py-2 text-sm text-dim">{children}</div>; }
 
