@@ -1,0 +1,22 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage
+*.tsbuildinfo
+# stray tsc emit of the node config (Vite uses vite.config.ts directly)
+vite.config.js
+vite.config.d.ts
+
+# reference archives & raw business data — kept local, never published to GitHub
+_archive_nextjs/
+_archive_old_next_app/
+chats/
+**/uploads/
+*.xlsx
+*.xls
+*.csv

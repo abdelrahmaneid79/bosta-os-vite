@@ -1,0 +1,42 @@
+/** Missing-data detection from live reads. Each issue links to where it's
+ *  fixed. READ-ONLY. */
+import { requireEngine } from "@/core/db/engine";
+import { getStockSummary } from "./stock";
+import { getSettlementPeriods } from "./settlements";
+
+export type Severity = "high" | "medium" | "low";
+export interface MissingIssue {
+  key: string; title: string; detail: string; severity: Severity; count: number; route: string;
+}
+
+export async function getMissingData(): Promise<MissingIssue[]> {
+  const sb = requireEngine();
+  const issues: MissingIssue[] = [];
+
+  const [stock, periods, unmapped, unrecon] = await Promise.all([
+    getStockSummary(),
+    getSettlementPeriods(),
+    sb.from("sale_items").select("id", { count: "exact", head: true }).is("voided_at", null).is("product_id", null),
+    sb.from("sales").select("id", { count: "exact", head: true }).is("voided_at", null).eq("reconciled", false),
+  ]);
+
+  if (stock.missingCostCount) issues.push({ key: "missing-cogs", title: "Products missing cost", severity: "high",
+    detail: "In stock but no recorded cost — profit is understated.", count: stock.missingCostCount, route: "/stock" });
+  if (stock.negativeCount) issues.push({ key: "negative-stock", title: "Negative stock", severity: "high",
+    detail: "On-hand below zero — a purchase is likely missing.", count: stock.negativeCount, route: "/stock" });
+
+  const unmappedCount = unmapped.count ?? 0;
+  if (unmappedCount) issues.push({ key: "unmapped", title: "Unmapped sale lines", severity: "medium",
+    detail: "Sale lines not linked to a product — excluded from product reports.", count: unmappedCount, route: "/sales" });
+
+  const unreconCount = unrecon.count ?? 0;
+  if (unreconCount) issues.push({ key: "unreconciled-sales", title: "Sales days not matching lines", severity: "medium",
+    detail: "Day total differs from the sum of product lines beyond tolerance.", count: unreconCount, route: "/sales" });
+
+  const openOwed = periods.filter((p) => p.status !== "reconciled" && p.netExpected > 0).length;
+  if (openOwed) issues.push({ key: "settlements", title: "Unreconciled settlements", severity: "low",
+    detail: "Settlement periods with money expected but not reconciled.", count: openOwed, route: "/cheques" });
+
+  const order = { high: 0, medium: 1, low: 2 };
+  return issues.sort((a, b) => order[a.severity] - order[b.severity]);
+}

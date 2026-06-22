@@ -1,0 +1,82 @@
+/**
+ * The engine seam. The Vite app NEVER recomputes verified money math — it calls
+ * the proven Postgres RPCs (WAC, inventory ledger, settlement, money recalc)
+ * shipped with the existing Supabase backend. This is the ONLY place those
+ * write-path RPCs are invoked, with arguments typed from the generated schema.
+ *
+ * READ-ONLY MODE: nothing here is called yet. Writes are gated behind explicit
+ * owner approval (see SCOPE + project rules). Reads live in src/core/read/*.
+ */
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
+import type { FnArgs, Enums } from "./tables";
+
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+/** True when read access is configured (anon key — free, no writes implied). */
+export const isEngineConfigured = Boolean(url && anonKey);
+
+export const sb: SupabaseClient<Database> | null = isEngineConfigured
+  ? createClient<Database>(url as string, anonKey as string, {
+      auth: { persistSession: true, autoRefreshToken: true },
+    })
+  : null;
+
+export function requireEngine(): SupabaseClient<Database> {
+  if (!sb) throw new Error("Supabase not configured (set VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).");
+  return sb;
+}
+
+async function rpc<T extends keyof Database["public"]["Functions"]>(
+  name: T,
+  args: FnArgs<T>,
+): Promise<Database["public"]["Functions"][T]["Returns"]> {
+  const client = requireEngine();
+  const { data, error } = await client.rpc(name, args as never);
+  if (error) throw error;
+  return data as Database["public"]["Functions"][T]["Returns"];
+}
+
+// ── WRITE-PATH WRAPPERS (defined, not yet wired — approval required) ─────────
+
+export interface PurchaseLine {
+  product_id: string;
+  quantity: number;
+  unit_cost: number;
+  total_cost?: number;
+}
+
+/** Stock IN + WAC snapshot (via trigger). Reverse with void_purchase_batch. */
+export const createPurchase = (args: {
+  supplierId: string | null;
+  invoiceRef: string | null;
+  purchaseDate: string;
+  locationId: string;
+  lines: PurchaseLine[];
+  source?: Enums<"source_type">;
+  verification?: Enums<"verification_status">;
+}) =>
+  rpc("create_purchase", {
+    p_supplier_id: args.supplierId as string,
+    p_invoice_ref: args.invoiceRef as string,
+    p_purchase_date: args.purchaseDate,
+    p_location_id: args.locationId,
+    p_source_type: args.source ?? "manual",
+    p_verification: args.verification ?? "verified",
+    p_lines: args.lines as unknown as Database["public"]["Functions"]["create_purchase"]["Args"]["p_lines"],
+  });
+
+/** Sale line → posts stock-out movement + COGS snapshot + reconciles the day. */
+export const createSaleItem = (a: FnArgs<"create_sale_item">) => rpc("create_sale_item", a);
+/** Edit: voids old movement first, updates line, re-posts at current WAC. */
+export const updateSaleItem = (a: FnArgs<"update_sale_item">) => rpc("update_sale_item", a);
+/** Delete: voids movement (restores stock) then removes the line. */
+export const deleteSaleItem = (p_id: string) => rpc("delete_sale_item", { p_id });
+export const voidSaleMovements = (p_sale_id: string) => rpc("void_sale_movements", { p_sale_id });
+
+/** Idempotent cache rebuilds — safe to call after backdated changes. */
+export const recomputeProductCosts = (p_product_id: string) => rpc("recompute_product_costs", { p_product_id });
+export const recalcMoneyAccount = (p_account_id: string) => rpc("recalc_money_account", { p_account_id });
+export const ensureMonthlySettlementPeriod = (p_location_id: string, p_month: string) =>
+  rpc("ensure_monthly_settlement_period", { p_location_id, p_month });

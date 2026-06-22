@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fredoka:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:#F3F1EE;font-family:'IBM Plex Sans Arabic',sans-serif;color:#160910;-webkit-font-smoothing:antialiased}
+::selection{background:#F868C8;color:#160910}
+.wf{background:#0A0608;border:1px solid #2C1622;border-radius:14px}
+.an{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.04em;color:#8A8173}
+.cref{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:#C81E83;background:#FBE2F1;padding:1px 6px;border-radius:5px;white-space:nowrap}
+.specrow td{border-bottom:1px solid #EDE8E0;padding:11px 14px;font-size:13.5px;color:#4A4338;vertical-align:top;line-height:1.5}
+.specrow th{text-align:left;padding:11px 14px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:#9A8F7D;border-bottom:1px solid #E7E1DA;font-weight:600;background:#FAF8F5}
+.tnode{font-size:13px;color:#4A4338;line-height:1.95;font-family:'IBM Plex Mono',monospace}
+.tnode b{color:#160910;font-weight:600}
+.tnode i{color:#C81E83;font-style:normal}
+.tnode s{color:#9A8F7D;text-decoration:none}
+</style>
+</helmet>
+
+<div style="background:#F3F1EE;min-height:100vh;background-image:radial-gradient(circle at 1px 1px, rgba(22,9,16,0.05) 1px, transparent 0);background-size:26px 26px">
+
+<!-- ════════ COVER ════════ -->
+<div data-screen-label="Cover" style="max-width:1120px;margin:0 auto;padding:72px 24px 0">
+  <div style="display:flex;align-items:center;gap:11px;margin-bottom:56px">
+    <div style="width:40px;height:40px;border-radius:11px;background:#160910;display:flex;align-items:center;justify-content:center"><div style="width:23px;height:30px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat"></div></div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px;letter-spacing:-.01em">BostaOS</div>
+    <div style="flex:1"></div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8A8173;letter-spacing:.04em">PRODUCT SPECIFICATION · BUILD-READY</div>
+  </div>
+
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#C81E83;letter-spacing:.16em;margin-bottom:24px">FULL PRODUCT SPEC — v1 · 9 SCREENS · 4 STATES EACH</div>
+  <h1 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(40px,6.4vw,76px);line-height:0.98;letter-spacing:-.03em;max-width:16ch;margin-bottom:28px">Every screen, every state, nothing left to interpret.</h1>
+  <p style="font-size:18px;line-height:1.65;color:#5C5346;max-width:62ch;margin-bottom:46px">The complete build specification for BostaOS. Desktop and mobile wireframes, exact component trees, card structure, button placement, filters, actions, KPIs, tables, charts, modals, drawers, sheets — and the empty / populated / loading / error state for all nine screens. A frontend engineer should be able to build from this without making a single design decision.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:#DFD8CE;border:1px solid #DFD8CE;border-radius:16px;overflow:hidden">
+    <div style="background:#FBFAF8;padding:18px 20px"><div class="an" style="margin-bottom:7px;color:#9A8F7D">SCREENS</div><div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:24px">9</div></div>
+    <div style="background:#FBFAF8;padding:18px 20px"><div class="an" style="margin-bottom:7px;color:#9A8F7D">STATES EACH</div><div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:24px">4</div></div>
+    <div style="background:#FBFAF8;padding:18px 20px"><div class="an" style="margin-bottom:7px;color:#9A8F7D">COMPONENTS</div><div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:24px">34</div></div>
+    <div style="background:#FBFAF8;padding:18px 20px"><div class="an" style="margin-bottom:7px;color:#9A8F7D">BREAKPOINTS</div><div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:24px">3</div></div>
+    <div style="background:#FBFAF8;padding:18px 20px"><div class="an" style="margin-bottom:7px;color:#9A8F7D">USER FLOWS</div><div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:24px">5</div></div>
+  </div>
+</div>
+
+<!-- ════════ HOW TO READ ════════ -->
+<div data-screen-label="How to read" style="max-width:1120px;margin:64px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#C81E83">00</span>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(26px,4vw,36px);letter-spacing:-.02em">How to read this spec</h2>
+  </div>
+  <p style="font-size:16px;line-height:1.7;color:#5C5346;max-width:64ch;margin-bottom:28px">Every page section follows the identical order: <strong style="color:#160910">route → desktop wireframe → mobile wireframe → component tree → spec sheet (KPIs, filters, actions, tables, charts, overlays) → four states.</strong> The conventions below are constant throughout.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">WIREFRAME ANNOTATIONS</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:10px;align-items:center"><span class="cref">C-12</span><span style="font-size:13px;color:#5C5346">component ref → see inventory §03</span></div>
+        <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono';font-size:10px;color:#160910;background:#F868C8;padding:2px 7px;border-radius:5px;font-weight:600">A</span><span style="font-size:13px;color:#5C5346">primary action / button location</span></div>
+        <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono';font-size:10px;color:#fff;background:#160910;padding:2px 7px;border-radius:5px;font-weight:600">1</span><span style="font-size:13px;color:#5C5346">numbered build note below frame</span></div>
+        <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono';font-size:11px;color:#C81E83">⇥ 16</span><span style="font-size:13px;color:#5C5346">spacing / measure in px (token)</span></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">STATE TAGS</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono';font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:#F2EEE9;color:#8A8173">EMPTY</span><span style="font-size:13px;color:#5C5346">no data yet / filtered to nothing</span></div>
+        <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono';font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:#FBE2F1;color:#C81E83">POPULATED</span><span style="font-size:13px;color:#5C5346">the default, with real data</span></div>
+        <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono';font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:#EEF0F4;color:#5B6478">LOADING</span><span style="font-size:13px;color:#5C5346">skeleton / shimmer placeholders</span></div>
+        <div style="display:flex;gap:10px;align-items:center"><span style="font-family:'IBM Plex Mono';font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:#FBE3E3;color:#C0392B">ERROR</span><span style="font-size:13px;color:#5C5346">fetch / sync / validation failure</span></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">COMPONENT-TREE SYNTAX</div>
+      <div class="tnode" style="font-size:12px;line-height:1.85">
+        <div><b>&lt;Screen&gt;</b> <s>// container</s></div>
+        <div>&nbsp;├ <b>&lt;Organism&gt;</b> <span class="cref">C-01</span></div>
+        <div>&nbsp;│ ├ <b>&lt;Molecule&gt;</b> <i>prop=value</i></div>
+        <div>&nbsp;│ └ <b>&lt;Atom&gt;</b> <s>×3</s></div>
+        <div>&nbsp;└ <b>&lt;Organism&gt;</b> <s>// repeats</s></div>
+      </div>
+      <div style="font-size:12.5px;color:#8A8173;margin-top:12px;line-height:1.5"><i style="color:#C81E83;font-style:normal">pink</i> = key prop · <s style="color:#9A8F7D">grey</s> = note/count</div>
+    </div>
+    <div style="background:#160910;border:1px solid #2C1622;border-radius:16px;padding:20px">
+      <div class="an" style="color:#A87C95;margin-bottom:14px">BREAKPOINTS (CONSTANT)</div>
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;justify-content:space-between"><span style="font-family:'IBM Plex Mono';font-size:12px;color:#F868C8;font-weight:600">MOBILE</span><span style="font-size:13px;color:#FBE9F4">0 – 599px · 1 col · bottom nav</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-family:'IBM Plex Mono';font-size:12px;color:#F868C8;font-weight:600">TABLET</span><span style="font-size:13px;color:#FBE9F4">600 – 1023px · 2 col · rail</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-family:'IBM Plex Mono';font-size:12px;color:#F868C8;font-weight:600">DESKTOP</span><span style="font-size:13px;color:#FBE9F4">1024px+ · 12-col · left rail</span></div>
+      </div>
+      <div style="font-size:12.5px;color:#B59AA8;margin-top:14px;line-height:1.5">Wireframes show mobile (375) &amp; desktop (1280). Tablet rules given in §05.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ 01 SITEMAP ════════ -->
+<div data-screen-label="01 Sitemap" style="max-width:1120px;margin:96px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#C81E83">01</span>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(26px,4vw,36px);letter-spacing:-.02em">Complete sitemap</h2>
+  </div>
+  <p style="font-size:16px;line-height:1.7;color:#5C5346;max-width:64ch;margin-bottom:28px">Four primary destinations in the nav. Cash is a hub that fans into three ledger views. Reports and Settings sit outside the primary nav (header / overflow). Every route, level and entry point is fixed below.</p>
+
+  <div style="display:grid;grid-template-columns:1.45fr 1fr;gap:18px;align-items:start">
+    <!-- tree -->
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:18px;padding:26px 28px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:18px">ROUTE TREE</div>
+      <div class="tnode">
+        <div><b>/</b> <s>→ redirects to /today</s></div>
+        <div style="height:8px"></div>
+        <div><i>● PRIMARY NAV (4)</i></div>
+        <div><b>/today</b> <s>— L0 · default landing</s> <span class="cref">P-01</span></div>
+        <div><b>/cash</b> <s>— L0 · hub</s> <span class="cref">P-02</span></div>
+        <div>&nbsp;&nbsp;├ <b>/cash/sales</b> <s>— L1</s> <span class="cref">P-03</span></div>
+        <div>&nbsp;&nbsp;├ <b>/cash/purchases</b> <s>— L1</s> <span class="cref">P-04</span></div>
+        <div>&nbsp;&nbsp;└ <b>/cash/expenses</b> <s>— L1</s> <span class="cref">P-05</span></div>
+        <div><b>/products</b> <s>— L0</s> <span class="cref">P-06</span></div>
+        <div>&nbsp;&nbsp;└ <b>/products/:id</b> <s>— L1 drawer</s></div>
+        <div><b>/profit</b> <s>— L0</s> <span class="cref">P-07</span></div>
+        <div>&nbsp;&nbsp;└ <b>/profit/:month</b> <s>— L1 drawer</s></div>
+        <div style="height:8px"></div>
+        <div><i>● SECONDARY (header / overflow)</i></div>
+        <div><b>/reports</b> <s>— from Profit + header</s> <span class="cref">P-08</span></div>
+        <div><b>/settings</b> <s>— from avatar menu</s> <span class="cref">P-09</span></div>
+        <div>&nbsp;&nbsp;├ /settings/sync</div>
+        <div>&nbsp;&nbsp;├ /settings/categories</div>
+        <div>&nbsp;&nbsp;└ /settings/data-quality</div>
+        <div style="height:8px"></div>
+        <div><i>● GLOBAL OVERLAY (any route)</i></div>
+        <div><b>?add=sale|purchase|expense</b> <s>— quick-add sheet</s> <span class="cref">C-20</span></div>
+      </div>
+    </div>
+    <!-- depth + entry -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:#160910;border:1px solid #2C1622;border-radius:18px;padding:22px 24px">
+        <div class="an" style="color:#A87C95;margin-bottom:14px">NAV MODEL</div>
+        <div style="font-size:14px;color:#FBE9F4;line-height:1.7">Max depth <strong style="color:#F868C8">2 taps</strong> to any record. L0 = nav. L1 = drawer/sub-tab over the same shell. No L2 pages — detail always opens as a drawer, never a full navigation.</div>
+      </div>
+      <div style="background:#fff;border:1px solid #E7E1DA;border-radius:18px;padding:22px 24px">
+        <div class="an" style="color:#9A8F7D;margin-bottom:14px">PRIMARY ENTRY POINTS</div>
+        <div style="display:flex;flex-direction:column;gap:9px;font-size:13.5px;color:#4A4338">
+          <div>App open → <strong>/today</strong></div>
+          <div>＋ button (global) → <strong>quick-add sheet</strong></div>
+          <div>Today stat tap → <strong>/cash</strong> or <strong>/profit</strong></div>
+          <div>Profit "Share" → <strong>/reports</strong> (pre-filled)</div>
+          <div>Avatar → <strong>/settings</strong></div>
+        </div>
+      </div>
+      <div style="background:#FBE2F1;border:1px solid #F0C4E0;border-radius:18px;padding:18px 22px">
+        <div class="an" style="color:#C81E83;margin-bottom:8px">DEEP-LINK / SHARE</div>
+        <div style="font-size:13.5px;color:#7A2358;line-height:1.6">Every screen is URL-addressable so WhatsApp links open the exact view. Filters persist in the query string.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ 02 DESIGN TOKENS ════════ -->
+<div data-screen-label="02 Design tokens" style="max-width:1120px;margin:96px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#C81E83">02</span>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(26px,4vw,36px);letter-spacing:-.02em">Design token system</h2>
+  </div>
+  <p style="font-size:16px;line-height:1.7;color:#5C5346;max-width:64ch;margin-bottom:28px">Exact values. Named tokens an engineer maps straight to CSS variables / Tailwind config. No magic numbers anywhere else in the spec — everything references these.</p>
+
+  <!-- COLOR TOKENS -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:12px">2.1 · COLOUR</div>
+  <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden;margin-bottom:16px">
+    <table style="width:100%;border-collapse:collapse">
+      <tr class="specrow"><th style="width:160px">TOKEN</th><th style="width:120px">VALUE</th><th style="width:90px">SWATCH</th><th>USAGE</th></tr>
+      <tr class="specrow"><td><code>--brand</code></td><td>#F868C8</td><td><div style="width:40px;height:18px;border-radius:4px;background:#F868C8"></div></td><td>The single accent. Primary buttons, active nav, live/selected, one chart series.</td></tr>
+      <tr class="specrow"><td><code>--brand-ink</code></td><td>#160910</td><td><div style="width:40px;height:18px;border-radius:4px;background:#160910"></div></td><td>Text/icons ON brand pink. Never pink text on pink.</td></tr>
+      <tr class="specrow"><td><code>--jet</code></td><td>#080808</td><td><div style="width:40px;height:18px;border-radius:4px;background:#080808"></div></td><td>App canvas (dark product theme).</td></tr>
+      <tr class="specrow"><td><code>--surface</code></td><td>#160910</td><td><div style="width:40px;height:18px;border-radius:4px;background:#160910"></div></td><td>Raised card on canvas.</td></tr>
+      <tr class="specrow"><td><code>--surface-2</code></td><td>#1F1018</td><td><div style="width:40px;height:18px;border-radius:4px;background:#1F1018"></div></td><td>Nested surface (input, sheet field).</td></tr>
+      <tr class="specrow"><td><code>--line</code></td><td>#2C1622</td><td><div style="width:40px;height:18px;border-radius:4px;background:#2C1622"></div></td><td>Hairline border / divider on dark.</td></tr>
+      <tr class="specrow"><td><code>--berry</code></td><td>#881848</td><td><div style="width:40px;height:18px;border-radius:4px;background:#881848"></div></td><td>Insight/share cards, report header band.</td></tr>
+      <tr class="specrow"><td><code>--text-hi</code></td><td>#FBE9F4</td><td><div style="width:40px;height:18px;border-radius:4px;background:#FBE9F4;border:1px solid #E7E1DA"></div></td><td>Primary text on dark.</td></tr>
+      <tr class="specrow"><td><code>--text-mid</code></td><td>#B59AA8</td><td><div style="width:40px;height:18px;border-radius:4px;background:#B59AA8"></div></td><td>Secondary text / labels on dark.</td></tr>
+      <tr class="specrow"><td><code>--text-low</code></td><td>#8A6E7E</td><td><div style="width:40px;height:18px;border-radius:4px;background:#8A6E7E"></div></td><td>Tertiary / timestamps.</td></tr>
+      <tr class="specrow"><td><code>--up</code></td><td>#54D69A</td><td><div style="width:40px;height:18px;border-radius:4px;background:#54D69A"></div></td><td>Money IN / positive delta. Semantic only.</td></tr>
+      <tr class="specrow"><td><code>--down</code></td><td>#FF5C5C</td><td><div style="width:40px;height:18px;border-radius:4px;background:#FF5C5C"></div></td><td>Money OUT / negative delta. Semantic only.</td></tr>
+      <tr class="specrow"><td><code>--warn</code></td><td>#F2B33D</td><td><div style="width:40px;height:18px;border-radius:4px;background:#F2B33D"></div></td><td>Sync stale / data-quality partial.</td></tr>
+    </table>
+  </div>
+  <div style="font-size:13px;color:#8A8173;margin-bottom:34px;line-height:1.6">Spec sheets in this document render on a light paper background for legibility; the <strong style="color:#160910">product itself is the dark jet theme</strong> shown inside every wireframe frame.</div>
+
+  <!-- TYPE + SPACE + RADIUS -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:16px 16px 0">2.2 · TYPE SCALE</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th>TOKEN</th><th>SIZE / LH</th><th>FONT · WT</th></tr>
+        <tr class="specrow"><td>display</td><td>40 / 44</td><td>Fredoka 600</td></tr>
+        <tr class="specrow"><td>hero-num</td><td>32 / 36</td><td>Fredoka 600</td></tr>
+        <tr class="specrow"><td>title</td><td>22 / 28</td><td>Fredoka 600</td></tr>
+        <tr class="specrow"><td>stat</td><td>26 / 30</td><td>Fredoka 600</td></tr>
+        <tr class="specrow"><td>body</td><td>15 / 22</td><td>Plex Arabic 400</td></tr>
+        <tr class="specrow"><td>body-strong</td><td>15 / 22</td><td>Plex Arabic 600</td></tr>
+        <tr class="specrow"><td>label</td><td>13 / 18</td><td>Plex Arabic 500</td></tr>
+        <tr class="specrow"><td>caption</td><td>11 / 14</td><td>Plex Arabic 400</td></tr>
+        <tr class="specrow"><td>mono-tag</td><td>10 / 12</td><td>Plex Mono 600 · +.08em</td></tr>
+      </table>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+        <div class="an" style="color:#9A8F7D;padding:16px 16px 0">2.3 · SPACING (4-PT)</div>
+        <table style="width:100%;border-collapse:collapse;margin-top:10px">
+          <tr class="specrow"><th>TOKEN</th><th>PX</th><th>USE</th></tr>
+          <tr class="specrow"><td>s1</td><td>4</td><td>icon ↔ label</td></tr>
+          <tr class="specrow"><td>s2</td><td>8</td><td>chip padding</td></tr>
+          <tr class="specrow"><td>s3</td><td>12</td><td>list-row gap</td></tr>
+          <tr class="specrow"><td>s4</td><td>16</td><td>card padding (m)</td></tr>
+          <tr class="specrow"><td>s5</td><td>24</td><td>card padding (d) · section</td></tr>
+          <tr class="specrow"><td>s6</td><td>32</td><td>block gap</td></tr>
+          <tr class="specrow"><td>s7</td><td>48</td><td>page margin (d)</td></tr>
+        </table>
+      </div>
+      <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+        <div class="an" style="color:#9A8F7D;padding:16px 16px 0">2.4 · RADIUS · ELEVATION · MOTION · Z</div>
+        <table style="width:100%;border-collapse:collapse;margin-top:10px">
+          <tr class="specrow"><th>TOKEN</th><th>VALUE</th></tr>
+          <tr class="specrow"><td>r-input / r-card / r-sheet</td><td>10 / 16 / 24 px · pill 999</td></tr>
+          <tr class="specrow"><td>shadow-card</td><td>0 1px 2px rgba(0,0,0,.4)</td></tr>
+          <tr class="specrow"><td>shadow-pop</td><td>0 12px 30px -12px rgba(0,0,0,.6)</td></tr>
+          <tr class="specrow"><td>ease / dur</td><td>cubic(.2,.8,.2,1) · 180ms</td></tr>
+          <tr class="specrow"><td>dur-sheet</td><td>240ms slide-up</td></tr>
+          <tr class="specrow"><td>z nav / sheet / toast</td><td>40 / 60 / 80</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ 03 COMPONENT INVENTORY ════════ -->
+<div data-screen-label="03 Components" style="max-width:1120px;margin:96px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#C81E83">03</span>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(26px,4vw,36px);letter-spacing:-.02em">Component inventory</h2>
+  </div>
+  <p style="font-size:16px;line-height:1.7;color:#5C5346;max-width:64ch;margin-bottom:28px">34 components, three tiers. Every wireframe in this spec is an arrangement of these IDs — no element appears that isn't catalogued here. Props listed are the build-required minimum.</p>
+
+  <!-- ATOMS -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:12px">ATOMS — A</div>
+  <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden;margin-bottom:18px">
+    <table style="width:100%;border-collapse:collapse">
+      <tr class="specrow"><th style="width:64px">ID</th><th style="width:180px">COMPONENT</th><th>PROPS / VARIANTS</th></tr>
+      <tr class="specrow"><td><span class="cref">A-01</span></td><td>Button</td><td>variant: primary·ghost·destructive · size: sm(36)·md(44)·lg(48) · icon? · loading? · fullWidth?</td></tr>
+      <tr class="specrow"><td><span class="cref">A-02</span></td><td>IconButton</td><td>40×40 hit area · icon · label(a11y) · active?</td></tr>
+      <tr class="specrow"><td><span class="cref">A-03</span></td><td>Pill / Badge</td><td>tone: brand·up·down·warn·neutral · text · leadingGlyph?</td></tr>
+      <tr class="specrow"><td><span class="cref">A-04</span></td><td>Input</td><td>type: text·number·money·date · prefix(EGP) · error? · 48h</td></tr>
+      <tr class="specrow"><td><span class="cref">A-05</span></td><td>Select / Dropdown</td><td>options[] · value · searchable? · bilingual label</td></tr>
+      <tr class="specrow"><td><span class="cref">A-06</span></td><td>Sparkline</td><td>points[] · stroke=--brand · h=14–20 · noAxis</td></tr>
+      <tr class="specrow"><td><span class="cref">A-07</span></td><td>Avatar</td><td>initials · 32 · menu trigger</td></tr>
+      <tr class="specrow"><td><span class="cref">A-08</span></td><td>Skeleton</td><td>shape: line·block·circle · shimmer · w/h</td></tr>
+      <tr class="specrow"><td><span class="cref">A-09</span></td><td>Mascot</td><td>mood: happy·think·sleep·oops · size · masked SVG</td></tr>
+      <tr class="specrow"><td><span class="cref">A-10</span></td><td>Toast</td><td>tone · text · undo? · auto 4s · z80</td></tr>
+    </table>
+  </div>
+
+  <!-- MOLECULES -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:12px">MOLECULES — C</div>
+  <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden;margin-bottom:18px">
+    <table style="width:100%;border-collapse:collapse">
+      <tr class="specrow"><th style="width:64px">ID</th><th style="width:180px">COMPONENT</th><th>PROPS / VARIANTS</th></tr>
+      <tr class="specrow"><td><span class="cref">C-01</span></td><td>StatCard</td><td>label · value · delta? · sparkline? · onTap → drill</td></tr>
+      <tr class="specrow"><td><span class="cref">C-02</span></td><td>HeroFigure</td><td>caption · bigValue(display) · deltaPill · statusLine</td></tr>
+      <tr class="specrow"><td><span class="cref">C-03</span></td><td>SegmentedControl</td><td>segments[] · value · onChange · fullWidth</td></tr>
+      <tr class="specrow"><td><span class="cref">C-04</span></td><td>FilterBar</td><td>range·category·search·export slots · sticky</td></tr>
+      <tr class="specrow"><td><span class="cref">C-05</span></td><td>LedgerRow</td><td>dot(up/down) · title · sub(date) · amount · swipe actions</td></tr>
+      <tr class="specrow"><td><span class="cref">C-06</span></td><td>ProductRow</td><td>rank · nameAr · nameEn · qty · revenue · fav · shareBar</td></tr>
+      <tr class="specrow"><td><span class="cref">C-07</span></td><td>InsightCard</td><td>text(1 line) · shareBtn · tone=berry</td></tr>
+      <tr class="specrow"><td><span class="cref">C-08</span></td><td>ChartPanel</td><td>title · series · ghostSeries? · legend · h</td></tr>
+      <tr class="specrow"><td><span class="cref">C-09</span></td><td>MonthCard</td><td>month · revenue · cost · net · onTap → drawer</td></tr>
+      <tr class="specrow"><td><span class="cref">C-10</span></td><td>EmptyState</td><td>mascotMood · headline · sub · action(A-01)</td></tr>
+      <tr class="specrow"><td><span class="cref">C-11</span></td><td>ErrorState</td><td>mascot=oops · message · retryBtn · supportLink</td></tr>
+      <tr class="specrow"><td><span class="cref">C-12</span></td><td>SkeletonGroup</td><td>preset: stats·list·chart·table</td></tr>
+      <tr class="specrow"><td><span class="cref">C-13</span></td><td>BreakdownBar</td><td>segments[{label,value,color}] · 100% stacked</td></tr>
+      <tr class="specrow"><td><span class="cref">C-14</span></td><td>ShareCard</td><td>brandedPattern · figures · WhatsApp CTA</td></tr>
+      <tr class="specrow"><td><span class="cref">C-15</span></td><td>DataTable</td><td>cols[] · sortable · stickyHeader · rowAction</td></tr>
+      <tr class="specrow"><td><span class="cref">C-16</span></td><td>ListItem (settings)</td><td>icon · label · value/chevron · toggle?</td></tr>
+    </table>
+  </div>
+
+  <!-- ORGANISMS -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:12px">ORGANISMS / SHELL — C</div>
+  <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse">
+      <tr class="specrow"><th style="width:64px">ID</th><th style="width:180px">COMPONENT</th><th>PROPS / VARIANTS · PLACEMENT</th></tr>
+      <tr class="specrow"><td><span class="cref">C-17</span></td><td>AppHeader</td><td>title · contextAction(right) · avatar · desktop only top bar (h56)</td></tr>
+      <tr class="specrow"><td><span class="cref">C-18</span></td><td>BottomNav</td><td>4 tabs + center Add · mobile · fixed bottom · z40 · 64h+safe</td></tr>
+      <tr class="specrow"><td><span class="cref">C-19</span></td><td>SideRail</td><td>logo · 4 nav · Add · settings foot · desktop ≥1024 · 240w</td></tr>
+      <tr class="specrow"><td><span class="cref">C-20</span></td><td>QuickAddSheet</td><td>type toggle · amount(big) · date · category? · note · Save · mobile=bottom sheet / desktop=modal</td></tr>
+      <tr class="specrow"><td><span class="cref">C-21</span></td><td>DetailDrawer</td><td>record · edit-inline · delete · right drawer(d) / full sheet(m)</td></tr>
+      <tr class="specrow"><td><span class="cref">C-22</span></td><td>ConfirmModal</td><td>title · body · confirm(destructive) · cancel · centered</td></tr>
+      <tr class="specrow"><td><span class="cref">C-23</span></td><td>FilterDrawer (mobile)</td><td>collapses C-04 controls into a bottom sheet on mobile</td></tr>
+      <tr class="specrow"><td><span class="cref">C-24</span></td><td>PageScaffold</td><td>header slot · filter slot · content · respects nav insets</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ════════ 04 INTERACTION SYSTEM ════════ -->
+<div data-screen-label="04 Interaction" style="max-width:1120px;margin:96px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#C81E83">04</span>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(26px,4vw,36px);letter-spacing:-.02em">Interaction system</h2>
+  </div>
+  <p style="font-size:16px;line-height:1.7;color:#5C5346;max-width:64ch;margin-bottom:28px">Every interactive element obeys the same state machine, gestures and feedback. Defined once; referenced by every component above.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:16px 16px 0">4.1 · ELEMENT STATES (all interactives)</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th>STATE</th><th>TREATMENT</th></tr>
+        <tr class="specrow"><td>rest</td><td>base token colours</td></tr>
+        <tr class="specrow"><td>hover (d)</td><td>+6% lightness · 120ms</td></tr>
+        <tr class="specrow"><td>press</td><td>scale .97 · 90ms</td></tr>
+        <tr class="specrow"><td>focus-visible</td><td>2px --brand ring, 2px offset</td></tr>
+        <tr class="specrow"><td>active/selected</td><td>--brand fill or 2px --brand underline</td></tr>
+        <tr class="specrow"><td>loading</td><td>spinner replaces label, width locked</td></tr>
+        <tr class="specrow"><td>disabled</td><td>40% opacity, no pointer</td></tr>
+      </table>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:16px 16px 0">4.2 · GESTURES &amp; TRANSITIONS</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th>TRIGGER</th><th>RESULT</th></tr>
+        <tr class="specrow"><td>tap ＋</td><td>QuickAddSheet slides up 240ms</td></tr>
+        <tr class="specrow"><td>tap StatCard</td><td>cross-fade nav to drill target</td></tr>
+        <tr class="specrow"><td>tap LedgerRow</td><td>DetailDrawer in from right/bottom</td></tr>
+        <tr class="specrow"><td>swipe-left row (m)</td><td>reveal Edit · Delete</td></tr>
+        <tr class="specrow"><td>pull-down (m)</td><td>refresh → sync</td></tr>
+        <tr class="specrow"><td>save record</td><td>sheet dismiss + number count-up + toast(undo)</td></tr>
+        <tr class="specrow"><td>delete</td><td>ConfirmModal → optimistic remove + toast(undo 4s)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div style="background:#160910;border:1px solid #2C1622;border-radius:16px;padding:22px 24px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px">
+    <div><div class="an" style="color:#A87C95;margin-bottom:8px">FEEDBACK LATENCY</div><div style="font-size:13.5px;color:#FBE9F4;line-height:1.6">&lt;100ms optimistic UI on every write. Spinner only after 400ms. Skeleton only after 200ms.</div></div>
+    <div><div class="an" style="color:#A87C95;margin-bottom:8px">VALIDATION</div><div style="font-size:13.5px;color:#FBE9F4;line-height:1.6">Inline, on blur. Error text under field in --down. Save disabled until amount &gt; 0. Never a blocking alert.</div></div>
+    <div><div class="an" style="color:#A87C95;margin-bottom:8px">UNDO-FIRST</div><div style="font-size:13.5px;color:#FBE9F4;line-height:1.6">Destructive actions are reversible for 4s via toast rather than guarded by friction. One ConfirmModal only for permanent deletes.</div></div>
+  </div>
+</div>
+
+<!-- ════════ 05 RESPONSIVE ════════ -->
+<div data-screen-label="05 Responsive" style="max-width:1120px;margin:96px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#C81E83">05</span>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(26px,4vw,36px);letter-spacing:-.02em">Responsive behavior</h2>
+  </div>
+  <p style="font-size:16px;line-height:1.7;color:#5C5346;max-width:64ch;margin-bottom:28px">Mobile-first. The same components recompose across three breakpoints — what moves, stacks and swaps is fixed below.</p>
+  <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse">
+      <tr class="specrow"><th style="width:150px">ELEMENT</th><th>MOBILE ≤599</th><th>TABLET 600–1023</th><th>DESKTOP ≥1024</th></tr>
+      <tr class="specrow"><td>Navigation</td><td>BottomNav C-18 + center Add</td><td>collapsed SideRail (icons)</td><td>SideRail C-19 (240w, labels)</td></tr>
+      <tr class="specrow"><td>Header</td><td>inline title, no top bar</td><td>top bar C-17</td><td>top bar C-17 + avatar menu</td></tr>
+      <tr class="specrow"><td>Add action</td><td>center nav button</td><td>rail button</td><td>rail button + ⌘K</td></tr>
+      <tr class="specrow"><td>Content grid</td><td>1 col, full-bleed cards</td><td>2 col</td><td>12-col; content max 1080, centered</td></tr>
+      <tr class="specrow"><td>StatCards</td><td>3-up scroll or 1-col stack</td><td>3-up row</td><td>3-up row, wider</td></tr>
+      <tr class="specrow"><td>Filters C-04</td><td>FilterDrawer C-23 (sheet)</td><td>inline sticky bar</td><td>inline sticky bar</td></tr>
+      <tr class="specrow"><td>Tables / ledger</td><td>card list (LedgerRow)</td><td>card list</td><td>DataTable C-15 (columns)</td></tr>
+      <tr class="specrow"><td>QuickAdd C-20</td><td>bottom sheet</td><td>bottom sheet</td><td>centered modal 440w</td></tr>
+      <tr class="specrow"><td>Detail C-21</td><td>full-screen sheet</td><td>right drawer 420</td><td>right drawer 460</td></tr>
+      <tr class="specrow"><td>Charts C-08</td><td>full-width, 160h</td><td>full-width, 220h</td><td>2/3 width, 280h</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ════════ PAGES BANNER ════════ -->
+<div style="max-width:1120px;margin:120px auto 0;padding:0 24px">
+  <div style="border-top:2px solid #160910;padding-top:18px;display:flex;justify-content:space-between;align-items:baseline">
+    <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;letter-spacing:.04em">SECTION P</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173;letter-spacing:.06em">THE NINE SCREENS</div>
+  </div>
+  <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(30px,5vw,56px);letter-spacing:-.03em;line-height:1.04;margin-top:24px;max-width:18ch">Every screen, both viewports, all four states.</h2>
+</div>
+
+<!-- ═══════════════ P-01 TODAY ═══════════════ -->
+<div data-screen-label="P-01 Today" style="max-width:1120px;margin:64px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#160910;background:#F868C8;padding:5px 11px;border-radius:8px">P-01</span>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;letter-spacing:-.01em">Today</h3>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173">/today · L0 · default landing</span>
+  </div>
+  <p style="font-size:15.5px;line-height:1.65;color:#5C5346;max-width:70ch;margin-bottom:24px"><strong style="color:#160910">Job:</strong> answer "are we OK?" in 3 seconds. <strong style="color:#160910">Nav placement:</strong> BottomNav tab 1 (mobile) / SideRail item 1 (desktop), home icon. <strong style="color:#160910">Default range:</strong> current month-to-date — always falls back to the latest month with data so it is never empty for an active shop.</p>
+
+  <!-- WIREFRAMES -->
+  <div style="display:grid;grid-template-columns:1.62fr 1fr;gap:18px;align-items:start;margin-bottom:18px">
+
+    <!-- DESKTOP -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">DESKTOP · 1280 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px">
+        <div class="wf" style="display:flex;overflow:hidden;border-radius:12px">
+          <!-- rail -->
+          <div style="width:88px;flex-shrink:0;background:#080808;border-right:1px solid #2C1622;padding:14px 0;display:flex;flex-direction:column;align-items:center;gap:16px">
+            <div style="width:26px;height:26px;border-radius:8px;background:#160910;display:flex;align-items:center;justify-content:center"><div style="width:14px;height:18px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat"></div></div>
+            <div style="display:flex;flex-direction:column;gap:13px;align-items:center;margin-top:6px">
+              <div style="font-size:8px;color:#160910;background:#F868C8;padding:5px 7px;border-radius:7px;font-family:'Fredoka';font-weight:600">Today</div>
+              <div style="font-size:8px;color:#8A6E7E">Cash</div>
+              <div style="width:30px;height:30px;border-radius:9px;background:#F868C8;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#160910" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+              <div style="font-size:8px;color:#8A6E7E">Goods</div>
+              <div style="font-size:8px;color:#8A6E7E">Profit</div>
+            </div>
+            <div style="margin-top:auto;font-size:13px;color:#5A3A4C">⚙</div>
+          </div>
+          <!-- content -->
+          <div style="flex:1;padding:16px 18px;min-width:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-family:'Fredoka';font-weight:600;font-size:15px;color:#FBE9F4">Today</div><div style="display:flex;gap:6px;align-items:center"><div style="background:#160910;border:1px solid #2C1622;border-radius:8px;padding:3px;display:flex"><span style="font-size:8px;background:#F868C8;color:#160910;padding:3px 8px;border-radius:6px;font-family:'Fredoka';font-weight:600">Month</span><span style="font-size:8px;color:#B59AA8;padding:3px 8px">3M</span><span style="font-size:8px;color:#B59AA8;padding:3px 8px">Year</span></div><div style="width:18px;height:18px;border-radius:50%;background:#2C1622"></div></div></div>
+            <!-- hero -->
+            <div style="font-size:9px;color:#A87C95;margin-bottom:2px">June · month to date</div>
+            <div style="display:flex;align-items:flex-end;gap:8px;margin-bottom:3px"><span style="font-family:'Fredoka';font-weight:600;font-size:30px;color:#fff;line-height:1">EGP 96,400</span><span style="font-size:9px;font-weight:600;color:#54D69A;background:rgba(84,214,154,.14);padding:2px 6px;border-radius:5px;margin-bottom:4px">▲ 8.3%</span></div>
+            <div style="font-size:10px;color:#54D69A;margin-bottom:12px">You're ahead of last month at this point.</div>
+            <!-- stats -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:12px">
+              <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px"><div style="font-size:8px;color:#A87C95">Today</div><div style="font-family:'Fredoka';font-weight:600;font-size:13px;color:#FBE9F4">4,210</div></div>
+              <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px"><div style="font-size:8px;color:#A87C95">Projected</div><div style="font-family:'Fredoka';font-weight:600;font-size:13px;color:#FBE9F4">138K</div></div>
+              <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px"><div style="font-size:8px;color:#A87C95">Payout</div><div style="font-family:'Fredoka';font-weight:600;font-size:13px;color:#FBE9F4">81K</div></div>
+            </div>
+            <!-- chart -->
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:10px;margin-bottom:10px">
+              <div style="font-size:8px;color:#A87C95;margin-bottom:6px">Daily sales · June vs May</div>
+              <svg width="100%" height="40" viewBox="0 0 320 40" preserveAspectRatio="none"><polyline points="0,30 40,32 80,24 120,28 160,18 200,22 240,12 280,16 320,8" fill="none" stroke="#5A3A4C" stroke-width="1.3" stroke-dasharray="3 3"/><polyline points="0,34 40,28 80,30 120,20 160,24 200,15 240,18 280,9 320,11" fill="none" stroke="#F868C8" stroke-width="1.8"/></svg>
+            </div>
+            <!-- insight -->
+            <div style="background:#881848;border-radius:9px;padding:9px 11px;display:flex;gap:8px;align-items:center"><div style="flex:1;font-size:9px;color:#FBE0EF">Thursdays are strongest — stock heavier going in.</div><div style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:4px 8px;border-radius:6px">Share</div></div>
+          </div>
+        </div>
+      </div>
+      <!-- desktop notes -->
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">SideRail <span class="cref">C-19</span> fixed 240w (icons-only @ tablet). Active = pink chip. Center ＋ opens <span class="cref">C-20</span>.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">HeroFigure <span class="cref">C-02</span> top-left of content; SegmentedControl <span class="cref">C-03</span> top-right; avatar far right opens Settings menu.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">3</span><span style="font-size:12.5px;color:#5C5346">3× StatCard <span class="cref">C-01</span> (tap → drill) → ChartPanel <span class="cref">C-08</span> with May ghost line → InsightCard <span class="cref">C-07</span>.</span></div>
+      </div>
+    </div>
+
+    <!-- MOBILE -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">MOBILE · 375 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px;display:flex;justify-content:center">
+        <div class="wf" style="width:212px;overflow:hidden;border-radius:18px;position:relative">
+          <div style="padding:14px 13px 64px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#FBE9F4">Today</span><div style="width:18px;height:18px;border-radius:50%;background:#2C1622"></div></div>
+            <div style="font-size:9px;color:#A87C95;margin-bottom:2px">June · MTD</div>
+            <div style="font-family:'Fredoka';font-weight:600;font-size:26px;color:#fff;line-height:1">EGP 96,400</div>
+            <div style="font-size:9px;color:#54D69A;margin:3px 0 12px">▲ 8.3% · ahead of last month</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:11px">
+              <div style="background:#160910;border:1px solid #2C1622;border-radius:8px;padding:7px"><div style="font-size:7px;color:#A87C95">Today</div><div style="font-family:'Fredoka';font-weight:600;font-size:11px;color:#FBE9F4">4,210</div></div>
+              <div style="background:#160910;border:1px solid #2C1622;border-radius:8px;padding:7px"><div style="font-size:7px;color:#A87C95">Proj.</div><div style="font-family:'Fredoka';font-weight:600;font-size:11px;color:#FBE9F4">138K</div></div>
+              <div style="background:#160910;border:1px solid #2C1622;border-radius:8px;padding:7px"><div style="font-size:7px;color:#A87C95">Payout</div><div style="font-family:'Fredoka';font-weight:600;font-size:11px;color:#FBE9F4">81K</div></div>
+            </div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:8px;padding:9px;margin-bottom:9px"><div style="font-size:7px;color:#A87C95;margin-bottom:5px">Daily sales</div><svg width="100%" height="32" viewBox="0 0 180 32" preserveAspectRatio="none"><polyline points="0,28 30,22 60,24 90,16 120,19 150,10 180,7" fill="none" stroke="#F868C8" stroke-width="1.7"/></svg></div>
+            <div style="background:#881848;border-radius:8px;padding:8px 10px;display:flex;gap:6px;align-items:center"><div style="flex:1;font-size:8px;color:#FBE0EF">Thursdays strongest.</div><div style="font-size:7px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:3px 7px;border-radius:5px">Share</div></div>
+          </div>
+          <!-- bottom nav -->
+          <div style="position:absolute;left:8px;right:8px;bottom:8px;background:#160910;border:1px solid #2C1622;border-radius:14px;padding:6px 5px;display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;text-align:center;font-size:7px;color:#F868C8;font-family:'Fredoka';font-weight:600">Today</div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Cash</div>
+            <div style="flex-shrink:0;width:30px;height:30px;border-radius:10px;background:#F868C8;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#160910" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Goods</div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Profit</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Same stack, 1-col. BottomNav <span class="cref">C-18</span> fixed; center ＋ floats over.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">Range control moves into a FilterDrawer <span class="cref">C-23</span> via the avatar-adjacent filter icon.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREE + SPEC SHEET -->
+  <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:18px;margin-bottom:18px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px 22px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">COMPONENT TREE</div>
+      <div class="tnode" style="font-size:12px">
+        <div><b>&lt;TodayScreen&gt;</b> <span class="cref">C-24</span></div>
+        <div>├ <b>&lt;Nav&gt;</b> <s>C-18/19 responsive</s></div>
+        <div>├ <b>&lt;AppHeader&gt;</b> <i>title=Today</i></div>
+        <div>│ └ <b>&lt;SegmentedControl&gt;</b> <span class="cref">C-03</span></div>
+        <div>├ <b>&lt;HeroFigure&gt;</b> <span class="cref">C-02</span></div>
+        <div>│ ├ value <i>MTD revenue</i></div>
+        <div>│ ├ <b>&lt;Pill&gt;</b> <i>delta</i> <s>A-03</s></div>
+        <div>│ └ statusLine</div>
+        <div>├ <b>&lt;StatRow&gt;</b> <s>3× C-01</s></div>
+        <div>│ └ <b>&lt;Sparkline&gt;</b> <s>A-06</s></div>
+        <div>├ <b>&lt;ChartPanel&gt;</b> <span class="cref">C-08</span> <i>+ghost</i></div>
+        <div>└ <b>&lt;InsightCard&gt;</b> <span class="cref">C-07</span></div>
+        <div>&nbsp;&nbsp;&nbsp;└ <b>&lt;Button&gt;</b> <i>Share</i> <s>A-01</s></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:18px 18px 0">SPEC SHEET</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th style="width:108px">FACET</th><th>DEFINITION</th></tr>
+        <tr class="specrow"><td>KPIs (3)</td><td>MTD revenue (hero) · Today's sales · Projected month-total · Expected payout (rev − rent)</td></tr>
+        <tr class="specrow"><td>Filters</td><td>Range segmented: Month · 3M · Year. No category/search here.</td></tr>
+        <tr class="specrow"><td>Actions</td><td>＋ Add (nav) · tap stat → drill · Share insight → /reports</td></tr>
+        <tr class="specrow"><td>Buttons</td><td>Share (ghost, in InsightCard) · Add (nav, primary)</td></tr>
+        <tr class="specrow"><td>Charts</td><td>1× line, daily sales this month + last-month ghost dashed</td></tr>
+        <tr class="specrow"><td>Tables</td><td>none</td></tr>
+        <tr class="specrow"><td>Overlays</td><td>QuickAddSheet C-20 · range FilterDrawer C-23 (mobile)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOUR STATES -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:10px">FOUR STATES</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <!-- empty -->
+    <div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#F2EEE9;color:#8A8173">EMPTY</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:30px;height:38px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:9px"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:11px;color:#FBE9F4">No sales logged yet</div>
+        <div style="font-size:8px;color:#8A6E7E;margin:3px 0 9px">Add today's first sale to wake up your dashboard.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:5px 11px;border-radius:7px">＋ Add sale</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">First-run / brand-new shop. EmptyState <span class="cref">C-10</span>, mascot=happy.</div>
+    </div>
+    <!-- populated -->
+    <div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE2F1;color:#C81E83">POPULATED</span></div>
+      <div class="wf" style="border-radius:11px;padding:14px 12px;min-height:150px">
+        <div style="font-size:8px;color:#A87C95">June · MTD</div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:18px;color:#fff;line-height:1.1">EGP 96,400</div>
+        <div style="font-size:8px;color:#54D69A;margin-bottom:9px">▲ 8.3%</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px"><div style="background:#160910;border-radius:6px;padding:5px"><div style="font-size:6px;color:#A87C95">Today</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4">4.2K</div></div><div style="background:#160910;border-radius:6px;padding:5px"><div style="font-size:6px;color:#A87C95">Proj</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4">138K</div></div><div style="background:#160910;border-radius:6px;padding:5px"><div style="font-size:6px;color:#A87C95">Pay</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4">81K</div></div></div>
+        <svg width="100%" height="26" viewBox="0 0 150 26" preserveAspectRatio="none"><polyline points="0,22 25,18 50,20 75,12 100,15 125,7 150,5" fill="none" stroke="#F868C8" stroke-width="1.6"/></svg>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Default. All KPIs + chart + insight present.</div>
+    </div>
+    <!-- loading -->
+    <div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF0F4;color:#5B6478">LOADING</span></div>
+      <div class="wf" style="border-radius:11px;padding:14px 12px;min-height:150px">
+        <div style="width:40%;height:8px;border-radius:4px;background:#23131C;margin-bottom:8px"></div>
+        <div style="width:70%;height:20px;border-radius:5px;background:#23131C;margin-bottom:12px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:10px"><div style="height:28px;border-radius:6px;background:#23131C"></div><div style="height:28px;border-radius:6px;background:#23131C"></div><div style="height:28px;border-radius:6px;background:#23131C"></div></div>
+        <div style="height:30px;border-radius:6px;background:#23131C"></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">SkeletonGroup <span class="cref">C-12</span> preset=stats+chart, shimmer. Shown only after 200ms.</div>
+    </div>
+    <!-- error -->
+    <div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE3E3;color:#C0392B">ERROR</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:30px;height:38px;background:#FF5C5C;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:9px;transform:rotate(8deg)"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:11px;color:#FBE9F4">Couldn't load today</div>
+        <div style="font-size:8px;color:#8A6E7E;margin:3px 0 9px">Check your connection — your data is safe.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#FBE9F4;background:#2C1622;padding:5px 11px;border-radius:7px">↻ Retry</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">ErrorState <span class="cref">C-11</span>, mascot=oops. Last cached figures shown faded behind if available.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ P-02 CASH ═══════════════ -->
+<div data-screen-label="P-02 Cash" style="max-width:1120px;margin:80px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#160910;background:#F868C8;padding:5px 11px;border-radius:8px">P-02</span>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;letter-spacing:-.01em">Cash</h3>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173">/cash · L0 · hub for Sales / Purchases / Expenses</span>
+  </div>
+  <p style="font-size:15.5px;line-height:1.65;color:#5C5346;max-width:70ch;margin-bottom:24px"><strong style="color:#160910">Job:</strong> "what moved in and out, and where do I go to log/inspect it." A summary band (In / Out / Net) over a unified recent-activity ledger, with three deep-link tiles into the dedicated ledgers. <strong style="color:#160910">Nav:</strong> tab 2 / rail 2.</p>
+
+  <div style="display:grid;grid-template-columns:1.62fr 1fr;gap:18px;align-items:start;margin-bottom:18px">
+    <!-- DESKTOP -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">DESKTOP · 1280 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px">
+        <div class="wf" style="overflow:hidden;border-radius:12px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-family:'Fredoka';font-weight:600;font-size:15px;color:#FBE9F4">Cash</div><div style="display:flex;gap:6px"><span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:4px 9px">⌕ Search</span><span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:4px 9px">Month ▾</span><span style="font-size:8px;color:#160910;background:#F868C8;font-family:'Fredoka';font-weight:600;border-radius:7px;padding:4px 9px">⤓ Export</span></div></div>
+          <!-- summary band -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:11px"><div style="font-size:8px;color:#A87C95">In · sales</div><div style="font-family:'Fredoka';font-weight:600;font-size:16px;color:#54D69A">+96,400</div></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:11px"><div style="font-size:8px;color:#A87C95">Out · goods+exp</div><div style="font-family:'Fredoka';font-weight:600;font-size:16px;color:#FF5C5C">−52,180</div></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:11px"><div style="font-size:8px;color:#A87C95">Net</div><div style="font-family:'Fredoka';font-weight:600;font-size:16px;color:#FBE9F4">44,220</div></div>
+          </div>
+          <!-- 3 ledger tiles -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:#FBE9F4">Sales</span><span style="font-size:8px;color:#8A6E7E">›</span></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:#FBE9F4">Purchases</span><span style="font-size:8px;color:#8A6E7E">›</span></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:#FBE9F4">Expenses</span><span style="font-size:8px;color:#8A6E7E">›</span></div>
+          </div>
+          <!-- ledger table -->
+          <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;padding:7px 11px;border-bottom:1px solid #1C0F16"><span style="font-size:7px;color:#8A6E7E;font-family:'IBM Plex Mono'">RECENT ACTIVITY</span></div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid #1C0F16"><div style="width:6px;height:6px;border-radius:50%;background:#54D69A"></div><span style="flex:1;font-size:9px;color:#FBE9F4">Sales</span><span style="font-size:8px;color:#8A6E7E">Thu 19 Jun</span><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A;width:48px;text-align:right">+4,210</span></div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid #1C0F16"><div style="width:6px;height:6px;border-radius:50%;background:#FF5C5C"></div><span style="flex:1;font-size:9px;color:#FBE9F4">Stock — مكسرات</span><span style="font-size:8px;color:#8A6E7E">Wed 18 Jun</span><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FF5C5C;width:48px;text-align:right">−1,850</span></div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 11px"><div style="width:6px;height:6px;border-radius:50%;background:#FF5C5C"></div><span style="flex:1;font-size:9px;color:#FBE9F4">Rent</span><span style="font-size:8px;color:#8A6E7E">01 Jun</span><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FF5C5C;width:48px;text-align:right">−15,000</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">FilterBar <span class="cref">C-04</span> top-right: search · range select · Export (primary). Sticky on scroll.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">Summary band = 3 read-only StatCards. Below: 3 ledger tiles (deep-link to P-03/04/05) then unified DataTable <span class="cref">C-15</span> / LedgerRow list.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">3</span><span style="font-size:12.5px;color:#5C5346">Row tap → DetailDrawer <span class="cref">C-21</span>; row swipe (m) → Edit/Delete. Dot colour = in(up)/out(down).</span></div>
+      </div>
+    </div>
+    <!-- MOBILE -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">MOBILE · 375 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px;display:flex;justify-content:center">
+        <div class="wf" style="width:212px;overflow:hidden;border-radius:18px;position:relative">
+          <div style="padding:14px 13px 64px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px"><span style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#FBE9F4">Cash</span><div style="display:flex;gap:5px"><span style="font-size:11px;color:#B59AA8">⌕</span><span style="font-size:11px;color:#B59AA8">⚙</span></div></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:10px;margin-bottom:9px;display:flex;justify-content:space-between"><div><div style="font-size:7px;color:#A87C95">In</div><div style="font-family:'Fredoka';font-weight:600;font-size:11px;color:#54D69A">+96K</div></div><div><div style="font-size:7px;color:#A87C95">Out</div><div style="font-family:'Fredoka';font-weight:600;font-size:11px;color:#FF5C5C">−52K</div></div><div><div style="font-size:7px;color:#A87C95">Net</div><div style="font-family:'Fredoka';font-weight:600;font-size:11px;color:#FBE9F4">44K</div></div></div>
+            <div style="display:flex;gap:5px;margin-bottom:9px"><span style="flex:1;text-align:center;font-size:7px;color:#FBE9F4;background:#160910;border:1px solid #2C1622;border-radius:7px;padding:5px">Sales</span><span style="flex:1;text-align:center;font-size:7px;color:#FBE9F4;background:#160910;border:1px solid #2C1622;border-radius:7px;padding:5px">Goods</span><span style="flex:1;text-align:center;font-size:7px;color:#FBE9F4;background:#160910;border:1px solid #2C1622;border-radius:7px;padding:5px">Exp</span></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid #1C0F16"><div style="width:5px;height:5px;border-radius:50%;background:#54D69A"></div><span style="flex:1;font-size:8px;color:#FBE9F4">Sales</span><span style="font-family:'Fredoka';font-weight:600;font-size:8px;color:#54D69A">+4,210</span></div>
+              <div style="display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid #1C0F16"><div style="width:5px;height:5px;border-radius:50%;background:#FF5C5C"></div><span style="flex:1;font-size:8px;color:#FBE9F4">Stock</span><span style="font-family:'Fredoka';font-weight:600;font-size:8px;color:#FF5C5C">−1,850</span></div>
+              <div style="display:flex;align-items:center;gap:6px;padding:7px 9px"><div style="width:5px;height:5px;border-radius:50%;background:#FF5C5C"></div><span style="flex:1;font-size:8px;color:#FBE9F4">Rent</span><span style="font-family:'Fredoka';font-weight:600;font-size:8px;color:#FF5C5C">−15,000</span></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:8px;right:8px;bottom:8px;background:#160910;border:1px solid #2C1622;border-radius:14px;padding:6px 5px;display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Today</div><div style="flex:1;text-align:center;font-size:7px;color:#F868C8;font-family:'Fredoka';font-weight:600">Cash</div>
+            <div style="flex-shrink:0;width:30px;height:30px;border-radius:10px;background:#F868C8;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#160910" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Goods</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Profit</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Summary band collapses to one row (In/Out/Net). Tiles become a 3-chip row.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">Table → LedgerRow card list. ＋ adds with type pre-set by current sub-view.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREE + SPEC -->
+  <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:18px;margin-bottom:18px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px 22px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">COMPONENT TREE</div>
+      <div class="tnode" style="font-size:12px">
+        <div><b>&lt;CashScreen&gt;</b> <span class="cref">C-24</span></div>
+        <div>├ <b>&lt;AppHeader&gt;</b> + <b>&lt;FilterBar&gt;</b> <span class="cref">C-04</span></div>
+        <div>├ <b>&lt;SummaryBand&gt;</b> <s>3× C-01 read-only</s></div>
+        <div>├ <b>&lt;LedgerTiles&gt;</b> <s>3× link</s> <i>→P-03/04/05</i></div>
+        <div>└ <b>&lt;ActivityList&gt;</b></div>
+        <div>&nbsp;&nbsp;├ desktop <b>&lt;DataTable&gt;</b> <span class="cref">C-15</span></div>
+        <div>&nbsp;&nbsp;└ mobile <b>&lt;LedgerRow&gt;</b> <s>× n · C-05</s></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:18px 18px 0">SPEC SHEET</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th style="width:108px">FACET</th><th>DEFINITION</th></tr>
+        <tr class="specrow"><td>KPIs (3)</td><td>In (sales total) · Out (goods + expenses) · Net — all for active range</td></tr>
+        <tr class="specrow"><td>Filters</td><td>Range select · free-text search · type filter via the 3 tiles</td></tr>
+        <tr class="specrow"><td>Actions</td><td>Export CSV · tap tile → ledger · tap row → drawer · swipe → edit/delete</td></tr>
+        <tr class="specrow"><td>Buttons</td><td>Export (primary) · ＋ Add (nav)</td></tr>
+        <tr class="specrow"><td>Tables</td><td>DataTable C-15: date · type · party · category · amount(signed) · sortable</td></tr>
+        <tr class="specrow"><td>Charts</td><td>none (lives in each ledger)</td></tr>
+        <tr class="specrow"><td>Overlays</td><td>DetailDrawer C-21 · ConfirmModal C-22 (delete) · QuickAddSheet C-20</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOUR STATES -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:10px">FOUR STATES</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#F2EEE9;color:#8A8173">EMPTY</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">Nothing logged this month</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Sales and costs you add will appear here.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:5px 10px;border-radius:7px">＋ Add entry</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Also covers filtered-to-zero (copy: "No matches — clear filters").</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE2F1;color:#C81E83">POPULATED</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:7px"><div><div style="font-size:6px;color:#A87C95">In</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">+96K</div></div><div><div style="font-size:6px;color:#A87C95">Out</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FF5C5C">−52K</div></div><div><div style="font-size:6px;color:#A87C95">Net</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4">44K</div></div></div>
+        <div style="background:#160910;border-radius:6px;padding:5px 7px;margin-bottom:4px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Sales</span><span style="font-size:7px;color:#54D69A;font-family:'Fredoka';font-weight:600">+4,210</span></div>
+        <div style="background:#160910;border-radius:6px;padding:5px 7px;margin-bottom:4px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Stock</span><span style="font-size:7px;color:#FF5C5C;font-family:'Fredoka';font-weight:600">−1,850</span></div>
+        <div style="background:#160910;border-radius:6px;padding:5px 7px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Rent</span><span style="font-size:7px;color:#FF5C5C;font-family:'Fredoka';font-weight:600">−15,000</span></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Band + ledger. Infinite scroll, 20/page.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF0F4;color:#5B6478">LOADING</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="display:flex;gap:5px;margin-bottom:9px"><div style="flex:1;height:26px;border-radius:6px;background:#23131C"></div><div style="flex:1;height:26px;border-radius:6px;background:#23131C"></div><div style="flex:1;height:26px;border-radius:6px;background:#23131C"></div></div>
+        <div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:5px"></div><div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:5px"></div><div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:5px"></div><div style="height:13px;border-radius:5px;background:#23131C"></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">SkeletonGroup <span class="cref">C-12</span> preset=stats+list.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE3E3;color:#C0392B">ERROR</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#FF5C5C;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px;transform:rotate(8deg)"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">Couldn't load activity</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Tap retry — nothing was lost.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#FBE9F4;background:#2C1622;padding:5px 10px;border-radius:7px">↻ Retry</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Summary band keeps cached totals; only list errors.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ P-03/04/05 LEDGER TEMPLATE ═══════════════ -->
+<div data-screen-label="P-03 Ledger" style="max-width:1120px;margin:80px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;flex-wrap:wrap">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#160910;background:#F868C8;padding:5px 11px;border-radius:8px">P-03 · 04 · 05</span>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;letter-spacing:-.01em">Sales · Purchases · Expenses</h3>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173">/cash/{sales|purchases|expenses} · L1 · one shared Ledger template</span>
+  </div>
+  <p style="font-size:15.5px;line-height:1.65;color:#5C5346;max-width:74ch;margin-bottom:20px">These three are <strong style="color:#160910">one template, three configurations</strong> — identical layout, components and states; only the data source, accent of the amount column, default add-type, KPIs and category facet differ. The config matrix below is the single source of truth; the wireframe shows <strong style="color:#160910">Sales</strong> as the concrete instance.</p>
+
+  <!-- CONFIG MATRIX -->
+  <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden;margin-bottom:18px">
+    <div class="an" style="color:#9A8F7D;padding:16px 16px 0">PER-PAGE CONFIG MATRIX</div>
+    <table style="width:100%;border-collapse:collapse;margin-top:10px">
+      <tr class="specrow"><th style="width:130px">CONFIG</th><th>SALES · P-03</th><th>PURCHASES · P-04</th><th>EXPENSES · P-05</th></tr>
+      <tr class="specrow"><td>Source</td><td>daily sales records</td><td>stock / goods buys</td><td>rent, salary, utilities…</td></tr>
+      <tr class="specrow"><td>Amount tone</td><td><span style="color:#1f9d6b;font-weight:600">+ up (green)</span></td><td><span style="color:#d23;font-weight:600">− down (red)</span></td><td><span style="color:#d23;font-weight:600">− down (red)</span></td></tr>
+      <tr class="specrow"><td>KPI strip</td><td>Total · Daily avg · vs last mo</td><td>Total spent · Top supplier</td><td>Total · Biggest category</td></tr>
+      <tr class="specrow"><td>Category facet</td><td>off (product attached)</td><td>supplier select</td><td>category select (bilingual)</td></tr>
+      <tr class="specrow"><td>Add default</td><td>type=Sale, amount focus</td><td>type=Purchase + product</td><td>type=Expense + category</td></tr>
+      <tr class="specrow"><td>Row extra</td><td>"vs 30-day avg" delta</td><td>linked product chip</td><td>category pill</td></tr>
+      <tr class="specrow"><td>Chart</td><td>daily line</td><td>weekly bars</td><td>category donut</td></tr>
+    </table>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.62fr 1fr;gap:18px;align-items:start;margin-bottom:18px">
+    <!-- DESKTOP (Sales) -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">DESKTOP · 1280 · SALES · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px">
+        <div class="wf" style="overflow:hidden;border-radius:12px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="display:flex;gap:8px;align-items:center"><span style="font-size:9px;color:#8A6E7E">Cash ›</span><div style="font-family:'Fredoka';font-weight:600;font-size:15px;color:#FBE9F4">Sales</div></div><div style="display:flex;gap:6px"><span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:4px 9px">⌕</span><span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:4px 9px">Month ▾</span><span style="font-size:8px;color:#160910;background:#F868C8;font-family:'Fredoka';font-weight:600;border-radius:7px;padding:4px 9px">⤓</span></div></div>
+          <!-- sub-tabs -->
+          <div style="background:#160910;border:1px solid #2C1622;border-radius:8px;padding:3px;display:flex;width:fit-content;margin-bottom:12px"><span style="font-size:8px;background:#F868C8;color:#160910;padding:4px 11px;border-radius:6px;font-family:'Fredoka';font-weight:600">Sales</span><span style="font-size:8px;color:#B59AA8;padding:4px 11px">Purchases</span><span style="font-size:8px;color:#B59AA8;padding:4px 11px">Expenses</span></div>
+          <!-- kpi strip -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px"><div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:10px"><div style="font-size:8px;color:#A87C95">Total</div><div style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#54D69A">96,400</div></div><div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:10px"><div style="font-size:8px;color:#A87C95">Daily avg</div><div style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#FBE9F4">5,070</div></div><div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:10px"><div style="font-size:8px;color:#A87C95">vs May</div><div style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#54D69A">▲8%</div></div></div>
+          <!-- table -->
+          <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden">
+            <div style="display:flex;padding:6px 11px;border-bottom:1px solid #1C0F16;font-family:'IBM Plex Mono';font-size:7px;color:#8A6E7E"><span style="flex:1">DATE</span><span style="width:60px">vs AVG</span><span style="width:50px;text-align:right">AMOUNT</span></div>
+            <div style="display:flex;align-items:center;padding:8px 11px;border-bottom:1px solid #1C0F16"><span style="flex:1;font-size:9px;color:#FBE9F4">Thu · 19 Jun</span><span style="width:60px;font-size:8px;color:#54D69A">+18%</span><span style="width:50px;text-align:right;font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">4,210</span></div>
+            <div style="display:flex;align-items:center;padding:8px 11px;border-bottom:1px solid #1C0F16"><span style="flex:1;font-size:9px;color:#FBE9F4">Wed · 18 Jun</span><span style="width:60px;font-size:8px;color:#FF5C5C">−4%</span><span style="width:50px;text-align:right;font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">3,380</span></div>
+            <div style="display:flex;align-items:center;padding:8px 11px"><span style="flex:1;font-size:9px;color:#FBE9F4">Tue · 17 Jun</span><span style="width:60px;font-size:8px;color:#54D69A">+2%</span><span style="width:50px;text-align:right;font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">3,610</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Breadcrumb "Cash › Sales" + SegmentedControl <span class="cref">C-03</span> switches the three configs without leaving the shell.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">KPI strip (per matrix) → DataTable <span class="cref">C-15</span> sortable, sticky header, "vs 30-day avg" column carried from the original app.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">3</span><span style="font-size:12.5px;color:#5C5346">Inline edit on row-tap drawer — <strong style="color:#160910">replaces the old prompt() dialogs entirely.</strong></span></div>
+      </div>
+    </div>
+    <!-- MOBILE (Sales) -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">MOBILE · 375 · SALES · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px;display:flex;justify-content:center">
+        <div class="wf" style="width:212px;overflow:hidden;border-radius:18px;position:relative">
+          <div style="padding:14px 13px 64px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:11px;color:#8A6E7E">‹</span><span style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#FBE9F4">Sales</span></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:8px;padding:3px;display:flex;margin-bottom:10px"><span style="flex:1;text-align:center;font-size:7px;background:#F868C8;color:#160910;padding:4px;border-radius:6px;font-family:'Fredoka';font-weight:600">Sales</span><span style="flex:1;text-align:center;font-size:7px;color:#B59AA8;padding:4px">Goods</span><span style="flex:1;text-align:center;font-size:7px;color:#B59AA8;padding:4px">Exp</span></div>
+            <div style="display:flex;gap:5px;margin-bottom:10px"><div style="flex:1;background:#160910;border:1px solid #2C1622;border-radius:7px;padding:6px"><div style="font-size:6px;color:#A87C95">Total</div><div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#54D69A">96K</div></div><div style="flex:1;background:#160910;border:1px solid #2C1622;border-radius:7px;padding:6px"><div style="font-size:6px;color:#A87C95">Avg</div><div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">5.0K</div></div></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 9px;border-bottom:1px solid #1C0F16"><div><div style="font-size:8px;color:#FBE9F4">Thu 19 Jun</div><div style="font-size:6px;color:#54D69A">+18% vs avg</div></div><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">4,210</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 9px;border-bottom:1px solid #1C0F16"><div><div style="font-size:8px;color:#FBE9F4">Wed 18 Jun</div><div style="font-size:6px;color:#FF5C5C">−4% vs avg</div></div><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">3,380</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 9px"><div><div style="font-size:8px;color:#FBE9F4">Tue 17 Jun</div><div style="font-size:6px;color:#54D69A">+2% vs avg</div></div><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">3,610</span></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:8px;right:8px;bottom:8px;background:#160910;border:1px solid #2C1622;border-radius:14px;padding:6px 5px;display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Today</div><div style="flex:1;text-align:center;font-size:7px;color:#F868C8;font-family:'Fredoka';font-weight:600">Cash</div>
+            <div style="flex-shrink:0;width:30px;height:30px;border-radius:10px;background:#F868C8;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#160910" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Goods</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Profit</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Table → LedgerRow <span class="cref">C-05</span> cards; "vs avg" sits under the date. Swipe-left = Edit/Delete.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">Filters → FilterDrawer <span class="cref">C-23</span> (sheet) via header ⚙. ＋ opens add pre-typed to current tab.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREE + SPEC -->
+  <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:18px;margin-bottom:18px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px 22px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">COMPONENT TREE (shared)</div>
+      <div class="tnode" style="font-size:12px">
+        <div><b>&lt;LedgerScreen&gt;</b> <i>config</i> <span class="cref">C-24</span></div>
+        <div>├ <b>&lt;Breadcrumb&gt;</b> + <b>&lt;SegmentedControl&gt;</b></div>
+        <div>├ <b>&lt;FilterBar&gt;</b> <span class="cref">C-04</span></div>
+        <div>├ <b>&lt;KpiStrip&gt;</b> <s>2–3× C-01 per matrix</s></div>
+        <div>├ <b>&lt;ChartPanel&gt;</b> <span class="cref">C-08</span> <s>collapsible</s></div>
+        <div>└ <b>&lt;Records&gt;</b></div>
+        <div>&nbsp;&nbsp;├ d: <b>&lt;DataTable&gt;</b> <span class="cref">C-15</span></div>
+        <div>&nbsp;&nbsp;└ m: <b>&lt;LedgerRow&gt;</b> <s>× n · C-05</s></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:18px 18px 0">SPEC SHEET (shared)</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th style="width:108px">FACET</th><th>DEFINITION</th></tr>
+        <tr class="specrow"><td>KPIs</td><td>2–3 per config (see matrix). Always for active range.</td></tr>
+        <tr class="specrow"><td>Filters</td><td>Range · search · category/supplier (purchases/expenses only) · sort</td></tr>
+        <tr class="specrow"><td>Actions</td><td>Add (pre-typed) · row→drawer→inline edit · swipe edit/delete · export</td></tr>
+        <tr class="specrow"><td>Buttons</td><td>Export (primary) · per-row Edit/Delete (in drawer) · ＋ Add (nav)</td></tr>
+        <tr class="specrow"><td>Tables</td><td>DataTable C-15 cols by config; sortable; sticky header; 20/page</td></tr>
+        <tr class="specrow"><td>Charts</td><td>Sales=line · Purchases=bars · Expenses=donut (collapsible)</td></tr>
+        <tr class="specrow"><td>Overlays</td><td>QuickAddSheet C-20 · DetailDrawer C-21 · ConfirmModal C-22 · FilterDrawer C-23</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOUR STATES -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:10px">FOUR STATES (shared)</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#F2EEE9;color:#8A8173">EMPTY</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">No sales this month</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Log your first to start the trend.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:5px 10px;border-radius:7px">＋ Add sale</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Headline + add-label swap by config. Filtered-zero variant offers "Clear filters".</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE2F1;color:#C81E83">POPULATED</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="display:flex;gap:5px;margin-bottom:8px"><div style="flex:1;background:#160910;border-radius:6px;padding:5px"><div style="font-size:6px;color:#A87C95">Total</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">96K</div></div><div style="flex:1;background:#160910;border-radius:6px;padding:5px"><div style="font-size:6px;color:#A87C95">Avg</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4">5K</div></div></div>
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;margin-bottom:4px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Thu 19</span><span style="font-size:7px;color:#54D69A;font-family:'Fredoka';font-weight:600">4,210</span></div>
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;margin-bottom:4px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Wed 18</span><span style="font-size:7px;color:#54D69A;font-family:'Fredoka';font-weight:600">3,380</span></div>
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Tue 17</span><span style="font-size:7px;color:#54D69A;font-family:'Fredoka';font-weight:600">3,610</span></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">KPI strip + records. Amount tone per config.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF0F4;color:#5B6478">LOADING</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="display:flex;gap:5px;margin-bottom:9px"><div style="flex:1;height:24px;border-radius:6px;background:#23131C"></div><div style="flex:1;height:24px;border-radius:6px;background:#23131C"></div></div>
+        <div style="height:14px;border-radius:5px;background:#23131C;margin-bottom:5px"></div><div style="height:14px;border-radius:5px;background:#23131C;margin-bottom:5px"></div><div style="height:14px;border-radius:5px;background:#23131C;margin-bottom:5px"></div><div style="height:14px;border-radius:5px;background:#23131C"></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">SkeletonGroup <span class="cref">C-12</span> table preset; KPI shells first.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE3E3;color:#C0392B">ERROR</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#FF5C5C;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px;transform:rotate(8deg)"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">Couldn't load records</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Failed write? It's queued offline.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#FBE9F4;background:#2C1622;padding:5px 10px;border-radius:7px">↻ Retry</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Write failures queue + retry; inline error toast on the row.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ P-06 PRODUCTS ═══════════════ -->
+<div data-screen-label="P-06 Products" style="max-width:1120px;margin:80px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#160910;background:#F868C8;padding:5px 11px;border-radius:8px">P-06</span>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;letter-spacing:-.01em">Products</h3>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173">/products · L0 · 57 SKUs, bilingual</span>
+  </div>
+  <p style="font-size:15.5px;line-height:1.65;color:#5C5346;max-width:70ch;margin-bottom:24px"><strong style="color:#160910">Job:</strong> "what's selling, what's not." A ranked list with share bars, favourites, and a revenue↔volume toggle. The strongest existing page — this is a reskin + bilingual cell fix, not a rebuild. <strong style="color:#160910">Nav:</strong> tab 3 / rail 3.</p>
+
+  <div style="display:grid;grid-template-columns:1.62fr 1fr;gap:18px;align-items:start;margin-bottom:18px">
+    <!-- DESKTOP -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">DESKTOP · 1280 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px">
+        <div class="wf" style="overflow:hidden;border-radius:12px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-family:'Fredoka';font-weight:600;font-size:15px;color:#FBE9F4">Products</div><div style="display:flex;gap:6px;align-items:center"><span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:4px 9px">⌕ Search</span><div style="background:#160910;border:1px solid #2C1622;border-radius:7px;padding:3px;display:flex"><span style="font-size:8px;background:#F868C8;color:#160910;padding:3px 8px;border-radius:5px;font-family:'Fredoka';font-weight:600">Revenue</span><span style="font-size:8px;color:#B59AA8;padding:3px 8px">Volume</span></div><span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:4px 8px">★ Fav</span></div></div>
+          <!-- ranked rows -->
+          <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid #1C0F16"><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#160910;background:#F868C8;width:18px;height:18px;border-radius:6px;display:flex;align-items:center;justify-content:center">1</span><div style="flex:1;min-width:0"><div style="font-size:9px;color:#FBE9F4;direction:rtl">جامى جيلى كاندى</div><div style="height:3px;border-radius:2px;background:#F868C8;width:90%;margin-top:3px"></div></div><span style="font-size:8px;color:#8A6E7E;width:42px;text-align:right">1,573kg</span><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4;width:42px;text-align:right">444K</span><span style="font-size:9px;color:#F868C8">★</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:9px 11px;border-bottom:1px solid #1C0F16"><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4;background:#2C1622;width:18px;height:18px;border-radius:6px;display:flex;align-items:center;justify-content:center">2</span><div style="flex:1;min-width:0"><div style="font-size:9px;color:#FBE9F4;direction:rtl">مكسرات مشكلة</div><div style="height:3px;border-radius:2px;background:#F868C8;width:64%;margin-top:3px"></div></div><span style="font-size:8px;color:#8A6E7E;width:42px;text-align:right">980kg</span><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4;width:42px;text-align:right">312K</span><span style="font-size:9px;color:#5A3A4C">☆</span></div>
+            <div style="display:flex;align-items:center;gap:9px;padding:9px 11px"><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4;background:#2C1622;width:18px;height:18px;border-radius:6px;display:flex;align-items:center;justify-content:center">3</span><div style="flex:1;min-width:0"><div style="font-size:9px;color:#FBE9F4;direction:rtl">تمر مغلف</div><div style="height:3px;border-radius:2px;background:#F868C8;width:41%;margin-top:3px"></div></div><span style="font-size:8px;color:#8A6E7E;width:42px;text-align:right">610kg</span><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#FBE9F4;width:42px;text-align:right">198K</span><span style="font-size:9px;color:#5A3A4C">☆</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Header: search · Revenue/Volume SegmentedControl <span class="cref">C-03</span> (drives sort + bar metric) · Favourites filter toggle.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">ProductRow <span class="cref">C-06</span>: rank chip · bilingual name (Arabic primary, RTL-correct) · share bar · qty · revenue · ★ favourite (real icon, not emoji).</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">3</span><span style="font-size:12.5px;color:#5C5346">Row tap → DetailDrawer <span class="cref">C-21</span>: per-product trend chart, share-of-total, edit name/price.</span></div>
+      </div>
+    </div>
+    <!-- MOBILE -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">MOBILE · 375 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px;display:flex;justify-content:center">
+        <div class="wf" style="width:212px;overflow:hidden;border-radius:18px;position:relative">
+          <div style="padding:14px 13px 64px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#FBE9F4">Products</span><span style="font-size:11px;color:#B59AA8">⌕</span></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:7px;padding:3px;display:flex;margin-bottom:10px"><span style="flex:1;text-align:center;font-size:7px;background:#F868C8;color:#160910;padding:4px;border-radius:5px;font-family:'Fredoka';font-weight:600">Revenue</span><span style="flex:1;text-align:center;font-size:7px;color:#B59AA8;padding:4px">Volume</span></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:7px;padding:8px 9px;border-bottom:1px solid #1C0F16"><span style="font-family:'Fredoka';font-weight:600;font-size:7px;color:#160910;background:#F868C8;width:15px;height:15px;border-radius:5px;display:flex;align-items:center;justify-content:center">1</span><div style="flex:1;min-width:0"><div style="font-size:8px;color:#FBE9F4;direction:rtl">جامى جيلى</div><div style="height:2px;border-radius:1px;background:#F868C8;width:90%;margin-top:2px"></div></div><span style="font-family:'Fredoka';font-weight:600;font-size:8px;color:#FBE9F4">444K</span></div>
+              <div style="display:flex;align-items:center;gap:7px;padding:8px 9px;border-bottom:1px solid #1C0F16"><span style="font-family:'Fredoka';font-weight:600;font-size:7px;color:#FBE9F4;background:#2C1622;width:15px;height:15px;border-radius:5px;display:flex;align-items:center;justify-content:center">2</span><div style="flex:1;min-width:0"><div style="font-size:8px;color:#FBE9F4;direction:rtl">مكسرات</div><div style="height:2px;border-radius:1px;background:#F868C8;width:64%;margin-top:2px"></div></div><span style="font-family:'Fredoka';font-weight:600;font-size:8px;color:#FBE9F4">312K</span></div>
+              <div style="display:flex;align-items:center;gap:7px;padding:8px 9px"><span style="font-family:'Fredoka';font-weight:600;font-size:7px;color:#FBE9F4;background:#2C1622;width:15px;height:15px;border-radius:5px;display:flex;align-items:center;justify-content:center">3</span><div style="flex:1;min-width:0"><div style="font-size:8px;color:#FBE9F4;direction:rtl">تمر مغلف</div><div style="height:2px;border-radius:1px;background:#F868C8;width:41%;margin-top:2px"></div></div><span style="font-family:'Fredoka';font-weight:600;font-size:8px;color:#FBE9F4">198K</span></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:8px;right:8px;bottom:8px;background:#160910;border:1px solid #2C1622;border-radius:14px;padding:6px 5px;display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Today</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Cash</div>
+            <div style="flex-shrink:0;width:30px;height:30px;border-radius:10px;background:#F868C8;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#160910" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#F868C8;font-family:'Fredoka';font-weight:600">Goods</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Profit</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Rank chip + Arabic name + share bar; long-press to favourite. Secondary metric hides until tap.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">Detail opens as full sheet. ＋ here = add a new product (not a sale).</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREE + SPEC -->
+  <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:18px;margin-bottom:18px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px 22px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">COMPONENT TREE</div>
+      <div class="tnode" style="font-size:12px">
+        <div><b>&lt;ProductsScreen&gt;</b> <span class="cref">C-24</span></div>
+        <div>├ <b>&lt;AppHeader&gt;</b></div>
+        <div>├ <b>&lt;FilterBar&gt;</b> <span class="cref">C-04</span></div>
+        <div>│ ├ search · <b>&lt;SegmentedControl&gt;</b> <i>rev/vol</i></div>
+        <div>│ └ <b>&lt;Toggle&gt;</b> <i>favourites</i></div>
+        <div>└ <b>&lt;ProductList&gt;</b></div>
+        <div>&nbsp;&nbsp;└ <b>&lt;ProductRow&gt;</b> <s>× 57 · C-06</s></div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;├ rankChip · nameAr · <b>&lt;BreakdownBar&gt;</b></div>
+        <div>&nbsp;&nbsp;&nbsp;&nbsp;└ <b>&lt;IconButton&gt;</b> <i>fav</i> <s>A-02</s></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:18px 18px 0">SPEC SHEET</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th style="width:108px">FACET</th><th>DEFINITION</th></tr>
+        <tr class="specrow"><td>KPIs</td><td>Per-row: revenue, qty, share-of-total bar, rank. Drawer adds trend.</td></tr>
+        <tr class="specrow"><td>Filters</td><td>Search (Ar/En) · sort by Revenue|Volume · Favourites-only toggle</td></tr>
+        <tr class="specrow"><td>Actions</td><td>★ favourite · tap → drawer · edit name/price · add product</td></tr>
+        <tr class="specrow"><td>Buttons</td><td>＋ New product (header, on Products) · Edit (in drawer)</td></tr>
+        <tr class="specrow"><td>Tables</td><td>Ranked list (not a grid) — rank · name · bar · qty · revenue · fav</td></tr>
+        <tr class="specrow"><td>Charts</td><td>Per-product trend line inside DetailDrawer; top-10 bar on tablet+</td></tr>
+        <tr class="specrow"><td>Overlays</td><td>DetailDrawer C-21 · add/edit product sheet</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOUR STATES -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:10px">FOUR STATES</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#F2EEE9;color:#8A8173">EMPTY</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">No products yet</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Add a product to track its sales.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:5px 10px;border-radius:7px">＋ New product</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Favourites-empty variant: "Star products to pin them here."</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE2F1;color:#C81E83">POPULATED</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;margin-bottom:4px;display:flex;align-items:center;gap:5px"><span style="font-size:6px;color:#160910;background:#F868C8;width:11px;height:11px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Fredoka';font-weight:600">1</span><div style="flex:1"><div style="font-size:7px;color:#FBE9F4;direction:rtl">جامى</div><div style="height:2px;background:#F868C8;width:90%;border-radius:1px;margin-top:1px"></div></div><span style="font-size:7px;color:#FBE9F4;font-family:'Fredoka';font-weight:600">444K</span></div>
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;margin-bottom:4px;display:flex;align-items:center;gap:5px"><span style="font-size:6px;color:#FBE9F4;background:#2C1622;width:11px;height:11px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Fredoka';font-weight:600">2</span><div style="flex:1"><div style="font-size:7px;color:#FBE9F4;direction:rtl">مكسرات</div><div style="height:2px;background:#F868C8;width:64%;border-radius:1px;margin-top:1px"></div></div><span style="font-size:7px;color:#FBE9F4;font-family:'Fredoka';font-weight:600">312K</span></div>
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;display:flex;align-items:center;gap:5px"><span style="font-size:6px;color:#FBE9F4;background:#2C1622;width:11px;height:11px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'Fredoka';font-weight:600">3</span><div style="flex:1"><div style="font-size:7px;color:#FBE9F4;direction:rtl">تمر</div><div style="height:2px;background:#F868C8;width:41%;border-radius:1px;margin-top:1px"></div></div><span style="font-size:7px;color:#FBE9F4;font-family:'Fredoka';font-weight:600">198K</span></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Ranked, bars relative to #1.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF0F4;color:#5B6478">LOADING</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:6px"></div><div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:6px"></div><div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:6px"></div><div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:6px"></div><div style="height:13px;border-radius:5px;background:#23131C"></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Row skeletons with bar placeholders.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE3E3;color:#C0392B">ERROR</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#FF5C5C;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px;transform:rotate(8deg)"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">Couldn't load products</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Retry to refresh the catalogue.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#FBE9F4;background:#2C1622;padding:5px 10px;border-radius:7px">↻ Retry</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">ErrorState <span class="cref">C-11</span> full-list; per-product drawer has its own.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ P-07 PROFIT ═══════════════ -->
+<div data-screen-label="P-07 Profit" style="max-width:1120px;margin:80px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#160910;background:#F868C8;padding:5px 11px;border-radius:8px">P-07</span>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;letter-spacing:-.01em">Profit</h3>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173">/profit · L0 · merges old P&amp;L + Reports entry</span>
+  </div>
+  <p style="font-size:15.5px;line-height:1.65;color:#5C5346;max-width:70ch;margin-bottom:24px"><strong style="color:#160910">Job:</strong> "did I make money, and can I share it." Hero net-profit, a cost breakdown bar, month history cards, and a one-tap Share that pre-fills Reports. <strong style="color:#160910">The methodology box and per-row data-quality grades are gone</strong> — moved to Settings. <strong style="color:#160910">Nav:</strong> tab 4 / rail 4.</p>
+
+  <div style="display:grid;grid-template-columns:1.62fr 1fr;gap:18px;align-items:start;margin-bottom:18px">
+    <!-- DESKTOP -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">DESKTOP · 1280 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px">
+        <div class="wf" style="overflow:hidden;border-radius:12px;padding:16px 18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-family:'Fredoka';font-weight:600;font-size:15px;color:#FBE9F4">Profit</div><div style="display:flex;gap:6px"><span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:4px 9px">June ▾</span><span style="font-size:8px;color:#160910;background:#F868C8;font-family:'Fredoka';font-weight:600;border-radius:7px;padding:4px 9px">↗ Share</span></div></div>
+          <!-- hero net -->
+          <div style="display:flex;gap:14px;margin-bottom:12px">
+            <div style="flex:1"><div style="font-size:9px;color:#A87C95">Net profit · June</div><div style="font-family:'Fredoka';font-weight:600;font-size:28px;color:#54D69A;line-height:1">EGP 44,220</div><div style="font-size:9px;color:#54D69A">▲ 12% vs May</div></div>
+            <!-- breakdown bar -->
+            <div style="flex:1;display:flex;flex-direction:column;justify-content:center"><div style="display:flex;height:11px;border-radius:6px;overflow:hidden;margin-bottom:5px"><div style="width:54%;background:#54D69A"></div><div style="width:31%;background:#FF5C5C"></div><div style="width:15%;background:#881848"></div></div><div style="display:flex;gap:9px;font-size:7px;color:#B59AA8"><span>● Profit 54%</span><span style="color:#FF5C5C">● Goods 31%</span><span style="color:#C46A9A">● Costs 15%</span></div></div>
+          </div>
+          <!-- month cards -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px"><div style="font-size:8px;color:#A87C95">June</div><div style="font-family:'Fredoka';font-weight:600;font-size:13px;color:#54D69A">44.2K</div><div style="font-size:7px;color:#8A6E7E">rev 96 · cost 52</div></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px"><div style="font-size:8px;color:#A87C95">May</div><div style="font-family:'Fredoka';font-weight:600;font-size:13px;color:#54D69A">39.5K</div><div style="font-size:7px;color:#8A6E7E">rev 89 · cost 49</div></div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;padding:9px"><div style="font-size:8px;color:#A87C95">April</div><div style="font-family:'Fredoka';font-weight:600;font-size:13px;color:#54D69A">41.1K</div><div style="font-size:7px;color:#8A6E7E">rev 91 · cost 50</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Hero net profit (semantic green) + month select + Share (primary → /reports pre-filled).</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">BreakdownBar <span class="cref">C-13</span> (profit / goods / fixed costs). MonthCard <span class="cref">C-09</span> history grid — tap → drawer with full statement.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">3</span><span style="font-size:12.5px;color:#5C5346">"How it's calculated" is a small ⓘ popover, not a banner. Data-quality lives in Settings.</span></div>
+      </div>
+    </div>
+    <!-- MOBILE -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">MOBILE · 375 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px;display:flex;justify-content:center">
+        <div class="wf" style="width:212px;overflow:hidden;border-radius:18px;position:relative">
+          <div style="padding:14px 13px 64px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#FBE9F4">Profit</span><span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:6px;padding:3px 7px">June ▾</span></div>
+            <div style="font-size:8px;color:#A87C95">Net · June</div>
+            <div style="font-family:'Fredoka';font-weight:600;font-size:24px;color:#54D69A;line-height:1">EGP 44,220</div>
+            <div style="font-size:8px;color:#54D69A;margin-bottom:9px">▲ 12% vs May</div>
+            <div style="display:flex;height:9px;border-radius:5px;overflow:hidden;margin-bottom:4px"><div style="width:54%;background:#54D69A"></div><div style="width:31%;background:#FF5C5C"></div><div style="width:15%;background:#881848"></div></div>
+            <div style="font-size:6px;color:#B59AA8;margin-bottom:10px">Profit 54 · Goods 31 · Costs 15</div>
+            <div style="display:flex;gap:5px;margin-bottom:9px"><div style="flex:1;background:#160910;border:1px solid #2C1622;border-radius:7px;padding:6px"><div style="font-size:6px;color:#A87C95">May</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">39.5K</div></div><div style="flex:1;background:#160910;border:1px solid #2C1622;border-radius:7px;padding:6px"><div style="font-size:6px;color:#A87C95">Apr</div><div style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#54D69A">41.1K</div></div></div>
+            <div style="text-align:center;font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;border-radius:8px;padding:7px">↗ Share to WhatsApp</div>
+          </div>
+          <div style="position:absolute;left:8px;right:8px;bottom:8px;background:#160910;border:1px solid #2C1622;border-radius:14px;padding:6px 5px;display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Today</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Cash</div>
+            <div style="flex-shrink:0;width:30px;height:30px;border-radius:10px;background:#F868C8;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#160910" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Goods</div><div style="flex:1;text-align:center;font-size:7px;color:#F868C8;font-family:'Fredoka';font-weight:600">Profit</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Share is a full-width primary button (thumb zone) — the monthly job. Month cards scroll horizontally.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">Tap a month card → full statement sheet.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREE + SPEC -->
+  <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:18px;margin-bottom:18px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px 22px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">COMPONENT TREE</div>
+      <div class="tnode" style="font-size:12px">
+        <div><b>&lt;ProfitScreen&gt;</b> <span class="cref">C-24</span></div>
+        <div>├ <b>&lt;AppHeader&gt;</b> + monthSelect + Share</div>
+        <div>├ <b>&lt;HeroFigure&gt;</b> <i>net profit</i> <span class="cref">C-02</span></div>
+        <div>├ <b>&lt;BreakdownBar&gt;</b> <span class="cref">C-13</span></div>
+        <div>├ <b>&lt;MonthGrid&gt;</b></div>
+        <div>│ └ <b>&lt;MonthCard&gt;</b> <s>× n · C-09</s></div>
+        <div>└ <b>&lt;Button&gt;</b> <i>Share</i> <s>A-01 (m: full-width)</s></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:18px 18px 0">SPEC SHEET</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th style="width:108px">FACET</th><th>DEFINITION</th></tr>
+        <tr class="specrow"><td>KPIs</td><td>Net profit (hero) · revenue · total cost · margin% · MoM delta</td></tr>
+        <tr class="specrow"><td>Filters</td><td>Month select (defaults latest complete month)</td></tr>
+        <tr class="specrow"><td>Actions</td><td>Share → /reports · tap month → statement drawer · ⓘ method popover</td></tr>
+        <tr class="specrow"><td>Buttons</td><td>Share (primary) · ⓘ how-calculated (ghost)</td></tr>
+        <tr class="specrow"><td>Tables</td><td>Full statement (rev − COGS − fixed = net) inside month drawer</td></tr>
+        <tr class="specrow"><td>Charts</td><td>BreakdownBar (stacked 100%) · profit trend on tablet+</td></tr>
+        <tr class="specrow"><td>Overlays</td><td>Statement DetailDrawer C-21 · method popover</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOUR STATES -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:10px">FOUR STATES</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#F2EEE9;color:#8A8173">EMPTY</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">Not enough data yet</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Log sales + costs for a month to see profit.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:5px 10px;border-radius:7px">Go to Cash</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Partial month: shows "in progress" tag instead of empty.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE2F1;color:#C81E83">POPULATED</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="font-size:6px;color:#A87C95">Net · June</div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:17px;color:#54D69A;line-height:1.1">44,220</div>
+        <div style="display:flex;height:8px;border-radius:5px;overflow:hidden;margin:8px 0 4px"><div style="width:54%;background:#54D69A"></div><div style="width:31%;background:#FF5C5C"></div><div style="width:15%;background:#881848"></div></div>
+        <div style="display:flex;gap:4px;margin-top:7px"><div style="flex:1;background:#160910;border-radius:5px;padding:5px"><div style="font-size:6px;color:#A87C95">May</div><div style="font-size:8px;color:#54D69A;font-family:'Fredoka';font-weight:600">39.5K</div></div><div style="flex:1;background:#160910;border-radius:5px;padding:5px"><div style="font-size:6px;color:#A87C95">Apr</div><div style="font-size:8px;color:#54D69A;font-family:'Fredoka';font-weight:600">41.1K</div></div></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Hero + bar + history.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF0F4;color:#5B6478">LOADING</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="width:50%;height:9px;border-radius:4px;background:#23131C;margin-bottom:8px"></div><div style="width:72%;height:18px;border-radius:5px;background:#23131C;margin-bottom:12px"></div><div style="height:9px;border-radius:5px;background:#23131C;margin-bottom:12px"></div><div style="display:flex;gap:4px"><div style="flex:1;height:26px;border-radius:5px;background:#23131C"></div><div style="flex:1;height:26px;border-radius:5px;background:#23131C"></div></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Hero + bar + cards skeleton.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE3E3;color:#C0392B">ERROR</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#FF5C5C;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px;transform:rotate(8deg)"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">Couldn't calculate profit</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Retry — figures aren't lost.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#FBE9F4;background:#2C1622;padding:5px 10px;border-radius:7px">↻ Retry</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Share disabled until recompute succeeds.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ P-08 REPORTS ═══════════════ -->
+<div data-screen-label="P-08 Reports" style="max-width:1120px;margin:80px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#160910;background:#F868C8;padding:5px 11px;border-radius:8px">P-08</span>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;letter-spacing:-.01em">Reports</h3>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173">/reports · secondary · entered from Profit + header</span>
+  </div>
+  <p style="font-size:15.5px;line-height:1.65;color:#5C5346;max-width:70ch;margin-bottom:24px"><strong style="color:#160910">Job:</strong> turn a month into a branded share. <strong style="color:#160910">Lands pre-generated</strong> for the latest month — never the old "configure &amp; click generate" dead-end. A live ShareCard preview with the brand pattern, then Share to WhatsApp / Save image / Copy text. <strong style="color:#160910">Nav:</strong> header link + Profit's Share button.</p>
+
+  <div style="display:grid;grid-template-columns:1.62fr 1fr;gap:18px;align-items:start;margin-bottom:18px">
+    <!-- DESKTOP -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">DESKTOP · 1280 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px">
+        <div class="wf" style="overflow:hidden;border-radius:12px;padding:16px 18px;display:flex;gap:14px">
+          <!-- config left -->
+          <div style="width:120px;flex-shrink:0">
+            <div style="font-family:'Fredoka';font-weight:600;font-size:13px;color:#FBE9F4;margin-bottom:10px">Report</div>
+            <div style="font-size:8px;color:#A87C95;margin-bottom:3px">Period</div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:7px;padding:6px 8px;font-size:8px;color:#FBE9F4;margin-bottom:8px">June 2026 ▾</div>
+            <div style="font-size:8px;color:#A87C95;margin-bottom:3px">Include</div>
+            <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:7px;color:#FBE9F4">✓ Net profit</span><span style="font-size:7px;color:#FBE9F4">✓ Top products</span><span style="font-size:7px;color:#8A6E7E">○ Daily chart</span></div>
+          </div>
+          <!-- preview right (branded share card) -->
+          <div style="flex:1;border-radius:10px;overflow:hidden;position:relative;background:#881848">
+            <img src="assets/bosta-pattern.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"/>
+            <div style="position:relative;padding:14px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><div style="width:16px;height:20px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat"></div><span style="font-family:'Fredoka';font-weight:600;font-size:9px;color:#fff">Bosta Bites · June</span></div>
+              <div style="font-size:7px;color:#FBE0EF">Net profit</div>
+              <div style="font-family:'Fredoka';font-weight:600;font-size:22px;color:#fff;line-height:1">EGP 44,220</div>
+              <div style="font-size:7px;color:#FBE0EF;margin:6px 0 3px">Top: جامى جيلى · مكسرات · تمر</div>
+              <div style="display:flex;gap:5px;margin-top:9px"><span style="font-size:7px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:5px 9px;border-radius:6px">↗ WhatsApp</span><span style="font-size:7px;color:#fff;border:1px solid rgba(255,255,255,.4);padding:5px 9px;border-radius:6px">⤓ Image</span><span style="font-size:7px;color:#fff;border:1px solid rgba(255,255,255,.4);padding:5px 9px;border-radius:6px">⧉ Text</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Two-pane: config (period + include toggles) left, live ShareCard <span class="cref">C-14</span> preview right. Updates instantly — no Generate button.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">Share row: WhatsApp (primary) · Save image (renders the branded card to PNG) · Copy text (plain fallback).</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">3</span><span style="font-size:12.5px;color:#5C5346">Pattern + mascot brand the card — replaces the old unstyled emoji-text dump.</span></div>
+      </div>
+    </div>
+    <!-- MOBILE -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">MOBILE · 375 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px;display:flex;justify-content:center">
+        <div class="wf" style="width:212px;overflow:hidden;border-radius:18px;position:relative">
+          <div style="padding:14px 13px 64px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:11px;color:#8A6E7E">‹</span><span style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#FBE9F4">Report</span></div>
+            <span style="font-size:8px;color:#B59AA8;border:1px solid #2C1622;border-radius:6px;padding:4px 8px;display:inline-block;margin-bottom:9px">June 2026 ▾</span>
+            <div style="border-radius:9px;overflow:hidden;position:relative;background:#881848;margin-bottom:9px"><img src="assets/bosta-pattern.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"/><div style="position:relative;padding:11px"><div style="display:flex;align-items:center;gap:5px;margin-bottom:7px"><div style="width:12px;height:15px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat"></div><span style="font-family:'Fredoka';font-weight:600;font-size:8px;color:#fff">Bosta Bites · June</span></div><div style="font-size:6px;color:#FBE0EF">Net profit</div><div style="font-family:'Fredoka';font-weight:600;font-size:17px;color:#fff">EGP 44,220</div></div></div>
+            <div style="text-align:center;font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;border-radius:8px;padding:8px;margin-bottom:5px">↗ Share to WhatsApp</div>
+            <div style="display:flex;gap:5px"><span style="flex:1;text-align:center;font-size:7px;color:#FBE9F4;border:1px solid #2C1622;border-radius:7px;padding:6px">⤓ Image</span><span style="flex:1;text-align:center;font-size:7px;color:#FBE9F4;border:1px solid #2C1622;border-radius:7px;padding:6px">⧉ Text</span></div>
+          </div>
+          <div style="position:absolute;left:8px;right:8px;bottom:8px;background:#160910;border:1px solid #2C1622;border-radius:14px;padding:6px 5px;display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Today</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Cash</div>
+            <div style="flex-shrink:0;width:30px;height:30px;border-radius:10px;background:#F868C8;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#160910" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Goods</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Profit</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Card preview stacks above the share actions; WhatsApp is the full-width primary.</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">"Include" toggles live in a collapsible "Customise" row to keep it short.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREE + SPEC -->
+  <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:18px;margin-bottom:18px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px 22px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">COMPONENT TREE</div>
+      <div class="tnode" style="font-size:12px">
+        <div><b>&lt;ReportsScreen&gt;</b> <span class="cref">C-24</span></div>
+        <div>├ <b>&lt;ReportConfig&gt;</b></div>
+        <div>│ ├ <b>&lt;Select&gt;</b> <i>period</i> <s>A-05</s></div>
+        <div>│ └ <b>&lt;Toggle&gt;</b> <s>× include opts</s></div>
+        <div>├ <b>&lt;ShareCard&gt;</b> <span class="cref">C-14</span> <i>live</i></div>
+        <div>│ ├ pattern bg · mascot · figures</div>
+        <div>└ <b>&lt;ShareActions&gt;</b></div>
+        <div>&nbsp;&nbsp;├ WhatsApp <s>A-01 primary</s></div>
+        <div>&nbsp;&nbsp;├ Save image · Copy text</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:18px 18px 0">SPEC SHEET</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th style="width:108px">FACET</th><th>DEFINITION</th></tr>
+        <tr class="specrow"><td>KPIs (on card)</td><td>Net profit · revenue · top 3 products · MoM delta</td></tr>
+        <tr class="specrow"><td>Filters</td><td>Period select · include toggles (profit/products/chart)</td></tr>
+        <tr class="specrow"><td>Actions</td><td>Share WhatsApp · Save PNG · Copy text · period change (live)</td></tr>
+        <tr class="specrow"><td>Buttons</td><td>WhatsApp (primary) · Save image · Copy text (ghost)</td></tr>
+        <tr class="specrow"><td>Tables</td><td>none — summarised onto the card</td></tr>
+        <tr class="specrow"><td>Charts</td><td>optional mini daily-line baked into the PNG when toggled on</td></tr>
+        <tr class="specrow"><td>Overlays</td><td>native share sheet · "saved ✓" toast A-10</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOUR STATES -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:10px">FOUR STATES</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#F2EEE9;color:#8A8173">EMPTY</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">No complete month yet</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Reports unlock after your first full month.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:5px 10px;border-radius:7px">See Profit</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Rare — only brand-new accounts. Never the old "click Generate" blank.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE2F1;color:#C81E83">POPULATED</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="border-radius:8px;overflow:hidden;position:relative;background:#881848;margin-bottom:6px"><img src="assets/bosta-pattern.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"/><div style="position:relative;padding:9px"><div style="font-size:6px;color:#FBE0EF">Net · June</div><div style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#fff">44,220</div></div></div>
+        <div style="text-align:center;font-size:7px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;border-radius:7px;padding:6px">↗ WhatsApp</div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Pre-generated for latest month on land.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF0F4;color:#5B6478">LOADING</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="height:60px;border-radius:8px;background:#23131C;margin-bottom:8px"></div><div style="height:18px;border-radius:6px;background:#23131C"></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Card renders progressively; figures count up when ready.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE3E3;color:#C0392B">ERROR</span></div>
+      <div class="wf" style="border-radius:11px;padding:16px 12px;min-height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:26px;height:33px;background:#FF5C5C;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat;margin-bottom:8px;transform:rotate(8deg)"></div>
+        <div style="font-family:'Fredoka';font-weight:600;font-size:10px;color:#FBE9F4">Share failed</div>
+        <div style="font-size:7px;color:#8A6E7E;margin:3px 0 8px">Image saved — try sending again.</div>
+        <span style="font-size:8px;font-family:'Fredoka';font-weight:600;color:#FBE9F4;background:#2C1622;padding:5px 10px;border-radius:7px">↻ Retry</span>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Fallback: offer Copy text if WhatsApp intent fails.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ P-09 SETTINGS ═══════════════ -->
+<div data-screen-label="P-09 Settings" style="max-width:1120px;margin:80px auto 0;padding:0 24px">
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#160910;background:#F868C8;padding:5px 11px;border-radius:8px">P-09</span>
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;letter-spacing:-.01em">Settings</h3>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173">/settings · secondary · from avatar menu</span>
+  </div>
+  <p style="font-size:15.5px;line-height:1.65;color:#5C5346;max-width:70ch;margin-bottom:24px"><strong style="color:#160910">Job:</strong> the home for everything that used to clutter the nav and filter bars — <strong style="color:#160910">Sync DB, categories, data-quality, export, language.</strong> Grouped list, plain language, the technical bits behind one tap. <strong style="color:#160910">Nav:</strong> avatar (desktop) / profile in nav overflow (mobile).</p>
+
+  <div style="display:grid;grid-template-columns:1.62fr 1fr;gap:18px;align-items:start;margin-bottom:18px">
+    <!-- DESKTOP -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">DESKTOP · 1280 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px">
+        <div class="wf" style="overflow:hidden;border-radius:12px;padding:16px 18px">
+          <div style="font-family:'Fredoka';font-weight:600;font-size:15px;color:#FBE9F4;margin-bottom:12px">Settings</div>
+          <div style="font-size:7px;color:#8A6E7E;font-family:'IBM Plex Mono';margin-bottom:6px">DATA</div>
+          <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden;margin-bottom:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid #1C0F16"><span style="font-size:9px;color:#FBE9F4">Sync database</span><span style="font-size:8px;color:#54D69A">● Synced 2m ago ›</span></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid #1C0F16"><span style="font-size:9px;color:#FBE9F4">Categories</span><span style="font-size:8px;color:#8A6E7E">12 ›</span></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid #1C0F16"><span style="font-size:9px;color:#FBE9F4">Data quality</span><span style="font-size:8px;color:#F2B33D">2 partial months ›</span></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px"><span style="font-size:9px;color:#FBE9F4">Export all (CSV)</span><span style="font-size:8px;color:#8A6E7E">›</span></div>
+          </div>
+          <div style="font-size:7px;color:#8A6E7E;font-family:'IBM Plex Mono';margin-bottom:6px">PREFERENCES</div>
+          <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px;border-bottom:1px solid #1C0F16"><span style="font-size:9px;color:#FBE9F4">Language</span><span style="font-size:8px;color:#8A6E7E">EN / ع ›</span></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 11px"><span style="font-size:9px;color:#FBE9F4">Monthly rent (payout calc)</span><span style="font-size:8px;color:#8A6E7E">15,000 ›</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Grouped ListItem <span class="cref">C-16</span> rows under section labels (Data · Preferences · About). Status shown inline (sync dot, partial-month warning).</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">2</span><span style="font-size:12.5px;color:#5C5346">"Sync database" → detail page with the Supabase URL/key form (the old nav button, relocated and explained in plain language).</span></div>
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">3</span><span style="font-size:12.5px;color:#5C5346">"Monthly rent" feeds the Today payout KPI — one editable assumption, surfaced.</span></div>
+      </div>
+    </div>
+    <!-- MOBILE -->
+    <div>
+      <div class="an" style="color:#9A8F7D;margin-bottom:8px">MOBILE · 375 · <span style="color:#C81E83">POPULATED</span></div>
+      <div style="background:#FAF8F5;border:1px solid #E7E1DA;border-radius:16px;padding:12px;display:flex;justify-content:center">
+        <div class="wf" style="width:212px;overflow:hidden;border-radius:18px;position:relative">
+          <div style="padding:14px 13px 64px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span style="font-size:11px;color:#8A6E7E">‹</span><span style="font-family:'Fredoka';font-weight:600;font-size:14px;color:#FBE9F4">Settings</span></div>
+            <div style="font-size:6px;color:#8A6E7E;font-family:'IBM Plex Mono';margin-bottom:5px">DATA</div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden;margin-bottom:9px">
+              <div style="display:flex;justify-content:space-between;padding:8px 9px;border-bottom:1px solid #1C0F16"><span style="font-size:8px;color:#FBE9F4">Sync database</span><span style="font-size:7px;color:#54D69A">● 2m ›</span></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 9px;border-bottom:1px solid #1C0F16"><span style="font-size:8px;color:#FBE9F4">Categories</span><span style="font-size:7px;color:#8A6E7E">12 ›</span></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 9px"><span style="font-size:8px;color:#FBE9F4">Data quality</span><span style="font-size:7px;color:#F2B33D">2 ›</span></div>
+            </div>
+            <div style="font-size:6px;color:#8A6E7E;font-family:'IBM Plex Mono';margin-bottom:5px">PREFERENCES</div>
+            <div style="background:#160910;border:1px solid #2C1622;border-radius:9px;overflow:hidden">
+              <div style="display:flex;justify-content:space-between;padding:8px 9px;border-bottom:1px solid #1C0F16"><span style="font-size:8px;color:#FBE9F4">Language</span><span style="font-size:7px;color:#8A6E7E">EN/ع ›</span></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 9px"><span style="font-size:8px;color:#FBE9F4">Monthly rent</span><span style="font-size:7px;color:#8A6E7E">15,000 ›</span></div>
+            </div>
+          </div>
+          <div style="position:absolute;left:8px;right:8px;bottom:8px;background:#160910;border:1px solid #2C1622;border-radius:14px;padding:6px 5px;display:flex;justify-content:space-between;align-items:center">
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Today</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Cash</div>
+            <div style="flex-shrink:0;width:30px;height:30px;border-radius:10px;background:#F868C8;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#160910" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+            <div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Goods</div><div style="flex:1;text-align:center;font-size:7px;color:#8A6E7E">Profit</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:8px;align-items:flex-start"><span style="font-family:'IBM Plex Mono';font-size:9px;color:#fff;background:#160910;padding:2px 6px;border-radius:5px;flex-shrink:0">1</span><span style="font-size:12.5px;color:#5C5346">Same grouped list, full-width rows; each → its own sub-page (full sheet). 48px row height.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TREE + SPEC -->
+  <div style="display:grid;grid-template-columns:1fr 1.3fr;gap:18px;margin-bottom:18px">
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;padding:20px 22px">
+      <div class="an" style="color:#9A8F7D;margin-bottom:14px">COMPONENT TREE</div>
+      <div class="tnode" style="font-size:12px">
+        <div><b>&lt;SettingsScreen&gt;</b> <span class="cref">C-24</span></div>
+        <div>├ <b>&lt;Section&gt;</b> <i>Data</i></div>
+        <div>│ └ <b>&lt;ListItem&gt;</b> <s>× 4 · C-16</s></div>
+        <div>├ <b>&lt;Section&gt;</b> <i>Preferences</i></div>
+        <div>│ └ <b>&lt;ListItem&gt;</b> <s>× 2</s></div>
+        <div>└ <b>&lt;Section&gt;</b> <i>About</i></div>
+        <div>&nbsp;&nbsp;└ version · sign out</div>
+        <div style="height:6px"></div>
+        <div><s>sub-pages:</s> SyncForm · CategoryEditor · DataQuality</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:16px;overflow:hidden">
+      <div class="an" style="color:#9A8F7D;padding:18px 18px 0">SPEC SHEET</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:10px">
+        <tr class="specrow"><th style="width:108px">FACET</th><th>DEFINITION</th></tr>
+        <tr class="specrow"><td>KPIs</td><td>none — status indicators only (sync time, partial-month count)</td></tr>
+        <tr class="specrow"><td>Filters</td><td>none</td></tr>
+        <tr class="specrow"><td>Actions</td><td>Sync now · edit categories · set rent · language · export · sign out</td></tr>
+        <tr class="specrow"><td>Buttons</td><td>Sync now (in sub-page) · Save (per editor) · Sign out (destructive)</td></tr>
+        <tr class="specrow"><td>Tables</td><td>CategoryEditor list; DataQuality month×grade table</td></tr>
+        <tr class="specrow"><td>Charts</td><td>none</td></tr>
+        <tr class="specrow"><td>Overlays</td><td>SyncForm sheet · ConfirmModal C-22 (sign out / wipe)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOUR STATES -->
+  <div class="an" style="color:#9A8F7D;margin-bottom:10px">FOUR STATES</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#F2EEE9;color:#8A8173">EMPTY</span></div>
+      <div class="wf" style="border-radius:11px;padding:14px 12px;min-height:140px;display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:7px;color:#8A6E7E;font-family:'IBM Plex Mono';margin-bottom:5px">DATA</div>
+        <div style="background:#160910;border-radius:7px;padding:9px;text-align:center"><div style="font-size:8px;color:#FBE9F4;margin-bottom:5px">Not connected</div><span style="font-size:7px;font-family:'Fredoka';font-weight:600;color:#160910;background:#F868C8;padding:4px 9px;border-radius:6px">Connect database</span></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">First-run: prompts DB connect; preferences seeded with defaults.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE2F1;color:#C81E83">POPULATED</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="font-size:6px;color:#8A6E7E;font-family:'IBM Plex Mono';margin-bottom:4px">DATA</div>
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;margin-bottom:3px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Sync</span><span style="font-size:6px;color:#54D69A">● 2m</span></div>
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;margin-bottom:3px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Categories</span><span style="font-size:6px;color:#8A6E7E">12</span></div>
+        <div style="background:#160910;border-radius:6px;padding:6px 7px;display:flex;justify-content:space-between"><span style="font-size:7px;color:#FBE9F4">Rent</span><span style="font-size:6px;color:#8A6E7E">15,000</span></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Grouped rows with live status.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#EEF0F4;color:#5B6478">LOADING</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px">
+        <div style="width:30%;height:7px;border-radius:4px;background:#23131C;margin-bottom:7px"></div><div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:5px"></div><div style="height:13px;border-radius:5px;background:#23131C;margin-bottom:5px"></div><div style="height:13px;border-radius:5px;background:#23131C"></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Sync status row shows spinner until handshake returns.</div>
+    </div>
+    <div>
+      <div style="margin-bottom:6px"><span style="font-family:'IBM Plex Mono';font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;background:#FBE3E3;color:#C0392B">ERROR</span></div>
+      <div class="wf" style="border-radius:11px;padding:12px;min-height:140px;display:flex;flex-direction:column;justify-content:center">
+        <div style="background:#2A0F12;border:1px solid #5A2026;border-radius:7px;padding:9px"><div style="font-size:8px;color:#FF8C8C;margin-bottom:3px">⚠ Sync failed</div><div style="font-size:6px;color:#B59AA8;margin-bottom:6px">Check URL &amp; key. Local data is safe.</div><span style="font-size:7px;font-family:'Fredoka';font-weight:600;color:#FBE9F4;background:#2C1622;padding:4px 9px;border-radius:6px">↻ Retry sync</span></div>
+      </div>
+      <div style="font-size:11px;color:#8A8173;margin-top:7px;line-height:1.45">Inline on the row that failed; app stays usable offline.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ 06 USER FLOWS ════════ -->
+<div data-screen-label="06 User flows" style="max-width:1120px;margin:110px auto 0;padding:0 24px">
+  <div style="border-top:2px solid #160910;padding-top:18px;display:flex;justify-content:space-between;align-items:baseline;margin-bottom:24px">
+    <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;letter-spacing:.04em">SECTION 06</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A8173;letter-spacing:.06em">USER FLOWS</div>
+  </div>
+  <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:10px">
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#C81E83">06</span>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:clamp(26px,4vw,36px);letter-spacing:-.02em">User flows</h2>
+  </div>
+  <p style="font-size:16px;line-height:1.7;color:#5C5346;max-width:64ch;margin-bottom:30px">Five flows cover the entire product. Each step names the screen <span class="cref">P-0x</span> and the overlay/component in play, the trigger, and the success end-state. Ordered by frequency — the daily one first, and frictionless by design.</p>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+
+    <!-- FLOW 1 -->
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:18px;padding:22px 24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span style="font-family:'IBM Plex Mono';font-size:11px;font-weight:600;color:#160910;background:#F868C8;padding:4px 9px;border-radius:7px">FLOW 1</span><div style="font-family:'Space Grotesk';font-weight:600;font-size:18px">Log today's sales</div><span style="font-size:12px;color:#8A8173">· daily · the core loop · target ≤ 15s</span></div>
+      <div style="display:flex;align-items:stretch;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">1 · TRIGGER</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Tap ＋ from any screen <span class="cref">C-18/19</span></div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">2 · SHEET</div><div style="font-size:13px;color:#4A4338;line-height:1.5">QuickAddSheet <span class="cref">C-20</span> opens, type=Sale, amount focused, keypad up</div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">3 · INPUT</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Type amount · date defaults today · Save (disabled until &gt;0)</div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FBE2F1;border:1px solid #F0C4E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">4 · SUCCESS</div><div style="font-size:13px;color:#7A2358;line-height:1.5">Sheet dismisses · Today hero counts up · toast "Added · Undo"</div></div>
+      </div>
+    </div>
+
+    <!-- FLOW 2 -->
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:18px;padding:22px 24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span style="font-family:'IBM Plex Mono';font-size:11px;font-weight:600;color:#160910;background:#F868C8;padding:4px 9px;border-radius:7px">FLOW 2</span><div style="font-family:'Space Grotesk';font-weight:600;font-size:18px">Log a purchase or expense</div><span style="font-size:12px;color:#8A8173">· weekly</span></div>
+      <div style="display:flex;align-items:stretch;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">1 · TRIGGER</div><div style="font-size:13px;color:#4A4338;line-height:1.5">＋ → toggle Expense/Purchase <span class="cref">C-20</span></div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">2 · DETAIL</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Amount · category/supplier select <span class="cref">A-05</span> · note</div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">3 · SAVE</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Optimistic write · lands in the right ledger <span class="cref">P-04/05</span></div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FBE2F1;border:1px solid #F0C4E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">4 · SUCCESS</div><div style="font-size:13px;color:#7A2358;line-height:1.5">Cash "Out" + Profit recompute · toast Undo</div></div>
+      </div>
+    </div>
+
+    <!-- FLOW 3 -->
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:18px;padding:22px 24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span style="font-family:'IBM Plex Mono';font-size:11px;font-weight:600;color:#160910;background:#F868C8;padding:4px 9px;border-radius:7px">FLOW 3</span><div style="font-family:'Space Grotesk';font-weight:600;font-size:18px">Morning "am I OK?" glance</div><span style="font-size:12px;color:#8A8173">· daily · zero input</span></div>
+      <div style="display:flex;align-items:stretch;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">1 · OPEN</div><div style="font-size:13px;color:#4A4338;line-height:1.5">App launches → /today <span class="cref">P-01</span>, smart-month default (never empty)</div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">2 · READ</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Hero + status line answer ahead/behind in 3s <span class="cref">C-02</span></div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">3 · DRILL (opt)</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Tap a stat → Cash/Profit for the why <span class="cref">C-01</span></div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FBE2F1;border:1px solid #F0C4E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">4 · DONE</div><div style="font-size:13px;color:#7A2358;line-height:1.5">Closes app reassured, or shares the insight in one tap</div></div>
+      </div>
+    </div>
+
+    <!-- FLOW 4 -->
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:18px;padding:22px 24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span style="font-family:'IBM Plex Mono';font-size:11px;font-weight:600;color:#160910;background:#F868C8;padding:4px 9px;border-radius:7px">FLOW 4</span><div style="font-family:'Space Grotesk';font-weight:600;font-size:18px">Generate &amp; share monthly report</div><span style="font-size:12px;color:#8A8173">· monthly</span></div>
+      <div style="display:flex;align-items:stretch;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">1 · TRIGGER</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Profit <span class="cref">P-07</span> → Share button</div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">2 · PREVIEW</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Reports <span class="cref">P-08</span> lands pre-generated, branded ShareCard <span class="cref">C-14</span></div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">3 · ADJUST (opt)</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Change month / toggle includes — preview updates live</div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FBE2F1;border:1px solid #F0C4E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">4 · SHARE</div><div style="font-size:13px;color:#7A2358;line-height:1.5">WhatsApp intent fires with PNG · "Shared ✓" toast</div></div>
+      </div>
+    </div>
+
+    <!-- FLOW 5 -->
+    <div style="background:#fff;border:1px solid #E7E1DA;border-radius:18px;padding:22px 24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span style="font-family:'IBM Plex Mono';font-size:11px;font-weight:600;color:#160910;background:#F868C8;padding:4px 9px;border-radius:7px">FLOW 5</span><div style="font-family:'Space Grotesk';font-weight:600;font-size:18px">First-run &amp; correct a mistake</div><span style="font-size:12px;color:#8A8173">· onboarding + edit</span></div>
+      <div style="display:flex;align-items:stretch;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">1 · ONBOARD</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Connect DB <span class="cref">P-09</span> · set rent · mascot empty states guide first entry</div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">2 · FIND</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Open the ledger, tap the wrong row → DetailDrawer <span class="cref">C-21</span></div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FAF8F5;border:1px solid #EDE8E0;border-radius:12px;padding:13px"><div class="an" style="color:#9A8F7D;margin-bottom:6px">3 · EDIT/DELETE</div><div style="font-size:13px;color:#4A4338;line-height:1.5">Inline edit, or Delete → ConfirmModal <span class="cref">C-22</span> (no prompt()!)</div></div>
+        <div style="display:flex;align-items:center;color:#C81E83;font-size:16px">→</div>
+        <div style="flex:1;min-width:140px;background:#FBE2F1;border:1px solid #F0C4E0;border-radius:12px;padding:13px"><div class="an" style="color:#C81E83;margin-bottom:6px">4 · SUCCESS</div><div style="font-size:13px;color:#7A2358;line-height:1.5">Optimistic update · 4s Undo · all dependent figures recompute</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HANDOFF / CLOSE -->
+  <div style="background:#080808;border-radius:20px;padding:40px 44px;margin-top:42px;position:relative;overflow:hidden">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:#F868C8;margin-bottom:18px">SPEC COMPLETE — READY TO BUILD</div>
+    <p style="font-family:'Fredoka',sans-serif;font-weight:500;font-size:clamp(19px,2.5vw,26px);line-height:1.4;color:#FBE9F4;max-width:46ch">9 screens · 4 states each · 34 components · tokens, interactions, responsive rules and 5 flows — all fixed. An engineer can now build screen-by-screen against the component IDs with no open design decisions.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:22px">
+      <span style="font-size:12px;font-family:'IBM Plex Mono';color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:6px 11px">NEXT → hi-fi the daily loop (P-01 + C-20) first</span>
+      <span style="font-size:12px;font-family:'IBM Plex Mono';color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:6px 11px">THEN → ledger template (P-03/04/05)</span>
+      <span style="font-size:12px;font-family:'IBM Plex Mono';color:#B59AA8;border:1px solid #2C1622;border-radius:7px;padding:6px 11px">THEN → Profit + Reports</span>
+    </div>
+    <div style="margin-top:24px;width:46px;height:58px;background:#F868C8;-webkit-mask:url(assets/bosta-mascot.svg) center/contain no-repeat;mask:url(assets/bosta-mascot.svg) center/contain no-repeat"></div>
+  </div>
+</div>
+
+<!-- ▼APPEND -->
+</div>
+</x-dc>
+</body>
+</html>

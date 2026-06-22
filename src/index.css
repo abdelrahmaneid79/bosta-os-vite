@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply box-border;
+  }
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+  }
+  ::selection {
+    background: #f868c8;
+    color: #160910;
+  }
+}
+
+@layer components {
+  /* Card / panel primitives shared across features */
+  .panel {
+    @apply bg-panel border border-line rounded-2xl;
+  }
+  .panel-2 {
+    @apply bg-panel2 border border-line rounded-2xl;
+  }
+  .eyebrow {
+    @apply font-mono text-[11px] tracking-[0.06em] text-dim;
+  }
+  .lift {
+    transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.15s;
+  }
+  .lift:active {
+    transform: scale(0.97);
+  }
+  .navbtn:hover {
+    background: #1c0f16 !important;
+  }
+  .row-hover {
+    transition: background 0.15s;
+  }
+  .row-hover:hover {
+    background: #1c0f16;
+  }
+  /* The Bosta peanut mascot rendered as a tintable mask */
+  .mascot {
+    background: #f868c8;
+    -webkit-mask: url(/assets/bosta-mascot.svg) center/contain no-repeat;
+    mask: url(/assets/bosta-mascot.svg) center/contain no-repeat;
+  }
+}
+
+@layer utilities {
+  /* Hide the rail scrollbar — keep a clean divider line (per design feedback) */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
