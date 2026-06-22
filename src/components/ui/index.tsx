@@ -2,17 +2,20 @@ import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAt
 import { cn } from "@/core/utils/cn";
 
 /* ─ Surfaces ───────────────────────────────────────────────────────────── */
-export function Card({ className, children, glow }: { className?: string; children: ReactNode; glow?: boolean }) {
+export function Card({ className, children, glow, accent }: { className?: string; children: ReactNode; glow?: boolean; accent?: string }) {
   return (
-    <div className={cn("relative overflow-hidden rounded-[20px] border border-line bg-panel p-4 sm:p-5", className)}>
-      {glow && <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-pink/10 blur-2xl" />}
+    <div
+      className={cn("relative overflow-hidden rounded-[20px] border border-line bg-panel p-4 sm:p-5", accent && "border-t-2", className)}
+      style={accent ? { borderTopColor: accent } : undefined}
+    >
+      {glow && <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full blur-2xl" style={{ background: `${accent ?? "#F868C8"}1f` }} />}
       {children}
     </div>
   );
 }
 
-export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("font-mono text-[10.5px] uppercase tracking-[0.12em] text-dim", className)}>{children}</div>;
+export function Eyebrow({ children, className, accent }: { children: ReactNode; className?: string; accent?: string }) {
+  return <div className={cn("font-mono text-[10.5px] uppercase tracking-[0.12em]", accent ?? "text-dim", className)}>{children}</div>;
 }
 
 export function SectionTitle({ children, sub }: { children: ReactNode; sub?: ReactNode }) {

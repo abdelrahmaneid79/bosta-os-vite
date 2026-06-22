@@ -455,23 +455,24 @@ describe("date-range engine (pinned today)", () => {
 });
 
 describe("dashboard layout customization", () => {
-  it("moves a widget up/down, clamped at edges", async () => {
-    const { DEFAULT_LAYOUT, moveWidget } = await import("@/core/dashboardLayout");
-    const m = moveWidget(DEFAULT_LAYOUT, "today", "up"); // today is index 1
-    expect(m.map((x) => x.id).slice(0, 2)).toEqual(["today", "ask"]);
-    expect(moveWidget(DEFAULT_LAYOUT, "ask", "up")).toEqual(DEFAULT_LAYOUT); // top can't go up
+  it("reorders a widget to another's position (drag-and-drop)", async () => {
+    const { DEFAULT_LAYOUT, reorderWidget } = await import("@/core/dashboardLayout");
+    const out = reorderWidget(DEFAULT_LAYOUT, "kpis", "activity"); // move kpis to activity's slot
+    const ids = out.map((x) => x.id);
+    expect(ids.indexOf("kpis")).toBeGreaterThan(ids.indexOf("trend"));
+    expect(reorderWidget(DEFAULT_LAYOUT, "kpis", "kpis")).toEqual(DEFAULT_LAYOUT); // no-op on self
   });
   it("toggles visibility", async () => {
     const { DEFAULT_LAYOUT, toggleWidget } = await import("@/core/dashboardLayout");
     expect(toggleWidget(DEFAULT_LAYOUT, "health").find((x) => x.id === "health")!.on).toBe(false);
   });
-  it("normalizes a saved layout: keeps order, drops unknown, appends new", async () => {
+  it("normalizes a saved layout: keeps order, drops unknown/removed, appends new", async () => {
     const { normalizeLayout, ALL_WIDGETS } = await import("@/core/dashboardLayout");
-    const saved = [{ id: "health", on: false }, { id: "bogus", on: true }, { id: "ask", on: true }];
+    const saved = [{ id: "health", on: false }, { id: "ask", on: true }, { id: "bogus", on: true }, { id: "kpis", on: true }];
     const out = normalizeLayout(saved);
     expect(out[0]).toEqual({ id: "health", on: false });
-    expect(out.map((x) => x.id).filter((id) => !ALL_WIDGETS.includes(id))).toEqual([]); // no unknowns
-    expect(out).toHaveLength(ALL_WIDGETS.length); // all present
+    expect(out.map((x) => x.id).filter((id: string) => !ALL_WIDGETS.includes(id as never))).toEqual([]); // drops ask + bogus
+    expect(out).toHaveLength(ALL_WIDGETS.length);
   });
 });
 

@@ -21,6 +21,8 @@ export default {
         good: "#54D69A",
         bad: "#FF5C5C",
         warn: "#F2B33D",
+        info: "#5C8DFF",
+        violet: "#9B6CFF",
       },
       fontFamily: {
         display: ["Fredoka", "sans-serif"],

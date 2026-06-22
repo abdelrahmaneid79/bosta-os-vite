@@ -68,7 +68,7 @@ function Icon({ d, className = "h-5 w-5", w = 1.9 }: { d: string; className?: st
 }
 
 interface Tab { to: string; label: string; el: React.ReactNode }
-interface Group { id: string; label: string; icon: string; tabs: Tab[] }
+interface Group { id: string; label: string; icon: string; accent: string; tabs: Tab[] }
 
 // Map each route to its screen; nav structure/labels/icons come from core/nav.
 const EL: Record<string, React.ReactNode> = {
@@ -80,8 +80,8 @@ const EL: Record<string, React.ReactNode> = {
   "/health": <HealthScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
   "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
 };
-const build = (s: { id: string; label: string; icon: string; tabs: { to: string; label: string }[] }): Group =>
-  ({ id: s.id, label: s.label, icon: s.icon, tabs: s.tabs.map((t) => ({ ...t, el: EL[t.to] })) });
+const build = (s: { id: string; label: string; icon: string; accent: string; tabs: { to: string; label: string }[] }): Group =>
+  ({ id: s.id, label: s.label, icon: s.icon, accent: s.accent, tabs: s.tabs.map((t) => ({ ...t, el: EL[t.to] })) });
 const GROUPS: Group[] = NAV_SECTIONS.map(build);
 const SETTINGS: Group = build(SETTINGS_SECTION);
 const ALL_GROUPS = [...GROUPS, SETTINGS];
@@ -97,7 +97,8 @@ function SectionTabs({ group }: { group: Group }) {
       {group.tabs.map((t) => (
         <NavLink key={t.to} to={t.to} end
           className={({ isActive }) => cn("rounded-xl px-3.5 py-1.5 font-display text-[13px] font-semibold transition",
-            isActive ? "bg-pink text-ink shadow-pink" : "border border-line bg-panel2 text-muted hover:text-text")}>
+            isActive ? "text-ink" : "border border-line bg-panel2 text-muted hover:text-text")}
+          style={({ isActive }) => (isActive ? { backgroundColor: group.accent, boxShadow: `0 6px 18px -6px ${group.accent}` } : undefined)}>
           {t.label}
         </NavLink>
       ))}
@@ -176,28 +177,35 @@ function Rail({ onAdd }: { onAdd: () => void }) {
 function RailGroup({ group }: { group: Group }) {
   const { pathname } = useLocation();
   const isHere = (to: string) => pathname === to || pathname.startsWith(to + "/");
+  const A = group.accent;
   if (group.tabs.length === 1) {
     const t = group.tabs[0];
+    const here = isHere(t.to);
     return (
       <NavLink to={t.to} end
-        className={cn("relative mb-0.5 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition", isHere(t.to) ? "bg-panel2 font-semibold text-pink" : "text-muted hover:bg-line2/50 hover:text-text")}>
-        {isHere(t.to) && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-pink" />}
+        className={cn("relative mb-0.5 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition", here ? "bg-panel2 font-semibold" : "text-muted hover:bg-line2/50 hover:text-text")}
+        style={here ? { color: A } : undefined}>
+        {here && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r" style={{ background: A }} />}
         <Icon d={group.icon} className="h-[18px] w-[18px]" /><span className="font-display">{group.label}</span>
       </NavLink>
     );
   }
   return (
     <div className="mb-1.5 mt-0.5">
-      <div className="flex items-center gap-2 px-2.5 pb-1 pt-1.5 text-faint">
+      <div className="flex items-center gap-2 px-2.5 pb-1 pt-1.5" style={{ color: A }}>
         <Icon d={group.icon} className="h-[15px] w-[15px]" /><span className="font-mono text-[10px] uppercase tracking-wider">{group.label}</span>
       </div>
-      {group.tabs.map((t) => (
-        <NavLink key={t.to} to={t.to} end
-          className={cn("relative ml-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] transition", isHere(t.to) ? "font-semibold text-pink" : "text-muted hover:text-text")}>
-          {isHere(t.to) && <span className="absolute -left-2 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r bg-pink" />}
-          {t.label}
-        </NavLink>
-      ))}
+      {group.tabs.map((t) => {
+        const here = isHere(t.to);
+        return (
+          <NavLink key={t.to} to={t.to} end
+            className={cn("relative ml-2 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] transition", here ? "font-semibold" : "text-muted hover:text-text")}
+            style={here ? { color: A } : undefined}>
+            {here && <span className="absolute -left-2 top-1/2 h-4 w-1 -translate-y-1/2 rounded-r" style={{ background: A }} />}
+            {t.label}
+          </NavLink>
+        );
+      })}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Pill, Ring, Badge, Button } from "@/components/ui";
+import { cn } from "@/core/utils/cn";
 import { useLayoutStore } from "@/store/layout";
 import { WIDGET_TITLES, type WidgetId } from "@/core/dashboardLayout";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
@@ -15,30 +16,65 @@ import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
 import { getHealthReport } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
-import { todayCairo, monthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
+import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { useActiveRange } from "@/store/filters";
-import { AskBostaPanel } from "./AskBosta";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
 
+/** Per-widget / per-metric accent palette — gives the dashboard real colour
+ *  differentiation instead of one flat pink. */
+const ACCENT = {
+  pink:  { hex: "#F868C8", text: "text-pink",  bar: "bg-pink",  soft: "bg-pink/35",  border: "border-t-pink" },
+  mint:  { hex: "#2BD4C4", text: "text-good",  bar: "bg-good",  soft: "bg-good/35",  border: "border-t-good" },
+  blue:  { hex: "#5C8DFF", text: "text-info",  bar: "bg-info",  soft: "bg-info/35",  border: "border-t-info" },
+  amber: { hex: "#F7A23B", text: "text-warn",  bar: "bg-warn",  soft: "bg-warn/35",  border: "border-t-warn" },
+  violet:{ hex: "#9B6CFF", text: "text-violet",bar: "bg-violet",soft: "bg-violet/35",border: "border-t-violet" },
+  red:   { hex: "#FF5C6C", text: "text-bad",   bar: "bg-bad",   soft: "bg-bad/35",   border: "border-t-bad" },
+} as const;
+type AccentKey = keyof typeof ACCENT;
+
 /** 14-day sales bar chart — pure SVG, no deps. Highlights today and the peak. */
-function Sparkbars({ series }: { series: { date: string; total: number }[] }) {
+function Sparkbars({ series, accent = "pink", height = "h-24" }: { series: { date: string; total: number }[]; accent?: AccentKey; height?: string }) {
   const max = Math.max(1, ...series.map((p) => p.total));
   const today = todayCairo();
+  const a = ACCENT[accent];
   return (
-    <div className="flex h-24 items-end gap-1">
+    <div className={`flex ${height} items-end gap-1`}>
       {series.map((p) => {
         const h = Math.max(3, (p.total / max) * 100);
         const isToday = p.date === today;
         return (
           <div key={p.date} className="group relative flex flex-1 flex-col items-center justify-end" title={`${fmtDate(p.date)} · ${egp(p.total)}`}>
-            <div className={`w-full rounded-t-md transition-all ${isToday ? "bg-pink" : p.total > 0 ? "bg-pink/35 group-hover:bg-pink/60" : "bg-line2"}`} style={{ height: `${h}%` }} />
+            <div className={`w-full rounded-t-md transition-all ${isToday ? a.bar : p.total > 0 ? `${a.soft} group-hover:opacity-80` : "bg-line2"}`} style={{ height: `${h}%` }} />
           </div>
         );
       })}
     </div>
+  );
+}
+
+function DeltaChip({ pct }: { pct: number | null }) {
+  if (pct == null) return null;
+  const up = pct >= 0;
+  return <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-semibold ${up ? "bg-good/15 text-good" : "bg-bad/15 text-bad"}`}>{up ? "▲" : "▼"} {Math.abs(Math.round(pct))}%</span>;
+}
+
+/** A colourful KPI tile: coloured top accent, value, delta vs previous period. */
+function ColorKpi({ label, value, accent, delta, sub, to, spark }: {
+  label: string; value: string; accent: AccentKey; delta?: number | null; sub?: string; to: string; spark?: { date: string; total: number }[];
+}) {
+  const a = ACCENT[accent];
+  return (
+    <Link to={to} className="lift group block overflow-hidden rounded-2xl border border-line border-t-2 bg-panel2 p-4 transition hover:border-line2" style={{ borderTopColor: a.hex }}>
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-dim">{label}</span>
+        <DeltaChip pct={delta ?? null} />
+      </div>
+      <div className={`mt-2 font-display text-2xl font-semibold ${a.text}`}>{value}</div>
+      {spark ? <div className="mt-2 opacity-80"><Sparkbars series={spark} accent={accent} height="h-8" /></div> : sub ? <div className="mt-1 text-[11px] text-faint">{sub}</div> : null}
+    </Link>
   );
 }
 const dot = (s: string) => s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : "bg-dim";
@@ -69,9 +105,12 @@ export function InsightRow({ i }: { i: Insight }) {
   );
 }
 
+const delta = (cur: number, prev: number): number | null => (prev > 0 ? ((cur - prev) / prev) * 100 : null);
+
 /* ─ Today / Command Center ─────────────────────────────────────────────── */
 export function DashboardScreen() {
   const month = monthBoundsCairo();
+  const last = lastMonthBoundsCairo();
   const today = todayCairo();
   const chartFrom = isoDaysAgo(today, 13);
   const cc = useQuery({ queryKey: ["cc"], queryFn: getCommandCenter, enabled: en });
@@ -79,50 +118,59 @@ export function DashboardScreen() {
   const insights = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
   const feed = useQuery({ queryKey: ["activity"], queryFn: () => getActivityFeed(30, 8), enabled: en });
   const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
-  const daily = useQuery({ queryKey: ["daily14", chartFrom], queryFn: () => getDailyRevenue({ from: chartFrom, to: today }), enabled: en });
-  const profit = useQuery({ queryKey: ["profit", month], queryFn: () => getProfitReadout(month), enabled: en });
+  const daily = useQuery({ queryKey: ["dailyDash", last.from], queryFn: () => getDailyRevenue({ from: last.from, to: today }), enabled: en });
+  const profitM = useQuery({ queryKey: ["profit", month], queryFn: () => getProfitReadout(month), enabled: en });
+  const profitL = useQuery({ queryKey: ["profit", last], queryFn: () => getProfitReadout(last), enabled: en });
   const c = cc.data;
   if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
 
   const byDay = new Map((daily.data ?? []).map((p) => [p.date, p.total]));
   const series = isoRange(chartFrom, today).map((d) => ({ date: d, total: byDay.get(d) ?? 0 }));
-  const p = profit.data;
+  const monthRev = isoRange(month.from, today).reduce((s, d) => s + (byDay.get(d) ?? 0), 0);
+  const lastRev = (daily.data ?? []).filter((p) => p.date >= last.from && p.date <= last.to).reduce((s, p) => s + p.total, 0);
+  const pM = profitM.data, pL = profitL.data;
+  const profitDelta = pM?.netProfit != null && pL?.netProfit != null ? delta(pM.netProfit, pL.netProfit) : null;
   const attention = (miss.data?.length ?? 0) + (insights.data?.filter((i) => i.severity !== "info").length ?? 0);
 
-  // ── widget registry: every Today block is a customizable widget ──────────
   const widgets: Record<WidgetId, ReactNode> = {
-    ask: <AskBostaPanel />,
-    today: (
-      <Card glow>
-        <div className="flex items-start justify-between">
+    kpis: (
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <ColorKpi label="Revenue · month" accent="pink" value={c ? egpShort(monthRev) : "—"} delta={delta(monthRev, lastRev)} spark={series} to="/sales" />
+        <ColorKpi label="Net profit · month" accent="mint" value={pM ? (pM.netProfit == null ? "unknown" : egpShort(pM.netProfit)) : "—"} delta={profitDelta} sub={pM?.netMargin != null ? `${Math.round(pM.netMargin)}% margin` : "after costs"} to="/reports" />
+        <ColorKpi label="Cash on hand" accent="blue" value={c ? (c.cashBalance == null ? "—" : egpShort(c.cashBalance)) : "—"} sub="current balance" to="/money" />
+        <ColorKpi label="Owed to you" accent="amber" value={c ? egpShort(c.owed) : "—"} sub="open settlements" to="/cheques" />
+      </div>
+    ),
+    trend: (
+      <Card glow accent="#F868C8">
+        <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
           <div>
-            <Eyebrow>Today · {fmtDate(today, "EEE d MMM")}</Eyebrow>
-            <div className="mt-1 flex items-end gap-3">
-              <div className="font-display text-4xl font-semibold leading-none text-white">{c ? egp(c.todayRevenue) : "—"}</div>
-              <div className="pb-1 text-sm text-muted">sold today</div>
+            <div className="flex items-start justify-between">
+              <div>
+                <Eyebrow accent="text-pink">Today · {fmtDate(today, "EEE d MMM")}</Eyebrow>
+                <div className="mt-1 flex items-end gap-3">
+                  <div className="font-display text-4xl font-semibold leading-none text-white">{c ? egp(c.todayRevenue) : "—"}</div>
+                  <div className="pb-1 text-sm text-muted">sold today</div>
+                </div>
+              </div>
+              <Link to="/sales" className="rounded-lg bg-pink px-3 py-1.5 font-display text-xs font-semibold text-ink shadow-pink">+ Sale</Link>
             </div>
-            <div className="mt-1 text-sm text-good">{c ? `${egp(c.monthRevenue)} this month` : "—"}</div>
+            <div className="mt-4">
+              {daily.isLoading ? <div className="h-24 animate-pulse rounded-lg bg-line2" /> : <Sparkbars series={series} accent="pink" />}
+              <div className="mt-1.5 flex justify-between text-[10px] text-dim"><span>{fmtDate(chartFrom, "d MMM")}</span><span>last 14 days</span><span>today</span></div>
+            </div>
           </div>
-          <Link to="/sales" className="rounded-lg bg-pink px-3 py-1.5 font-display text-xs font-semibold text-ink shadow-pink">+ Sale</Link>
-        </div>
-        <div className="mt-4">
-          {daily.isLoading ? <div className="h-24 animate-pulse rounded-lg bg-line2" /> : <Sparkbars series={series} />}
-          <div className="mt-1.5 flex justify-between text-[10px] text-dim"><span>{fmtDate(chartFrom, "d MMM")}</span><span>last 14 days</span><span>today</span></div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+            <MiniStat label="This month" value={c ? egp(monthRev) : "—"} accent="mint" delta={delta(monthRev, lastRev)} />
+            <MiniStat label="Stock value" value={c ? egp(c.stockValue) : "—"} accent="blue" />
+          </div>
         </div>
       </Card>
     ),
-    kpis: (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Net profit · month" value={p ? (p.netProfit == null ? "unknown" : egpShort(p.netProfit)) : "—"} accent="text-good" to="/reports" />
-        <Kpi label="Cash on hand" value={c ? (c.cashBalance == null ? "—" : egpShort(c.cashBalance)) : "—"} to="/money" />
-        <Kpi label="Stock value" value={c ? egpShort(c.stockValue) : "—"} to="/stock" />
-        <Kpi label="Owed to you" value={c ? egpShort(c.owed) : "—"} accent={c && c.owed > 0 ? "text-warn" : "text-text"} to="/cheques" />
-      </div>
-    ),
     attention: (
-      <Card>
+      <Card accent="#F7A23B">
         <div className="mb-2 flex items-center justify-between">
-          <Eyebrow>Needs attention{attention > 0 ? ` · ${attention}` : ""}</Eyebrow>
+          <Eyebrow accent="text-warn">Needs attention{attention > 0 ? ` · ${attention}` : ""}</Eyebrow>
           <Link to="/missing" className="text-xs text-pink">Open Gaps →</Link>
         </div>
         {!en ? <Note>Sign in to load.</Note> : miss.isLoading ? <SkeletonRows rows={3} /> :
@@ -140,9 +188,9 @@ export function DashboardScreen() {
       </Card>
     ),
     risks: (
-      <Card>
+      <Card accent="#FF5C6C">
         <div className="mb-2 flex items-center justify-between">
-          <Eyebrow>Risks &amp; signals</Eyebrow>
+          <Eyebrow accent="text-bad">Risks &amp; signals</Eyebrow>
           {(insights.data?.length ?? 0) > 3 && <Link to="/missing" className="text-xs text-pink">All {insights.data!.length} →</Link>}
         </div>
         {insights.isLoading ? <SkeletonRows rows={2} /> : (insights.data?.length ?? 0) === 0
@@ -151,9 +199,9 @@ export function DashboardScreen() {
       </Card>
     ),
     activity: (
-      <Card className="!p-0">
+      <Card className="!p-0" accent="#2BD4C4">
         <div className="flex items-center justify-between px-4 pt-4">
-          <Eyebrow>Recent activity</Eyebrow>
+          <Eyebrow accent="text-good">Recent activity</Eyebrow>
           <Link to="/activity" className="text-[11px] text-pink">All →</Link>
         </div>
         {!en ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Sign in to load.</div>
@@ -180,13 +228,13 @@ export function DashboardScreen() {
       </Card>
     ),
     health: (
-      <Card glow className="flex items-center gap-5">
+      <Card glow accent="#9B6CFF" className="flex items-center gap-5">
         <Ring value={health.data?.overall ?? null} size={96} stroke={11}>
           <span className="font-display text-2xl font-semibold text-white">{health.data?.overall ?? "—"}</span>
           <span className="text-[10px] text-dim">/ 100</span>
         </Ring>
         <div className="flex-1">
-          <Eyebrow>Business health</Eyebrow>
+          <Eyebrow accent="text-violet">Business health</Eyebrow>
           <div className="font-display text-lg font-semibold text-good">{health.data?.status ?? "—"}</div>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {health.data?.level != null && <Pill tone="warn">⚡ Level {health.data.level}</Pill>}
@@ -197,8 +245,8 @@ export function DashboardScreen() {
       </Card>
     ),
     quick: (
-      <Card>
-        <Eyebrow>Quick actions</Eyebrow>
+      <Card accent="#5C8DFF">
+        <Eyebrow accent="text-info">Quick actions</Eyebrow>
         <div className="mt-2 flex flex-wrap gap-2">
           <Link to="/sales" className="lift rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">+ Sale</Link>
           <Link to="/stock" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">+ Product</Link>
@@ -214,33 +262,52 @@ export function DashboardScreen() {
   return <CustomizableDashboard widgets={widgets} />;
 }
 
-/** Renders the Today widgets in the owner's saved order, with an edit mode to
- *  reorder, hide/show and reset — persisted per-browser. */
+function MiniStat({ label, value, accent, delta }: { label: string; value: string; accent: AccentKey; delta?: number | null }) {
+  const a = ACCENT[accent];
+  return (
+    <div className="rounded-xl border border-line bg-panel p-3">
+      <div className="flex items-center justify-between"><span className="text-[11px] text-dim">{label}</span><DeltaChip pct={delta ?? null} /></div>
+      <div className={`mt-1 font-display text-lg font-semibold ${a.text}`}>{value}</div>
+    </div>
+  );
+}
+
+/** Drag-to-reorder, click-to-hide dashboard. Smooth HTML5 drag-and-drop; layout
+ *  saved per-browser. */
 function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNode> }) {
-  const { layout, move, toggle, reset } = useLayoutStore();
+  const { layout, reorder, toggle, reset } = useLayoutStore();
   const [edit, setEdit] = useState(false);
+  const [drag, setDrag] = useState<WidgetId | null>(null);
+  const [over, setOver] = useState<WidgetId | null>(null);
   const hidden = layout.filter((x) => !x.on);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="font-display text-sm font-semibold text-dim">Your dashboard</div>
+        <div className="font-display text-sm font-semibold text-dim">{edit ? "Drag cards to reorder · tap Hide to remove" : "Your dashboard"}</div>
         <button onClick={() => setEdit((e) => !e)}
-          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${edit ? "border-pink bg-pink/15 text-pink" : "border-line bg-panel2 text-muted hover:text-text"}`}>
+          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${edit ? "border-pink bg-pink text-ink" : "border-line bg-panel2 text-muted hover:text-text"}`}>
           {edit ? "✓ Done" : "✎ Customize"}
         </button>
       </div>
 
       {layout.filter((x) => x.on).map((item) => (
-        <div key={item.id} className={edit ? "rounded-2xl border border-dashed border-pink/40 p-2" : ""}>
+        <div key={item.id}
+          draggable={edit}
+          onDragStart={() => setDrag(item.id)}
+          onDragEnd={() => { setDrag(null); setOver(null); }}
+          onDragOver={(e) => { if (edit && drag) { e.preventDefault(); setOver(item.id); } }}
+          onDrop={(e) => { e.preventDefault(); if (drag && drag !== item.id) reorder(drag, item.id); setDrag(null); setOver(null); }}
+          className={cn(edit && "rounded-2xl border border-dashed p-2 transition", edit && (over === item.id ? "border-pink bg-pink/5" : "border-line2"), drag === item.id && "opacity-40")}
+        >
           {edit && (
             <div className="mb-2 flex items-center gap-2 px-1">
+              <span className="cursor-grab text-dim active:cursor-grabbing" title="Drag">⠿</span>
               <span className="flex-1 font-mono text-[11px] uppercase tracking-wider text-faint">{WIDGET_TITLES[item.id]}</span>
-              <button onClick={() => move(item.id, "up")} className="rounded-md bg-line2 px-2 py-1 text-xs text-muted hover:text-text" title="Move up">↑</button>
-              <button onClick={() => move(item.id, "down")} className="rounded-md bg-line2 px-2 py-1 text-xs text-muted hover:text-text" title="Move down">↓</button>
-              <button onClick={() => toggle(item.id)} className="rounded-md bg-line2 px-2 py-1 text-xs text-muted hover:text-bad" title="Hide">Hide</button>
+              <button onClick={() => toggle(item.id)} className="rounded-md bg-line2 px-2.5 py-1 text-[11px] text-muted hover:text-bad">Hide</button>
             </div>
           )}
-          {widgets[item.id]}
+          <div className={edit ? "pointer-events-none" : ""}>{widgets[item.id]}</div>
         </div>
       ))}
 
@@ -250,7 +317,7 @@ function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNod
             <Eyebrow>Hidden widgets</Eyebrow>
             <button onClick={reset} className="text-xs text-pink hover:underline">Reset to default</button>
           </div>
-          {hidden.length === 0 ? <p className="mt-2 text-sm text-dim">All widgets are visible.</p> : (
+          {hidden.length === 0 ? <p className="mt-2 text-sm text-dim">All widgets are visible. Drag the cards above to reorder.</p> : (
             <div className="mt-2 flex flex-wrap gap-2">
               {hidden.map((h) => (
                 <button key={h.id} onClick={() => toggle(h.id)} className="rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12px] text-muted hover:border-pink/40 hover:text-text">+ {WIDGET_TITLES[h.id]}</button>
@@ -260,14 +327,6 @@ function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNod
         </Card>
       )}
     </div>
-  );
-}
-function Kpi({ label, value, accent = "text-text", to }: { label: string; value: string; accent?: string; to: string }) {
-  return (
-    <Link to={to} className="lift flex flex-col justify-between rounded-2xl border border-line bg-panel2 p-3.5 transition hover:border-pink/40">
-      <div className="text-[11px] text-dim">{label}</div>
-      <div className={`mt-2 font-display text-xl font-semibold ${accent}`}>{value}</div>
-    </Link>
   );
 }
 function Note({ children }: { children: React.ReactNode }) { return <div className="py-2 text-sm text-dim">{children}</div>; }
