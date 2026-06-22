@@ -264,3 +264,39 @@ generic "Save failed" — that's fixed.
   `priorRange`, and the **first mocked-Supabase mutation tests** (`mutations.test.ts`)
   proving the duplicate-day guard blocks a second insert, and that a withdrawal posts as
   **negative** cash and triggers `recalc_money_account`. These run with **no database**.
+
+---
+
+# Cycle 3 — QA support & production hardening
+
+## QA Mode page (new) — `/qa` (rail/More → "QA Mode")
+- [ ] Lists every write flow grouped by area, each with screen · action · expected · table/RPC.
+- [ ] Mark each **Pass / Fail** — status is saved in this browser (localStorage), survives reload.
+- [ ] **Copy results** copies the whole checklist (PASS/FAIL per flow) to paste back.
+- [ ] **Recent writes & errors** feed shows every success/failure with **Copy diagnostics** + Clear.
+
+## Copy diagnostics on errors
+- [ ] A failed write toast now stays ~7s and has a **Copy** button → copies context + friendly + raw + code.
+- [ ] The same entry appears in QA Mode → "Recent writes & errors" for later copy-back.
+
+## Clearer success messages (what changed)
+- [ ] Purchase → "Stock +N <unit> · weighted-average cost updated".
+- [ ] Sale line → "Stock −N units · COGS captured"; edit → "stock reversed & reapplied".
+- [ ] Expense → "Expense <egp> recorded · reduces profit (not cash)".
+- [ ] Cash in/out → "balance recalculated · profit unaffected"; Withdraw → "profit unaffected (not an expense)".
+- [ ] Cash count → "matched expected" or "adjustment <egp> posted to match reality".
+- [ ] Cheque → "expected <egp> · received <egp>"; voids/reconcile state what changed.
+
+## Activity page (new) — `/activity`
+- [ ] After any write, open Activity → the event shows at the top (newest first).
+- [ ] **Refresh** re-pulls; rows deep-link to the source screen; voided records excluded.
+
+## Mobile nav (regrouped)
+- [ ] Bottom bar shows 5 primary tabs (Today, Sales, Goods, Cash, Activity) + **More**.
+- [ ] **More** opens a sheet grid with every other section.
+
+## Import audit trail
+- [ ] Proposal documented in `docs/PROPOSAL_import_audit_trail.md` — Phase 1 needs **no
+  migration** (existing `imports`/`import_rows` tables). Not yet implemented; awaiting go-ahead.
+
+## Coverage: **66 unit tests** (added QA-catalogue integrity checks).

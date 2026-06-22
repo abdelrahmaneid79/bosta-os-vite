@@ -21,6 +21,7 @@ const screens = () => import("@/features/engine/screens");
 const dash = () => import("@/features/engine/dashboard");
 const money = () => import("@/features/engine/money");
 const more = () => import("@/features/engine/more");
+const qa = () => import("@/features/qa/QAScreen");
 const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
   lazy(() => load().then((m) => ({ default: m[key] as unknown as React.ComponentType })));
 
@@ -31,6 +32,7 @@ const ReconcileScreen = L(screens, "ReconcileScreen");
 const DashboardScreen = L(dash, "DashboardScreen");
 const HealthScreen = L(dash, "HealthScreen");
 const MissingScreen = L(dash, "MissingScreen");
+const ActivityScreen = L(dash, "ActivityScreen");
 const MoneyScreen = L(money, "MoneyScreen");
 const ChequesScreen = L(money, "ChequesScreen");
 const ExpensesScreen = L(money, "ExpensesScreen");
@@ -38,6 +40,7 @@ const ReportsScreen = L(more, "ReportsScreen");
 const SystemCheckScreen = L(more, "SystemCheckScreen");
 const ImportsScreen = L(more, "ImportsScreen");
 const SettingsScreen = L(more, "SettingsScreen");
+const QAScreen = L(qa, "QAScreen");
 
 const I = {
   today: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
@@ -51,6 +54,9 @@ const I = {
   reports: "M6 2h9l5 5v15H4V2zM9 13h6M9 17h6",
   health: "M22 12h-4l-3 8L9 4l-3 8H2",
   gaps: "M12 2 2 22h20zM12 9v5M12 18h.01",
+  activity: "M3 12h4l2 6 4-14 2 8h6",
+  qa: "M9 11l3 3 8-8M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
   system: "M9 12l2 2 4-4M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z",
   settings: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a8 8 0 0 0 .1-3l1.6-1.2-2-3.4-1.8.7a8 8 0 0 0-2.6-1.5L14 1h-4l-.3 1.9a8 8 0 0 0-2.6 1.5l-1.8-.7-2 3.4L4.7 12a8 8 0 0 0 0 3l-1.6 1.2 2 3.4 1.8-.7a8 8 0 0 0 2.6 1.5L10 23h4l.3-1.9a8 8 0 0 0 2.6-1.5l1.8.7 2-3.4z",
   plus: "M12 5v14M5 12h14",
@@ -72,19 +78,24 @@ const NAV: Item[] = [
   { to: "/cheques", label: "Cheques", icon: I.cheques, el: <ChequesScreen /> },
   { to: "/reconcile", label: "Profit", icon: I.profit, el: <ReconcileScreen /> },
   { to: "/reports", label: "Reports", icon: I.reports, el: <ReportsScreen /> },
+  { to: "/activity", label: "Activity", icon: I.activity, el: <ActivityScreen /> },
   { to: "/health", label: "Health", icon: I.health, el: <HealthScreen /> },
   { to: "/missing", label: "Gaps", icon: I.gaps, el: <MissingScreen /> },
 ];
 const FOOT: Item[] = [
   { to: "/imports", label: "Imports", icon: I.reports, el: <ImportsScreen /> },
+  { to: "/qa", label: "QA Mode", icon: I.qa, el: <QAScreen /> },
   { to: "/system", label: "System", icon: I.system, el: <SystemCheckScreen /> },
   { to: "/settings", label: "Settings", icon: I.settings, el: <SettingsScreen /> },
 ];
 const ALL = [...NAV, ...FOOT];
+/** Primary tabs for the mobile bottom bar; the rest live behind "More". */
+const MOBILE_PRIMARY = ["/dashboard", "/sales", "/stock", "/money", "/activity"];
 const FULLTITLE: Record<string, string> = {
   "/dashboard": "Today", "/sales": "Sales", "/stock": "Goods", "/purchases": "Purchases",
   "/money": "Cash", "/expenses": "Expenses", "/cheques": "Cheques & Settlement", "/reconcile": "Profit", "/reports": "Reports",
-  "/health": "Business Health", "/missing": "Missing Data", "/imports": "Imports", "/system": "System Check", "/settings": "Settings",
+  "/activity": "Activity", "/health": "Business Health", "/missing": "Missing Data", "/imports": "Imports",
+  "/qa": "QA Mode", "/system": "System Check", "/settings": "Settings",
 };
 
 function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -162,14 +173,40 @@ function Header({ onAdd }: { onAdd: () => void }) {
 }
 
 function MobileNav() {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const { pathname } = useLocation();
+  const primary = MOBILE_PRIMARY.map((to) => ALL.find((n) => n.to === to)!).filter(Boolean);
+  const rest = ALL.filter((n) => !MOBILE_PRIMARY.includes(n.to));
+  const restActive = rest.some((n) => n.to === pathname);
   return (
-    <nav className="no-scrollbar fixed inset-x-0 bottom-0 z-40 flex items-center gap-1 overflow-x-auto border-t border-line2 bg-rail px-2 py-2 md:hidden">
-      {ALL.map((n) => (
-        <NavLink key={n.to} to={n.to} className={({ isActive }) => cn("flex min-w-[56px] flex-shrink-0 flex-col items-center gap-1 rounded-xl px-2 py-1.5", isActive ? "text-pink" : "text-faint")}>
-          <Icon d={n.icon} className="h-5 w-5" /><span className="text-[9px] font-semibold">{n.label}</span>
-        </NavLink>
-      ))}
-    </nav>
+    <>
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line2 bg-rail px-1 py-2 md:hidden">
+        {primary.map((n) => (
+          <NavLink key={n.to} to={n.to} className={({ isActive }) => cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", isActive ? "text-pink" : "text-faint")}>
+            <Icon d={n.icon} className="h-5 w-5" /><span className="text-[9px] font-semibold">{n.label}</span>
+          </NavLink>
+        ))}
+        <button onClick={() => setMoreOpen(true)} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", restActive ? "text-pink" : "text-faint")}>
+          <Icon d={I.more} className="h-5 w-5" /><span className="text-[9px] font-semibold">More</span>
+        </button>
+      </nav>
+      {moreOpen && (
+        <div onClick={() => setMoreOpen(false)} className="fixed inset-0 z-[60] flex items-end bg-black/70 md:hidden">
+          <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheetUp rounded-t-3xl border border-line bg-panel2 p-5 pb-8 shadow-sheet">
+            <div className="mb-3 flex items-center justify-between"><div className="font-display text-lg font-semibold">All sections</div>
+              <button onClick={() => setMoreOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-line2 text-muted">✕</button></div>
+            <div className="grid grid-cols-3 gap-2">
+              {rest.map((n) => (
+                <NavLink key={n.to} to={n.to} onClick={() => setMoreOpen(false)}
+                  className={({ isActive }) => cn("flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-panel p-3", isActive ? "text-pink" : "text-muted")}>
+                  <Icon d={n.icon} className="h-5 w-5" /><span className="text-[11px] font-semibold">{n.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

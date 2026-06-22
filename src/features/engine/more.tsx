@@ -4,7 +4,6 @@ import Papa from "papaparse";
 import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge } from "@/components/ui";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState } from "@/components/feedback";
-import { errorMessage } from "@/core/db/errors";
 import { parseSalesRows, parseExpenseRows, type Row } from "@/core/import/csv";
 import { getChannels } from "@/core/read/common";
 import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
@@ -226,7 +225,7 @@ const PAY: Enums<"payment_method">[] = ["cash", "cheque", "card", "transfer", "c
 type ImpKind = "sales" | "expenses";
 
 export function ImportsScreen() {
-  const toast = useUI().toast;
+  const { toast, reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const [kind, setKind] = useState<ImpKind>("sales");
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -283,8 +282,8 @@ export function ImportsScreen() {
       }
       return { imported, skipped, failed };
     },
-    onSuccess: (res) => { toast(`Imported ${res.imported} · skipped ${res.skipped}${res.failed ? ` · failed ${res.failed}` : ""}`, res.failed ? "error" : "success"); qc.invalidateQueries(); setRows(null); setFileName(""); },
-    onError: (e) => { console.error("[BostaOS import]", e); toast(errorMessage(e), "error"); },
+    onSuccess: (res) => { reportSuccess("Import", `Imported ${res.imported} · skipped ${res.skipped}${res.failed ? ` · failed ${res.failed}` : ""}`); qc.invalidateQueries(); setRows(null); setFileName(""); },
+    onError: (e) => reportError("Import", e),
   });
 
   if (!en) return <EmptyState title="Sign in to import" />;
@@ -350,7 +349,7 @@ export function ImportsScreen() {
 // ── Settings (editable: tracking start, low-stock default, rent, revenue share)
 export function SettingsScreen() {
   const { email } = useAuth();
-  const toast = useUI().toast;
+  const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const settings = useQuery({ queryKey: ["settings"], queryFn: getSettings, enabled: en });
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
@@ -376,8 +375,8 @@ export function SettingsScreen() {
       if (what === "rent") return setLocationTerm(loc.id, "rent", num(rent) ?? 0, todayCairo());
       return setLocationTerm(loc.id, "revenue_charge", (num(share) ?? 0) / 100, todayCairo()); // % → rate
     },
-    onSuccess: () => { toast("Saved", "success"); setConfirm(null); qc.invalidateQueries(); },
-    onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); },
+    onSuccess: (_d, what) => { reportSuccess("Settings", `${what === "rent" ? "Monthly rent" : what === "share" ? "Revenue share" : what === "tracking" ? "Tracking start" : "Low-stock default"} saved`); setConfirm(null); qc.invalidateQueries(); },
+    onError: (e) => reportError("Settings", e),
   });
 
   if (!en) return <EmptyState title="Sign in to manage settings" />;

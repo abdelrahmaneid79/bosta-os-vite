@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Pill, Ring, GatedButton, Badge } from "@/components/ui";
+import { Card, Eyebrow, Pill, Ring, GatedButton, Badge, Button } from "@/components/ui";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -259,6 +259,39 @@ export function MissingScreen() {
             </Card>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ─ Activity — full business event feed (verify writes here) ─────────────── */
+export function ActivityScreen() {
+  const feed = useQuery({ queryKey: ["activity-full"], queryFn: () => getActivityFeed(60, 60), enabled: en });
+  if (!en) return <EmptyState title="Sign in to see activity" />;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Eyebrow>Recent activity · last 60 days</Eyebrow>
+        <Button variant="outline" disabled={feed.isFetching} onClick={() => feed.refetch()}>{feed.isFetching ? "Refreshing…" : "Refresh"}</Button>
+      </div>
+      {feed.isLoading ? <SkeletonRows rows={8} />
+        : feed.isError ? <ErrorState message={String((feed.error as Error)?.message)} onRetry={() => feed.refetch()} />
+        : (feed.data?.length ?? 0) === 0 ? <EmptyState title="No events yet" hint="Record a sale, purchase, expense, or cash movement and it appears here." />
+        : (
+        <Card className="!p-0"><div className="divide-y divide-line2">
+          {feed.data!.map((e) => (
+            <Link key={`${e.kind}-${e.id}`} to={e.route} className="row-hover flex items-center gap-3 px-4 py-2.5">
+              <span className="text-base">{kindGlyph[e.kind]}</span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm text-text">{e.label}</div>
+                <div className="text-[11px] text-dim capitalize">{e.kind} · {fmtDate(e.date)}</div>
+              </div>
+              {e.amount !== 0 && (
+                <div className={`font-display text-sm font-semibold ${e.amount > 0 ? "text-good" : "text-muted"}`}>{e.amount > 0 ? "+" : "−"}{egp(Math.abs(e.amount))}</div>
+              )}
+            </Link>
+          ))}
+        </div></Card>
       )}
     </div>
   );

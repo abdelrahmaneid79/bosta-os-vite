@@ -9,18 +9,26 @@ export function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          onClick={() => dismiss(t.id)}
-          className="pointer-events-auto flex animate-toastIn items-center gap-2.5 rounded-xl border border-line bg-panel2 px-5 py-3 font-display text-sm font-medium text-text shadow-sheet"
+          className="pointer-events-auto flex max-w-[92vw] animate-toastIn items-start gap-2.5 rounded-xl border border-line bg-panel2 px-5 py-3 font-display text-sm font-medium text-text shadow-sheet"
         >
           <span
             className={cn(
-              "h-2 w-2 rounded-full",
+              "mt-1.5 h-2 w-2 flex-shrink-0 rounded-full",
               t.kind === "success" && "bg-good",
               t.kind === "error" && "bg-bad",
               t.kind === "info" && "bg-pink",
             )}
           />
-          {t.message}
+          <span onClick={() => dismiss(t.id)} className="cursor-pointer break-words">{t.message}</span>
+          {t.kind === "error" && (
+            <button
+              onClick={() => navigator.clipboard?.writeText(t.copy ?? t.message)}
+              className="ml-1 flex-shrink-0 rounded-md border border-line px-2 py-0.5 text-[11px] text-dim hover:text-text"
+              title="Copy diagnostics"
+            >
+              Copy
+            </button>
+          )}
         </div>
       ))}
     </div>
@@ -76,17 +84,6 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
           Retry
         </button>
       )}
-    </div>
-  );
-}
-
-export function DemoBanner() {
-  return (
-    <div className="flex items-center gap-2 border-b border-warn/30 bg-warn/10 px-4 py-2 text-center text-[12px] text-warn sm:px-6">
-      <span className="font-display font-semibold">Demo data</span>
-      <span className="text-warn/80">
-        — Supabase isn't connected. Numbers are sample data. Add VITE_SUPABASE_URL & ANON_KEY to go live.
-      </span>
     </div>
   );
 }

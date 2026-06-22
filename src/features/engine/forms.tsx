@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Field, Input, Select } from "@/components/ui";
 import { useUI } from "@/store/ui";
 import { todayCairo } from "@/core/time";
+import { egp } from "@/core/utils/format";
 import { getProducts, getLocations, getChannels } from "@/core/read/common";
 import { getExpenseCategories } from "@/core/read/expenses";
 import { getMoneyAccounts } from "@/core/read/money";
@@ -14,14 +15,15 @@ import {
   addExpense, ensureExpenseCategory, createMovement, recordWithdrawal, recordCashCount, recordCheque,
   type ProductInput,
 } from "@/core/db/mutations";
-import { errorMessage } from "@/core/db/errors";
 
-function useWrite(onDone?: () => void) {
+/** Write helper bound to a context label, so successes/errors are logged to the
+ *  in-app diagnostics feed with what changed and copyable error details. */
+function useWrite(context: string, onDone?: () => void) {
   const qc = useQueryClient();
-  const { toast } = useUI();
+  const { reportSuccess, reportError } = useUI();
   return {
-    ok(msg: string) { qc.invalidateQueries(); toast(msg, "success"); onDone?.(); },
-    fail(e: unknown) { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); },
+    ok(msg: string) { qc.invalidateQueries(); reportSuccess(context, msg); onDone?.(); },
+    fail(e: unknown) { reportError(context, e); },
   };
 }
 
@@ -29,7 +31,7 @@ const num = (s: string): number | null => { const n = parseFloat(s); return Numb
 
 /* ─ Product create / edit ──────────────────────────────────────────────── */
 export function ProductForm({ product, onDone }: { product?: Tables<"products">; onDone?: () => void }) {
-  const w = useWrite(onDone);
+  const w = useWrite(product ? "Edit product" : "Add product", onDone);
   const [nameEn, setNameEn] = useState(product?.name_en ?? "");
   const [nameAr, setNameAr] = useState(product?.name_ar ?? "");
   const [unitType, setUnitType] = useState<"weight" | "count">((product?.unit_type as "weight" | "count") ?? "weight");
@@ -47,7 +49,7 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
       };
       return product ? updateProduct(product.id, input).then(() => product.id) : createProduct(input);
     },
-    onSuccess: () => w.ok(product ? "Product updated" : "Product added"),
+    onSuccess: () => w.ok(product ? `Updated "${nameEn.trim()}"` : `Added "${nameEn.trim()}" to Goods`),
     onError: w.fail,
   });
 
@@ -74,7 +76,7 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
 
 /* ─ Purchase (stock-in + WAC via verified RPC) ─────────────────────────── */
 export function PurchaseForm({ onDone }: { onDone?: () => void }) {
-  const w = useWrite(onDone);
+  const w = useWrite("Add purchase", onDone);
   const products = useQuery({ queryKey: ["products-list"], queryFn: getProducts });
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations });
   const [productId, setProductId] = useState("");
@@ -89,7 +91,10 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
       productId, quantity: num(qty) ?? 0, unitCost: num(unitCost) ?? 0,
       vendor: vendor || null, invoiceRef: vendor || null, date, locationId: loc!.id,
     }),
-    onSuccess: () => w.ok("Purchase added · stock & cost updated"),
+    onSuccess: () => {
+      const unit = (products.data ?? []).find((p) => p.id === productId)?.base_unit ?? "units";
+      w.ok(`Stock +${num(qty) ?? 0} ${unit} · weighted-average cost updated`);
+    },
     onError: w.fail,
   });
 
@@ -120,7 +125,7 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
 
 /* ─ Sale: create the day's header ──────────────────────────────────────── */
 export function SaleForm({ onDone }: { onDone?: () => void }) {
-  const w = useWrite(onDone);
+  const w = useWrite("New sale day", onDone);
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations });
   const channels = useQuery({ queryKey: ["channels"], queryFn: getChannels });
   const [date, setDate] = useState(todayCairo());
@@ -129,7 +134,7 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
   const ch = channels.data?.[0];
   const m = useMutation({
     mutationFn: () => createSale({ date, total: num(total) ?? 0, locationId: loc!.id, channelId: ch!.id }),
-    onSuccess: () => w.ok("Sale day created — add product lines to track stock & profit"),
+    onSuccess: () => w.ok(`Sale day created · ${egp(num(total) ?? 0)} revenue — add lines for stock & profit`),
     onError: w.fail,
   });
   const ready = !!loc && !!ch && !!date && (num(total) ?? -1) >= 0;
@@ -146,7 +151,7 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
 
 /* ─ Sale line: add or edit a product line (deducts stock + COGS) ────────── */
 export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: SaleLine; onDone?: () => void }) {
-  const w = useWrite(onDone);
+  const w = useWrite(item ? "Edit sale line" : "Add sale line", onDone);
   const products = useQuery({ queryKey: ["products-list"], queryFn: getProducts });
   const [productId, setProductId] = useState(item?.productId ?? "");
   const [qty, setQty] = useState(item ? String(item.qty) : "");
@@ -159,7 +164,9 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
       const payload = { productId, qty: num(qty) ?? 0, unitPrice: num(price) ?? 0, lineTotal: num(lineTotal) || computed, notes: null };
       return item ? editSaleItem(item.id, payload) : addSaleItem({ saleId, ...payload });
     },
-    onSuccess: () => w.ok(item ? "Line updated · stock reapplied" : "Line added · stock deducted"),
+    onSuccess: () => w.ok(item
+      ? `Line updated to ${num(qty) ?? 0} units · stock reversed & reapplied · COGS recaptured`
+      : `Stock −${num(qty) ?? 0} units · COGS captured at current cost`),
     onError: w.fail,
   });
   const ready = !!productId && (num(qty) ?? 0) > 0;
@@ -186,7 +193,7 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
 /* ─ Expense (operating ledger; withdrawals are NOT expenses) ────────────── */
 const PAYMENTS: Enums<"payment_method">[] = ["cash", "cheque", "card", "transfer", "credit", "unknown"];
 export function ExpenseForm({ onDone }: { onDone?: () => void }) {
-  const w = useWrite(onDone);
+  const w = useWrite("Add expense", onDone);
   const cats = useQuery({ queryKey: ["expense-cats"], queryFn: getExpenseCategories });
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations });
   const [date, setDate] = useState(todayCairo());
@@ -202,7 +209,7 @@ export function ExpenseForm({ onDone }: { onDone?: () => void }) {
       if (!catId) throw new Error("Pick or name a category.");
       return addExpense({ date, categoryId: catId, amount: num(amount) ?? 0, paymentMethod: pay, notes: notes || null, locationId: loc!.id });
     },
-    onSuccess: () => w.ok("Expense added"), onError: w.fail,
+    onSuccess: () => w.ok(`Expense ${egp(num(amount) ?? 0)} recorded · reduces profit (not cash)`), onError: w.fail,
   });
   const ready = !!loc && !!date && (num(amount) ?? 0) > 0 && (categoryId || newCat.trim());
   return (
@@ -230,20 +237,28 @@ export function ExpenseForm({ onDone }: { onDone?: () => void }) {
 /* ─ Cash: movement (in / out / withdraw) and physical count ────────────── */
 type CashMode = "in" | "out" | "withdraw" | "count";
 export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void }) {
-  const w = useWrite(onDone);
+  const ctx = mode === "count" ? "Cash count" : mode === "withdraw" ? "Withdrawal" : mode === "in" ? "Cash in" : "Cash out";
+  const w = useWrite(ctx, onDone);
   const accounts = useQuery({ queryKey: ["money-accounts"], queryFn: getMoneyAccounts });
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayCairo());
   const [notes, setNotes] = useState("");
   const acc = accounts.data?.[0];
   const m = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const amt = num(amount) ?? 0;
-      if (mode === "count") return recordCashCount(acc!.id, amt, date, notes || null).then(() => {});
-      if (mode === "withdraw") return recordWithdrawal(acc!.id, amt, date, notes || null);
-      return createMovement({ accountId: acc!.id, type: mode === "in" ? "owner_injection" : "cash_expense", amount: amt, date, notes: notes || null });
+      if (mode === "count") return recordCashCount(acc!.id, amt, date, notes || null); // returns difference
+      if (mode === "withdraw") { await recordWithdrawal(acc!.id, amt, date, notes || null); return null; }
+      await createMovement({ accountId: acc!.id, type: mode === "in" ? "owner_injection" : "cash_expense", amount: amt, date, notes: notes || null });
+      return null;
     },
-    onSuccess: () => w.ok(mode === "count" ? "Cash count saved" : mode === "withdraw" ? "Withdrawal recorded (cash, not profit)" : "Cash movement saved"),
+    onSuccess: (diff) => {
+      const amt = num(amount) ?? 0;
+      if (mode === "count") w.ok(diff === 0 ? "Cash count matched expected · balance confirmed" : `Cash count saved · adjustment ${egp(diff ?? 0)} posted to match reality`);
+      else if (mode === "withdraw") w.ok(`Cash −${egp(amt)} · balance recalculated · profit unaffected (not an expense)`);
+      else if (mode === "in") w.ok(`Cash +${egp(amt)} · balance recalculated · profit unaffected`);
+      else w.ok(`Cash −${egp(amt)} · balance recalculated · profit unaffected`);
+    },
     onError: w.fail,
   });
   const label = mode === "count" ? "Counted cash (actual)" : mode === "in" ? "Cash in — amount (EGP)" : mode === "out" ? "Cash out — amount (EGP)" : "Withdrawal — amount (EGP)";
@@ -266,7 +281,7 @@ export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void
 /* ─ Cheque: record a received/expected cheque against a settlement period ── */
 const CHQ_STATUS: Enums<"cheque_status">[] = ["expected", "received", "deposited", "cleared", "reconciled"];
 export function ChequeForm({ onDone }: { onDone?: () => void }) {
-  const w = useWrite(onDone);
+  const w = useWrite("Record cheque", onDone);
   const periods = useQuery({ queryKey: ["periods"], queryFn: getSettlementPeriods });
   const [periodId, setPeriodId] = useState("");
   const [status, setStatus] = useState<Enums<"cheque_status">>("received");
@@ -282,7 +297,7 @@ export function ChequeForm({ onDone }: { onDone?: () => void }) {
       periodId, expected: num(expected) ?? 0, received: needsReceived ? (num(received) ?? 0) : null,
       receivedDate: needsReceived ? date : null, status, notes: notes || null,
     }),
-    onSuccess: () => w.ok("Cheque recorded"), onError: w.fail,
+    onSuccess: () => w.ok(`Cheque recorded · expected ${egp(num(expected) ?? 0)}${needsReceived ? ` · received ${egp(num(received) ?? 0)}` : ""}`), onError: w.fail,
   });
   const ready = !!periodId && (num(expected) ?? -1) >= 0 && (!needsReceived || ((num(received) ?? -1) >= 0 && !!date));
   return (

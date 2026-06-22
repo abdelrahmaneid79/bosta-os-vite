@@ -15,6 +15,7 @@ import { composeHealth } from "@/core/read/health";
 import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange, priorRange } from "@/core/time";
 import { explainError, errorMessage, rawMessage } from "@/core/db/errors";
 import { aggregateExpenseCategories } from "@/core/read/expenses";
+import { QA_FLOWS, QA_GROUPS } from "@/features/qa/checklist";
 
 describe("import CSV parsing", () => {
   it("normalizes dates and numbers", () => {
@@ -360,6 +361,25 @@ describe("priorRange = equal-length window immediately before", () => {
   });
   it("handles a single day", () => {
     expect(priorRange({ from: "2026-06-10", to: "2026-06-10" })).toEqual({ from: "2026-06-09", to: "2026-06-09" });
+  });
+});
+
+describe("QA checklist catalogue", () => {
+  it("has unique flow ids", () => {
+    expect(new Set(QA_FLOWS.map((f) => f.id)).size).toBe(QA_FLOWS.length);
+  });
+  it("every flow names a screen, action, expected result and table/RPC", () => {
+    for (const f of QA_FLOWS) {
+      expect(f.screen.length).toBeGreaterThan(0);
+      expect(f.action.length).toBeGreaterThan(0);
+      expect(f.expected.length).toBeGreaterThan(0);
+      expect(f.touches.length).toBeGreaterThan(0);
+    }
+  });
+  it("covers every write group", () => {
+    for (const g of ["Goods", "Purchases", "Sales", "Expenses", "Cash", "Cheques", "Imports", "Settings"]) {
+      expect(QA_GROUPS).toContain(g);
+    }
   });
 });
 
