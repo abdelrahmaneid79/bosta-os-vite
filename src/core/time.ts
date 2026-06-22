@@ -46,6 +46,20 @@ export function isoDaysAgo(iso: string, n: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/** Days in an inclusive ISO range. */
+export function rangeLengthDays(from: string, to: string): number {
+  return isoRange(from, to).length;
+}
+
+/** The equal-length window immediately before `range` — for "vs prior period"
+ *  trends that work for any range (presets or a custom picker). Pure. */
+export function priorRange(range: { from: string; to: string }): { from: string; to: string } {
+  const days = Math.max(1, rangeLengthDays(range.from, range.to));
+  const to = isoDaysAgo(range.from, 1);
+  const from = isoDaysAgo(to, days - 1);
+  return { from, to };
+}
+
 /** Inclusive list of ISO dates from `from` to `to`. */
 export function isoRange(from: string, to: string): string[] {
   const out: string[] = [];

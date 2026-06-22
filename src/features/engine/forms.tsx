@@ -14,13 +14,14 @@ import {
   addExpense, ensureExpenseCategory, createMovement, recordWithdrawal, recordCashCount, recordCheque,
   type ProductInput,
 } from "@/core/db/mutations";
+import { errorMessage } from "@/core/db/errors";
 
 function useWrite(onDone?: () => void) {
   const qc = useQueryClient();
   const { toast } = useUI();
   return {
     ok(msg: string) { qc.invalidateQueries(); toast(msg, "success"); onDone?.(); },
-    fail(e: unknown) { toast(e instanceof Error ? e.message : "Save failed", "error"); },
+    fail(e: unknown) { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); },
   };
 }
 
@@ -111,6 +112,7 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
         <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       </div>
       <p className="text-[11px] text-dim">Quantity is in base units ({(products.data ?? []).find((p) => p.id === productId)?.base_unit ?? "g"}). This increases stock and recomputes weighted-average cost.</p>
+      {date < todayCairo() && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Backdated purchase — sales recorded <b>after</b> this date already captured their cost at the time and won't change. Going forward, weighted-average cost reflects this batch.</p>}
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Add purchase"}</Button>
     </form>
   );

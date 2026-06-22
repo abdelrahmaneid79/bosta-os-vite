@@ -22,6 +22,7 @@ import { getPurchases, getPurchaseTotal } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
 import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
 import { voidSaleItem, voidSale } from "@/core/db/mutations";
+import { errorMessage } from "@/core/db/errors";
 import { useUI } from "@/store/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Tables } from "@/core/db/tables";
@@ -173,8 +174,8 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
   const [confirm, setConfirm] = useState<null | { kind: "line"; item: SaleLine } | { kind: "day" }>(null);
 
   const refresh = () => { qc.invalidateQueries(); items.refetch(); };
-  const voidLine = useMutation({ mutationFn: (id: string) => voidSaleItem(id), onSuccess: () => { toast("Line voided · stock restored", "success"); setConfirm(null); refresh(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
-  const voidDay = useMutation({ mutationFn: () => voidSale(sale.id), onSuccess: () => { toast("Sale day voided · stock restored", "success"); setConfirm(null); onClose(); qc.invalidateQueries(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
+  const voidLine = useMutation({ mutationFn: (id: string) => voidSaleItem(id), onSuccess: () => { toast("Line voided · stock restored", "success"); setConfirm(null); refresh(); }, onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); } });
+  const voidDay = useMutation({ mutationFn: () => voidSale(sale.id), onSuccess: () => { toast("Sale day voided · stock restored", "success"); setConfirm(null); onClose(); qc.invalidateQueries(); }, onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); } });
 
   const lineSum = (items.data ?? []).reduce((a, l) => a + l.lineTotal, 0);
   const missingCogs = (items.data ?? []).filter((l) => l.productId && !l.hasCogs).length;

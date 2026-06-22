@@ -12,7 +12,9 @@ import {
 import { reconTolerance as recon } from "@/core/read/sales";
 import { signMoney, affectsProfit, type MoneyType } from "@/core/money/sign";
 import { composeHealth } from "@/core/read/health";
-import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
+import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange, priorRange } from "@/core/time";
+import { explainError, errorMessage, rawMessage } from "@/core/db/errors";
+import { aggregateExpenseCategories } from "@/core/read/expenses";
 
 describe("import CSV parsing", () => {
   it("normalizes dates and numbers", () => {
@@ -300,6 +302,64 @@ describe("health score composition (real or null, never faked)", () => {
     });
     expect(h.overall).toBeNull();
     expect(h.status).toBe("Not enough data yet");
+  });
+});
+
+describe("friendly error mapping (never swallows the raw DB message)", () => {
+  it("reads message from a PostgrestError-shaped plain object (not an Error)", () => {
+    const pg = { message: 'new row violates row-level security policy for table "products"', code: "42501" };
+    expect(rawMessage(pg)).toContain("row-level security");
+    expect(explainError(pg).title).toMatch(/Permission denied/);
+    expect(errorMessage(pg)).toContain("42501"); // raw code preserved for screenshots
+  });
+  it("maps unique violations to 'already exists'", () => {
+    expect(explainError({ code: "23505", message: "duplicate key value" }).title).toMatch(/already exists/);
+  });
+  it("maps missing RPC / schema drift", () => {
+    expect(explainError({ message: "Could not find the function create_purchase" }).title).toMatch(/backend function is missing/);
+  });
+  it("maps expired session", () => {
+    expect(explainError({ message: "JWT expired" }).title).toMatch(/session expired/i);
+  });
+  it("maps network failure", () => {
+    expect(explainError({ message: "Failed to fetch" }).title).toMatch(/Couldn't reach the server/);
+  });
+  it("falls back to the raw message instead of a generic 'Save failed'", () => {
+    expect(explainError({ message: "something specific went wrong" }).title).toBe("something specific went wrong");
+    expect(errorMessage("plain string error")).toBe("plain string error");
+  });
+});
+
+describe("expense category aggregation + trend", () => {
+  const cur = [
+    { category: "Rent", amount: 15000 },
+    { category: "Supplies", amount: 3000 },
+    { category: "Supplies", amount: 2000 },
+  ];
+  const prior = [{ category: "Rent", amount: 15000 }, { category: "Supplies", amount: 4000 }];
+  it("sums by category and ranks by amount", () => {
+    const out = aggregateExpenseCategories(cur, prior);
+    expect(out[0]).toMatchObject({ category: "Rent", amount: 15000 });
+    expect(out.find((c) => c.category === "Supplies")!.amount).toBe(5000);
+  });
+  it("computes share of current total", () => {
+    const out = aggregateExpenseCategories(cur, prior);
+    expect(out.find((c) => c.category === "Rent")!.sharePct).toBeCloseTo(75); // 15000/20000
+  });
+  it("computes change vs prior, withholding when prior is zero", () => {
+    const out = aggregateExpenseCategories(cur, prior);
+    expect(out.find((c) => c.category === "Supplies")!.changePct).toBeCloseTo(25); // 5000 vs 4000
+    const novel = aggregateExpenseCategories([{ category: "Marketing", amount: 500 }], []);
+    expect(novel[0].changePct).toBeNull(); // no fake %
+  });
+});
+
+describe("priorRange = equal-length window immediately before", () => {
+  it("mirrors a month-length range", () => {
+    expect(priorRange({ from: "2026-06-01", to: "2026-06-30" })).toEqual({ from: "2026-05-02", to: "2026-05-31" });
+  });
+  it("handles a single day", () => {
+    expect(priorRange({ from: "2026-06-10", to: "2026-06-10" })).toEqual({ from: "2026-06-09", to: "2026-06-09" });
   });
 });
 

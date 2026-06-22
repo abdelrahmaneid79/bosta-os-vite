@@ -13,6 +13,7 @@ import { getSettlementPeriods, getCheques } from "@/core/read/settlements";
 import { getExpenses, getExpenseTotal } from "@/core/read/expenses";
 import { getLocations } from "@/core/read/common";
 import { voidMovement, reconcileCheque, voidCheque, openSettlementPeriod, voidExpense } from "@/core/db/mutations";
+import { errorMessage } from "@/core/db/errors";
 import { CashForm, ChequeForm, ExpenseForm } from "./forms";
 import { useUI } from "@/store/ui";
 
@@ -36,7 +37,7 @@ export function MoneyScreen() {
   const accounts = useQuery({ queryKey: ["money-accounts"], queryFn: getMoneyAccounts, enabled: en });
   const accId = accounts.data?.[0]?.id;
   const c = sum.data;
-  const del = useMutation({ mutationFn: (id: string) => voidMovement(id, accId!), onSuccess: () => { toast("Movement voided", "success"); setVoidMv(null); qc.invalidateQueries(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
+  const del = useMutation({ mutationFn: (id: string) => voidMovement(id, accId!), onSuccess: () => { toast("Movement voided", "success"); setVoidMv(null); qc.invalidateQueries(); }, onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); } });
   if (!en) return <EmptyState title="Sign in to load money" />;
 
   const titles = { count: "Count cash", in: "Add cash", out: "Cash out", withdraw: "Owner withdrawal" } as const;
@@ -94,7 +95,7 @@ export function ExpensesScreen() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
   const total = useQuery({ queryKey: ["expenseTotal", r], queryFn: () => getExpenseTotal(r), enabled: en });
-  const del = useMutation({ mutationFn: (id: string) => voidExpense(id), onSuccess: () => { toast("Expense voided", "success"); setVoidId(null); qc.invalidateQueries(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
+  const del = useMutation({ mutationFn: (id: string) => voidExpense(id), onSuccess: () => { toast("Expense voided", "success"); setVoidId(null); qc.invalidateQueries(); }, onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); } });
   if (!en) return <EmptyState title="Sign in to load expenses" />;
   return (
     <div className="space-y-4">
@@ -141,9 +142,9 @@ export function ChequesScreen() {
   const periods = useQuery({ queryKey: ["periods"], queryFn: getSettlementPeriods, enabled: en });
   const cheques = useQuery({ queryKey: ["cheques"], queryFn: getCheques, enabled: en });
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
-  const openPeriod = useMutation({ mutationFn: () => openSettlementPeriod(locations.data![0].id, monthBoundsCairo().from), onSuccess: () => { toast("Settlement period ready for this month", "success"); qc.invalidateQueries(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
-  const rec = useMutation({ mutationFn: (id: string) => reconcileCheque(id), onSuccess: () => { toast("Cheque reconciled", "success"); setConfirm(null); qc.invalidateQueries(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
-  const del = useMutation({ mutationFn: (id: string) => voidCheque(id), onSuccess: () => { toast("Cheque voided", "success"); setConfirm(null); qc.invalidateQueries(); }, onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error") });
+  const openPeriod = useMutation({ mutationFn: () => openSettlementPeriod(locations.data![0].id, monthBoundsCairo().from), onSuccess: () => { toast("Settlement period ready for this month", "success"); qc.invalidateQueries(); }, onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); } });
+  const rec = useMutation({ mutationFn: (id: string) => reconcileCheque(id), onSuccess: () => { toast("Cheque reconciled", "success"); setConfirm(null); qc.invalidateQueries(); }, onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); } });
+  const del = useMutation({ mutationFn: (id: string) => voidCheque(id), onSuccess: () => { toast("Cheque voided", "success"); setConfirm(null); qc.invalidateQueries(); }, onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); } });
   if (!en) return <EmptyState title="Sign in to load settlements" />;
 
   return (

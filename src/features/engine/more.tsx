@@ -4,6 +4,7 @@ import Papa from "papaparse";
 import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge } from "@/components/ui";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState } from "@/components/feedback";
+import { errorMessage } from "@/core/db/errors";
 import { parseSalesRows, parseExpenseRows, type Row } from "@/core/import/csv";
 import { getChannels } from "@/core/read/common";
 import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
@@ -11,13 +12,13 @@ import type { Enums } from "@/core/db/tables";
 import { egp, egpShort, pct } from "@/core/utils/format";
 import { isEngineConfigured, sb } from "@/core/db/engine";
 import { useAuth, SignOutButton } from "@/features/auth/auth";
-import { monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, todayCairo } from "@/core/time";
+import { monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, todayCairo, priorRange } from "@/core/time";
 import { getStockSummary } from "@/core/read/stock";
 import { getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
 import { getProductProfit } from "@/core/read/products";
 import { getPurchaseTotal } from "@/core/read/purchases";
-import { getSettings, getExpenses } from "@/core/read/expenses";
+import { getSettings, getExpenses, getExpenseCategoryTrends } from "@/core/read/expenses";
 import { getCheques } from "@/core/read/settlements";
 import { getLocations } from "@/core/read/common";
 import { setAppSetting, setLocationTerm } from "@/core/db/mutations";
@@ -25,8 +26,9 @@ import { WRITE_BADGE } from "@/core/capabilities";
 import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
-type RK = "30d" | "month" | "last";
-const range = (k: RK) => k === "30d" ? { from: isoDaysAgo(todayCairo(), 29), to: todayCairo() } : k === "last" ? lastMonthBoundsCairo() : monthBoundsCairo();
+type RK = "30d" | "month" | "last" | "custom";
+const presetRange = (k: Exclude<RK, "custom">) => k === "30d" ? { from: isoDaysAgo(todayCairo(), 29), to: todayCairo() } : k === "last" ? lastMonthBoundsCairo() : monthBoundsCairo();
+const rangeLabel = (k: RK) => k === "month" ? "this month" : k === "last" ? "last month" : k === "30d" ? "last 30 days" : "custom range";
 
 function downloadCSV(name: string, rows: Record<string, unknown>[]) {
   if (!rows.length) return;
@@ -40,23 +42,37 @@ function downloadCSV(name: string, rows: Record<string, unknown>[]) {
 // ── Reports ─────────────────────────────────────────────────────────────────
 export function ReportsScreen() {
   const [k, setK] = useState<RK>("month");
-  const r = range(k);
+  const [cFrom, setCFrom] = useState(monthBoundsCairo().from);
+  const [cTo, setCTo] = useState(todayCairo());
+  const r = k === "custom" ? { from: cFrom <= cTo ? cFrom : cTo, to: cTo >= cFrom ? cTo : cFrom } : presetRange(k);
+  const prior = priorRange(r);
   const stock = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: en });
   const sales = useQuery({ queryKey: ["salesStats", r], queryFn: () => getSalesStats(r), enabled: en });
   const profit = useQuery({ queryKey: ["profit", r], queryFn: () => getProfitReadout(r), enabled: en });
   const purch = useQuery({ queryKey: ["purchaseTotal", r], queryFn: () => getPurchaseTotal(r), enabled: en });
   const expenses = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
+  const expTrends = useQuery({ queryKey: ["expTrends", r, prior], queryFn: () => getExpenseCategoryTrends(r, prior), enabled: en });
   const cheques = useQuery({ queryKey: ["cheques"], queryFn: getCheques, enabled: en });
   const products = useQuery({ queryKey: ["productProfit", r], queryFn: () => getProductProfit(r), enabled: en });
   if (!en) return <EmptyState title="Sign in to build reports" />;
   const p = profit.data;
   const prods = products.data ?? [];
+  const cats = expTrends.data ?? [];
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Eyebrow>P&L · {k === "month" ? "this month" : k === "last" ? "last month" : "30 days"}</Eyebrow>
-        <Tabs value={k} onChange={setK} options={[{ value: "30d", label: "30 days" }, { value: "month", label: "This month" }, { value: "last", label: "Last month" }]} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Eyebrow>P&L · {rangeLabel(k)} {k === "custom" ? `(${r.from} → ${r.to})` : ""}</Eyebrow>
+        <Tabs value={k} onChange={setK} options={[{ value: "30d", label: "30 days" }, { value: "month", label: "This month" }, { value: "last", label: "Last month" }, { value: "custom", label: "Custom" }]} />
       </div>
+      {k === "custom" && (
+        <Card className="!py-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="From"><Input type="date" value={cFrom} max={cTo} onChange={(e) => setCFrom(e.target.value)} /></Field>
+            <Field label="To"><Input type="date" value={cTo} max={todayCairo()} onChange={(e) => setCTo(e.target.value)} /></Field>
+            <span className="pb-2 text-[11px] text-dim">vs prior {prior.from} → {prior.to}</span>
+          </div>
+        </Card>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Revenue" value={p ? egp(p.revenue) : "—"} />
         <Stat label="COGS" value={p ? egp(p.cogs) : "—"} />
@@ -116,6 +132,39 @@ export function ReportsScreen() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </Card>
+
+      <Card className="!p-0">
+        <div className="flex items-center justify-between px-4 pt-4">
+          <Eyebrow>Expenses by category · vs prior period</Eyebrow>
+          <Button variant="ghost" disabled={!cats.length}
+            onClick={() => downloadCSV("expense-categories.csv", cats.map((c) => ({ category: c.category, amount: Math.round(c.amount), prior: Math.round(c.prior), share_pct: c.sharePct.toFixed(1), change_pct: c.changePct == null ? "n/a" : c.changePct.toFixed(1) })))}>⤓ CSV</Button>
+        </div>
+        {expTrends.isLoading ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Loading…</div>
+          : cats.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">No expenses in this range.</div>
+          : (
+          <div className="mt-2 divide-y divide-line2">
+            {cats.slice(0, 12).map((c) => (
+              <div key={c.category} className="px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm capitalize text-text">{c.category}</div>
+                    <div className="text-[11px] text-dim">{pct(c.sharePct)} of spend{c.prior > 0 ? ` · was ${egp(c.prior)}` : " · new this period"}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-display text-sm font-semibold text-bad">−{egp(c.amount)}</div>
+                    {c.changePct != null && (
+                      <span className={`font-mono text-[11px] ${c.changePct > 0 ? "text-bad" : "text-good"}`}>
+                        {c.changePct > 0 ? "▲ +" : "▼ −"}{Math.abs(Math.round(c.changePct))}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line2"><div className="h-full rounded-full bg-warn/70" style={{ width: `${Math.max(2, Math.min(100, c.sharePct))}%` }} /></div>
+              </div>
+            ))}
           </div>
         )}
       </Card>
@@ -235,7 +284,7 @@ export function ImportsScreen() {
       return { imported, skipped, failed };
     },
     onSuccess: (res) => { toast(`Imported ${res.imported} · skipped ${res.skipped}${res.failed ? ` · failed ${res.failed}` : ""}`, res.failed ? "error" : "success"); qc.invalidateQueries(); setRows(null); setFileName(""); },
-    onError: (e) => toast(e instanceof Error ? e.message : "Import failed", "error"),
+    onError: (e) => { console.error("[BostaOS import]", e); toast(errorMessage(e), "error"); },
   });
 
   if (!en) return <EmptyState title="Sign in to import" />;
@@ -328,7 +377,7 @@ export function SettingsScreen() {
       return setLocationTerm(loc.id, "revenue_charge", (num(share) ?? 0) / 100, todayCairo()); // % → rate
     },
     onSuccess: () => { toast("Saved", "success"); setConfirm(null); qc.invalidateQueries(); },
-    onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error"),
+    onError: (e) => { console.error("[BostaOS write]", e); toast(errorMessage(e), "error"); },
   });
 
   if (!en) return <EmptyState title="Sign in to manage settings" />;

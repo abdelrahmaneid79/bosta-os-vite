@@ -230,3 +230,37 @@ Creating new records (products, sales, expenses, movements) does not — that's 
 - `A sale already exists for that day — open it to add items.` → expected dup-day guard (not a bug).
 - `A received cheque needs an amount received and a received date.` → expected cheque validation.
 - Any balance/stock number that does **not** change after a write, or a cash balance that diverges after a count → screenshot the screen + the value.
+
+---
+
+# Cycle 2 — Debuggability, reporting depth & mocked write tests
+
+## Friendly write errors (fixed)
+Failed writes now show an **owner-friendly reason + the raw DB message + code**, and
+log the full error object to the console (`[BostaOS write] …`). Previously a
+Supabase `PostgrestError` (a plain object, not an `Error`) was swallowed as a
+generic "Save failed" — that's fixed.
+- [ ] Force an error (e.g. a write your RLS forbids) → toast reads e.g.
+  *"Permission denied — your account can't write here (check RLS policies) — new row violates… [42501]"*.
+- [ ] Open DevTools console → the full error object is logged for screenshots.
+- [ ] Duplicate sale day → friendly *"That record already exists…"* still backed by the raw guard message.
+
+## Reports — custom date range
+- [ ] Reports → **Custom** tab → pick From / To → every section (P&L, products, expense
+  categories) recomputes for that window. "From" can't exceed "To"; "To" capped at today.
+- [ ] The header shows the resolved range and the **prior comparison window**.
+
+## Reports — expenses by category (new, read-only)
+- [ ] "Expenses by category" lists each with **share of spend** and **% change vs the prior
+  equal-length period**; a brand-new category shows "new this period" (no fake %).
+- [ ] ⤓ CSV exports category, amount, prior, share_pct, change_pct.
+
+## Backdated purchase note
+- [ ] Buy → set a **past** date → a warning explains prior sales keep their captured cost;
+  going-forward WAC reflects the batch. (No silent COGS rewrite.)
+
+## Automated coverage added this cycle
+- **63 unit tests** (2 files). New: friendly-error mapping, expense-category aggregation,
+  `priorRange`, and the **first mocked-Supabase mutation tests** (`mutations.test.ts`)
+  proving the duplicate-day guard blocks a second insert, and that a withdrawal posts as
+  **negative** cash and triggers `recalc_money_account`. These run with **no database**.

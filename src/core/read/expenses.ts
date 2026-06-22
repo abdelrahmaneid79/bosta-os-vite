@@ -26,6 +26,48 @@ export async function getExpenses(range: DateRange): Promise<ExpenseRow[]> {
 export async function getExpenseTotal(range: DateRange): Promise<number> {
   return (await getExpenses(range)).reduce((s, e) => s + e.amount, 0);
 }
+
+export interface ExpenseCatStat {
+  category: string;
+  amount: number;       // this period
+  prior: number;        // comparison period
+  sharePct: number;     // % of this period's total spend
+  changePct: number | null; // vs prior; null when prior is 0 (no fake %)
+}
+/** PURE: group expenses by category for the current period and compare to a
+ *  prior period. Share is of the current total; change is withheld (null) when
+ *  the prior period had nothing, so we never invent a percentage. */
+export function aggregateExpenseCategories(
+  current: { category: string; amount: number }[],
+  prior: { category: string; amount: number }[],
+): ExpenseCatStat[] {
+  const sum = (rows: { category: string; amount: number }[]) => {
+    const m = new Map<string, number>();
+    for (const r of rows) m.set(r.category, (m.get(r.category) ?? 0) + r.amount);
+    return m;
+  };
+  const cur = sum(current);
+  const pri = sum(prior);
+  const total = [...cur.values()].reduce((s, v) => s + v, 0);
+  const out: ExpenseCatStat[] = [];
+  for (const [category, amount] of cur) {
+    const prVal = pri.get(category) ?? 0;
+    out.push({
+      category, amount, prior: prVal,
+      sharePct: total > 0 ? (amount / total) * 100 : 0,
+      changePct: prVal > 0 ? ((amount - prVal) / prVal) * 100 : null,
+    });
+  }
+  return out.sort((a, b) => b.amount - a.amount);
+}
+
+export async function getExpenseCategoryTrends(current: DateRange, prior: DateRange): Promise<ExpenseCatStat[]> {
+  const [cur, pri] = await Promise.all([getExpenses(current), getExpenses(prior)]);
+  return aggregateExpenseCategories(
+    cur.map((e) => ({ category: e.category, amount: e.amount })),
+    pri.map((e) => ({ category: e.category, amount: e.amount })),
+  );
+}
 export async function getExpenseCategories(): Promise<{ id: string; name: string; isOperating: boolean }[]> {
   const { data, error } = await requireEngine()
     .from("expense_categories").select("id,name,is_operating").eq("active", true).order("sort_order");
