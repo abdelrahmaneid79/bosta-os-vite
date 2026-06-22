@@ -11,7 +11,7 @@ import { getSettlementPeriods } from "@/core/read/settlements";
 import type { Tables, Enums } from "@/core/db/tables";
 import type { SaleLine } from "@/core/read/sales";
 import {
-  createProduct, updateProduct, addPurchase, createSale, addSaleItem, editSaleItem,
+  createProduct, updateProduct, deleteProduct, addPurchase, createSale, addSaleItem, editSaleItem,
   addExpense, ensureExpenseCategory, createMovement, recordWithdrawal, recordCashCount, recordCheque,
   type ProductInput,
 } from "@/core/db/mutations";
@@ -41,6 +41,7 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
   const [low, setLow] = useState(product?.low_stock_threshold != null ? String(product.low_stock_threshold) : "");
   const [active, setActive] = useState(product?.active ?? true);
 
+  const [confirmDel, setConfirmDel] = useState(false);
   const m = useMutation({
     mutationFn: () => {
       const input: ProductInput = {
@@ -50,6 +51,11 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
       return product ? updateProduct(product.id, input).then(() => product.id) : createProduct(input);
     },
     onSuccess: () => w.ok(product ? `Updated "${nameEn.trim()}"` : `Added "${nameEn.trim()}" to Goods`),
+    onError: w.fail,
+  });
+  const del = useMutation({
+    mutationFn: () => deleteProduct(product!.id),
+    onSuccess: () => w.ok(`Deleted "${product!.name_en}"`),
     onError: w.fail,
   });
 
@@ -70,6 +76,20 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
         <label className="flex items-center gap-2 pt-7 text-sm text-muted"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
       </div>
       <Button type="submit" disabled={m.isPending} className="w-full">{m.isPending ? "Saving…" : product ? "Save changes" : "Add product"}</Button>
+      {product && (
+        confirmDel ? (
+          <div className="rounded-xl border border-bad/40 bg-bad/5 p-3 text-center">
+            <div className="text-[13px] text-bad">Delete "{product.name_en}" permanently?</div>
+            <div className="mt-1 text-[11px] text-dim">Only works if it has no purchase/sale history. Otherwise untick Active to retire it.</div>
+            <div className="mt-2 flex gap-2">
+              <Button type="button" variant="ghost" className="flex-1" onClick={() => setConfirmDel(false)}>Cancel</Button>
+              <button type="button" disabled={del.isPending} onClick={() => del.mutate()} className="flex-1 rounded-xl bg-bad px-3 py-2 font-display text-sm font-semibold text-white disabled:opacity-60">{del.isPending ? "Deleting…" : "Delete"}</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmDel(true)} className="w-full text-center text-xs text-bad hover:underline">Delete this product</button>
+        )
+      )}
     </form>
   );
 }
@@ -105,7 +125,7 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
       <Field label="Product">
         <Select value={productId} onChange={(e) => setProductId(e.target.value)} required>
           <option value="">Select a product…</option>
-          {(products.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name_en}{p.name_ar ? ` · ${p.name_ar}` : ""}</option>)}
+          {(products.data ?? []).filter((p) => p.active || p.id === productId).map((p) => <option key={p.id} value={p.id}>{p.name_en}{p.name_ar ? ` · ${p.name_ar}` : ""}</option>)}
         </Select>
       </Field>
       <div className="grid grid-cols-2 gap-3">
@@ -175,7 +195,7 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
       <Field label="Product">
         <Select value={productId} onChange={(e) => setProductId(e.target.value)} required>
           <option value="">Select a product…</option>
-          {(products.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name_en}{p.name_ar ? ` · ${p.name_ar}` : ""}</option>)}
+          {(products.data ?? []).filter((p) => p.active || p.id === productId).map((p) => <option key={p.id} value={p.id}>{p.name_en}{p.name_ar ? ` · ${p.name_ar}` : ""}</option>)}
         </Select>
       </Field>
       <div className="grid grid-cols-2 gap-3">

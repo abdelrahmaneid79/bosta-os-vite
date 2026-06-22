@@ -76,3 +76,31 @@ export function parseExpenseRows(rows: Row[]): ExpenseRowParsed[] {
     return { date, category, amount, payment, notes, issues };
   });
 }
+
+/** Heuristic reader for a single receipt/screenshot's OCR text → best (date,
+ *  total) guess. Picks the first parseable date and the amount on a line that
+ *  mentions "total" (falling back to the largest money number). The owner
+ *  always edits before approving, so this only needs to get close. Pure. */
+export function scanReceiptText(text: unknown): { date: string | null; total: number | null } {
+  const lines = String(text ?? "").split(/\r?\n/);
+  const dateRe = /(\d{4}-\d{2}-\d{2})|(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})/;
+  const moneyRe = /\d[\d,]*\.?\d*/g;
+  // Money numbers from a line, after removing any date token so date digits
+  // (e.g. 2026) don't masquerade as amounts.
+  const moneyOf = (line: string): number[] => {
+    const cleaned = line.replace(dateRe, " ");
+    const m = cleaned.match(moneyRe);
+    return m ? m.map(toNum).filter((x): x is number => x != null && x > 0) : [];
+  };
+  let date: string | null = null;
+  const amounts: number[] = [];
+  for (const line of lines) {
+    if (!date) { const dm = line.match(dateRe); if (dm) { const iso = toIso(dm[0]); if (iso) date = iso; } }
+    amounts.push(...moneyOf(line));
+  }
+  let total: number | null = null;
+  const totalLine = lines.find((l) => /total|الاجمالي|الإجمالي|اجمالي|net/i.test(l));
+  if (totalLine) { const vals = moneyOf(totalLine); if (vals.length) total = Math.max(...vals); }
+  if (total == null && amounts.length) total = Math.max(...amounts);
+  return { date, total };
+}

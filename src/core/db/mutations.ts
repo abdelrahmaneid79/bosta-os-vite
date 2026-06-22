@@ -70,6 +70,17 @@ export async function setProductActive(id: string, active: boolean): Promise<voi
   if (error) throw error;
 }
 
+/** Permanently delete a product. Succeeds when it has no purchase/sale history;
+ *  if the database blocks it (foreign-key references), the caller gets a clear
+ *  error and should deactivate instead — we never silently orphan financial data. */
+export async function deleteProduct(id: string): Promise<void> {
+  const sb = requireEngine();
+  // remove aliases first (safe, owned by the product), then the product itself
+  await sb.from("product_aliases").delete().eq("product_id", id);
+  const { error } = await sb.from("products").delete().eq("id", id);
+  if (error) throw error;
+}
+
 /** Teach the import matcher an alternate name for a product (idempotent-ish). */
 export async function addAlias(productId: string, alias: string): Promise<void> {
   const normalized = alias.trim().toLowerCase().replace(/\s+/g, " ");

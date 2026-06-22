@@ -328,3 +328,39 @@ generic "Save failed" — that's fixed.
 
 ## Coverage: **70 unit tests** — added the date-range engine (rolling/calendar/quarter/
 year/custom, Jan rollover, Feb end, reversed custom, labels).
+
+---
+
+# Cycle 5 — Brand, nav consolidation, smart receipts, delete
+
+## Navigation merged (16 buttons → 6 sections + Settings)
+- [ ] Rail shows: **Today · Sales · Inventory · Money · Reports · Insights** + **Settings** (bottom).
+- [ ] Each section has sub-tabs at the top of the page:
+  - Sales → **Sales days** / **Import & receipts**
+  - Inventory → **Stock** / **Purchases**
+  - Money → **Cash** / **Spend** / **Cheques**
+  - Reports → **Summary** / **Profit**
+  - Insights → **Health** / **Gaps** / **Activity**
+  - Settings → **General** / **System** / **QA Mode**
+- [ ] Old deep links still work (e.g. /stock, /cheques, /reconcile, /missing, /imports→/sales/import).
+
+## Brand / logo (real Bosta Bites mascot)
+- [ ] Rail top shows the **peanut mascot** mark (not a blob); the **+** is a clean round pink button below it.
+- [ ] Login + splash + header avatar use the mascot. (Assets: /public/mascot.png, mascot-96.png.)
+
+## Smart receipts / import (Sales → Import & receipts)
+- [ ] Accepts **CSV, Excel (.xlsx/.xls), and images (PNG/JPG)**.
+- [ ] Image: it runs **in-browser OCR** (downloads the engine on first use — needs internet) and pre-fills the
+  best-guess date + total; you then **edit** and Approve. Nothing saves until Approve.
+- [ ] Every format lands in an **editable table** (fix any value, add/remove rows) with duplicate-day skipping.
+- [ ] "Enter manually" lets you type rows with no file.
+
+## Delete anything you create
+- [ ] Goods → edit a product → **Delete this product** (confirm). Works when it has no history;
+  if it's referenced, you get a clear message to untick **Active** instead.
+- [ ] Inactive/voided products no longer appear in the purchase/sale product pickers or the Buy filter.
+
+## Coverage: **73 unit tests** — added receipt-OCR text scanning (date + total guess, honest nulls).
+
+> Note: image OCR can't be exercised in CI (no browser); the *parsing* of OCR text is unit-tested,
+> and the Tesseract call is a thin wrapper that runs in your browser.

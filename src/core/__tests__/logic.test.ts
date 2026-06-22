@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { CAP, isEnabled, cap } from "@/core/capabilities";
 import { reconTolerance } from "@/core/read/sales";
-import { toIso, toNum, parseSalesRows, parseExpenseRows } from "@/core/import/csv";
+import { toIso, toNum, parseSalesRows, parseExpenseRows, scanReceiptText } from "@/core/import/csv";
 import { composeProfit } from "@/core/read/profit";
 import { aggregateProductProfit } from "@/core/read/products";
 import { mergeActivity, type ActivityEvent } from "@/core/read/activity";
@@ -40,6 +40,21 @@ describe("import CSV parsing", () => {
     const rows = parseExpenseRows([{ date: "2/6/2026", account: "Rent", amount: "15000" }]);
     expect(rows[0]).toMatchObject({ date: "2026-06-02", category: "Rent", amount: 15000 });
     expect(parseExpenseRows([{ date: "2026-06-02", amount: "10" }])[0].category).toBe("Other");
+  });
+});
+
+describe("receipt OCR text scanning (best-guess date + total)", () => {
+  it("picks the date and the total-labelled amount", () => {
+    const text = "Bosta Bites\nDate: 12/06/2026\nItems 320.00\nVAT 44.80\nTOTAL  4,200.50\nThank you";
+    expect(scanReceiptText(text)).toEqual({ date: "2026-06-12", total: 4200.5 });
+  });
+  it("falls back to the largest number when no total label", () => {
+    const text = "2026-06-01\n120\n980\n55";
+    expect(scanReceiptText(text)).toEqual({ date: "2026-06-01", total: 980 });
+  });
+  it("returns nulls on unreadable text without inventing data", () => {
+    expect(scanReceiptText("no useful content here")).toEqual({ date: null, total: null });
+    expect(scanReceiptText("")).toEqual({ date: null, total: null });
   });
 });
 

@@ -1,27 +1,28 @@
 /**
- * BostaOS v2 shell — matches the Claude Design reference: slim pink-accented
- * rail, central + quick-add (write-gated), big Fredoka header, jet bg with pink
- * glow. Fully operational over the verified Supabase engine.
+ * BostaOS shell — Bosta Bites brand: jet background with pink glow, the peanut
+ * mascot mark, and a slim rail of consolidated sections. Each section groups
+ * related screens behind sub-tabs (Sales = days + receipts, Inventory = stock +
+ * purchases, Money = cash + spend + cheques, Reports = summary + profit,
+ * Insights = health + gaps + activity, Settings = general + system + QA).
  */
 import { lazy, Suspense, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/core/utils/cn";
 import { fmtDate } from "@/core/utils/date";
 import { monthBoundsCairo } from "@/core/time";
 import { AuthProvider, AuthGate } from "@/features/auth/auth";
-import { GatedButton } from "@/components/ui";
 import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
 import { WRITE_BADGE } from "@/core/capabilities";
 
-// Lazy route chunks — each feature module is split out of the initial bundle so
-// the shell + Today load fast; the rest stream in on navigation.
+// Lazy route chunks — split out of the initial bundle.
 const screens = () => import("@/features/engine/screens");
 const dash = () => import("@/features/engine/dashboard");
 const money = () => import("@/features/engine/money");
 const more = () => import("@/features/engine/more");
 const product = () => import("@/features/engine/product");
+const receipts = () => import("@/features/engine/receipts");
 const qa = () => import("@/features/qa/QAScreen");
 const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
   lazy(() => load().then((m) => ({ default: m[key] as unknown as React.ComponentType })));
@@ -39,27 +40,18 @@ const ChequesScreen = L(money, "ChequesScreen");
 const ExpensesScreen = L(money, "ExpensesScreen");
 const ReportsScreen = L(more, "ReportsScreen");
 const SystemCheckScreen = L(more, "SystemCheckScreen");
-const ImportsScreen = L(more, "ImportsScreen");
 const SettingsScreen = L(more, "SettingsScreen");
+const ReceiptsScreen = L(receipts, "ReceiptsScreen");
 const QAScreen = L(qa, "QAScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
 
 const I = {
   today: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
   sales: "M3 3v18h18M7 14l3-3 3 3 5-6",
-  goods: "M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10",
-  buy: "M6 6h15l-1.6 9H7.6zM6 6 5 3H2M9 20.5a.9.9 0 1 0 0-.01M18 20.5a.9.9 0 1 0 0-.01",
-  cash: "M3 7h18v11H3zM3 11h18M7 15h3",
-  spend: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
-  cheques: "M2 7h20v10H2zM2 11h20M6 15h4",
-  profit: "M5 21V10M12 21V4M19 21v-7",
+  inventory: "M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10",
+  money: "M3 7h18v11H3zM3 11h18M7 15h3",
   reports: "M6 2h9l5 5v15H4V2zM9 13h6M9 17h6",
-  health: "M22 12h-4l-3 8L9 4l-3 8H2",
-  gaps: "M12 2 2 22h20zM12 9v5M12 18h.01",
-  activity: "M3 12h4l2 6 4-14 2 8h6",
-  qa: "M9 11l3 3 8-8M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
-  more: "M5 12h.01M12 12h.01M19 12h.01",
-  system: "M9 12l2 2 4-4M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7z",
+  insights: "M22 12h-4l-3 8L9 4l-3 8H2",
   settings: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a8 8 0 0 0 .1-3l1.6-1.2-2-3.4-1.8.7a8 8 0 0 0-2.6-1.5L14 1h-4l-.3 1.9a8 8 0 0 0-2.6 1.5l-1.8-.7-2 3.4L4.7 12a8 8 0 0 0 0 3l-1.6 1.2 2 3.4 1.8-.7a8 8 0 0 0 2.6 1.5L10 23h4l.3-1.9a8 8 0 0 0 2.6-1.5l1.8.7 2-3.4z",
   plus: "M12 5v14M5 12h14",
   search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3",
@@ -69,39 +61,67 @@ function Icon({ d, className = "h-5 w-5", w = 1.9 }: { d: string; className?: st
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" className={className}><path d={d} /></svg>;
 }
 
-interface Item { to: string; label: string; icon: string; el: React.ReactNode; }
-const NAV: Item[] = [
-  { to: "/dashboard", label: "Today", icon: I.today, el: <DashboardScreen /> },
-  { to: "/sales", label: "Sales", icon: I.sales, el: <SalesScreen /> },
-  { to: "/stock", label: "Goods", icon: I.goods, el: <StockScreen /> },
-  { to: "/purchases", label: "Buy", icon: I.buy, el: <PurchasesScreen /> },
-  { to: "/money", label: "Cash", icon: I.cash, el: <MoneyScreen /> },
-  { to: "/expenses", label: "Spend", icon: I.spend, el: <ExpensesScreen /> },
-  { to: "/cheques", label: "Cheques", icon: I.cheques, el: <ChequesScreen /> },
-  { to: "/reconcile", label: "Profit", icon: I.profit, el: <ReconcileScreen /> },
-  { to: "/reports", label: "Reports", icon: I.reports, el: <ReportsScreen /> },
-  { to: "/activity", label: "Activity", icon: I.activity, el: <ActivityScreen /> },
-  { to: "/health", label: "Health", icon: I.health, el: <HealthScreen /> },
-  { to: "/missing", label: "Gaps", icon: I.gaps, el: <MissingScreen /> },
+interface Tab { to: string; label: string; el: React.ReactNode }
+interface Group { id: string; label: string; icon: string; tabs: Tab[] }
+
+const GROUPS: Group[] = [
+  { id: "today", label: "Today", icon: I.today, tabs: [{ to: "/dashboard", label: "Today", el: <DashboardScreen /> }] },
+  { id: "sales", label: "Sales", icon: I.sales, tabs: [
+    { to: "/sales", label: "Sales days", el: <SalesScreen /> },
+    { to: "/sales/import", label: "Import & receipts", el: <ReceiptsScreen /> },
+  ] },
+  { id: "inventory", label: "Inventory", icon: I.inventory, tabs: [
+    { to: "/stock", label: "Stock", el: <StockScreen /> },
+    { to: "/purchases", label: "Purchases", el: <PurchasesScreen /> },
+  ] },
+  { id: "money", label: "Money", icon: I.money, tabs: [
+    { to: "/money", label: "Cash", el: <MoneyScreen /> },
+    { to: "/expenses", label: "Spend", el: <ExpensesScreen /> },
+    { to: "/cheques", label: "Cheques", el: <ChequesScreen /> },
+  ] },
+  { id: "reports", label: "Reports", icon: I.reports, tabs: [
+    { to: "/reports", label: "Summary", el: <ReportsScreen /> },
+    { to: "/reconcile", label: "Profit", el: <ReconcileScreen /> },
+  ] },
+  { id: "insights", label: "Insights", icon: I.insights, tabs: [
+    { to: "/health", label: "Health", el: <HealthScreen /> },
+    { to: "/missing", label: "Gaps", el: <MissingScreen /> },
+    { to: "/activity", label: "Activity", el: <ActivityScreen /> },
+  ] },
 ];
-const FOOT: Item[] = [
-  { to: "/imports", label: "Imports", icon: I.reports, el: <ImportsScreen /> },
-  { to: "/qa", label: "QA Mode", icon: I.qa, el: <QAScreen /> },
-  { to: "/system", label: "System", icon: I.system, el: <SystemCheckScreen /> },
-  { to: "/settings", label: "Settings", icon: I.settings, el: <SettingsScreen /> },
-];
-const ALL = [...NAV, ...FOOT];
-/** Primary tabs for the mobile bottom bar; the rest live behind "More". */
-const MOBILE_PRIMARY = ["/dashboard", "/sales", "/stock", "/money", "/activity"];
-const FULLTITLE: Record<string, string> = {
-  "/dashboard": "Today", "/sales": "Sales", "/stock": "Goods", "/purchases": "Purchases",
-  "/money": "Cash", "/expenses": "Expenses", "/cheques": "Cheques & Settlement", "/reconcile": "Profit", "/reports": "Reports",
-  "/activity": "Activity", "/health": "Business Health", "/missing": "Missing Data", "/imports": "Imports",
-  "/qa": "QA Mode", "/system": "System Check", "/settings": "Settings",
-};
+const SETTINGS: Group = { id: "settings", label: "Settings", icon: I.settings, tabs: [
+  { to: "/settings", label: "General", el: <SettingsScreen /> },
+  { to: "/system", label: "System", el: <SystemCheckScreen /> },
+  { to: "/qa", label: "QA Mode", el: <QAScreen /> },
+] };
+const ALL_GROUPS = [...GROUPS, SETTINGS];
+
+function groupForPath(pathname: string): Group | undefined {
+  return ALL_GROUPS.find((g) => g.tabs.some((t) => t.to === pathname || pathname.startsWith(t.to + "/")));
+}
+
+function SectionTabs({ group }: { group: Group }) {
+  if (group.tabs.length < 2) return null;
+  return (
+    <div className="mb-4 flex flex-wrap gap-1.5">
+      {group.tabs.map((t) => (
+        <NavLink key={t.to} to={t.to} end
+          className={({ isActive }) => cn("rounded-xl px-3.5 py-1.5 font-display text-[13px] font-semibold transition",
+            isActive ? "bg-pink text-ink shadow-pink" : "border border-line bg-panel2 text-muted hover:text-text")}>
+          {t.label}
+        </NavLink>
+      ))}
+    </div>
+  );
+}
+
+function Page({ group, children }: { group: Group; children: React.ReactNode }) {
+  return <><SectionTabs group={group} />{children}</>;
+}
 
 function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [view, setView] = useState<null | "product" | "purchase" | "sale" | "expense" | "cashcount">(null);
+  const navigate = useNavigate();
   if (!open) return null;
   const close = () => { setView(null); onClose(); };
   const titles = { product: "Add product", purchase: "Add purchase", sale: "New sale day", expense: "Add expense", cashcount: "Count cash" } as const;
@@ -125,8 +145,10 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
                 <span className="ml-auto rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-semibold text-good">enabled</span>
               </button>
             ))}
-            <div className="pt-2 font-mono text-[10px] uppercase tracking-wider text-dim">Coming soon</div>
-            {["Upload screenshot"].map((a) => <GatedButton key={a}>{a}</GatedButton>)}
+            <button onClick={() => { close(); navigate("/sales/import"); }} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
+              <span className="font-display text-sm font-semibold text-text">Import receipt / screenshot</span>
+              <span className="ml-auto rounded-full bg-pink/15 px-2 py-0.5 text-[10px] font-semibold text-pink">CSV · Excel · image</span>
+            </button>
           </div>
         )}
       </div>
@@ -135,19 +157,28 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 function Rail({ onAdd }: { onAdd: () => void }) {
+  const { pathname } = useLocation();
+  const active = groupForPath(pathname);
   return (
-    <aside className="no-scrollbar sticky top-0 hidden h-screen w-[76px] flex-shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-line2 bg-rail py-4 md:flex">
-      <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-xl bg-pink"><div className="mascot h-5 w-4" style={{ background: "#160910" }} /></div>
-      <button onClick={onAdd} className="lift my-1 flex h-11 w-11 items-center justify-center rounded-2xl bg-pink text-ink shadow-pink" aria-label="Quick add"><Icon d={I.plus} w={2.6} /></button>
-      {NAV.map((n) => <RailLink key={n.to} {...n} />)}
-      <div className="mt-auto flex flex-col items-center gap-1">{FOOT.map((n) => <RailLink key={n.to} {...n} />)}</div>
+    <aside className="no-scrollbar sticky top-0 hidden h-screen w-[84px] flex-shrink-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-line2 bg-rail py-4 md:flex">
+      <NavLink to="/dashboard" className="flex h-12 w-12 items-center justify-center rounded-2xl border border-line2 bg-panel2" title="Bosta Bites">
+        <img src="/mascot-96.png" alt="Bosta Bites" className="h-9 w-9 object-contain" />
+      </NavLink>
+      <button onClick={onAdd} className="lift mt-1 flex h-11 w-11 items-center justify-center rounded-full bg-pink text-ink shadow-pink" aria-label="Quick add">
+        <Icon d={I.plus} w={2.8} className="h-5 w-5" />
+      </button>
+      <div className="my-1 h-px w-9 bg-line2" />
+      {GROUPS.map((g) => <RailLink key={g.id} group={g} active={active?.id === g.id} />)}
+      <div className="mt-auto flex flex-col items-center gap-1.5 pt-2"><RailLink group={SETTINGS} active={active?.id === SETTINGS.id} /></div>
     </aside>
   );
 }
-function RailLink({ to, label, icon }: Item) {
+function RailLink({ group, active }: { group: Group; active: boolean }) {
   return (
-    <NavLink to={to} className={({ isActive }) => cn("navbtn flex w-[62px] flex-col items-center gap-1 rounded-xl py-2 transition", isActive ? "text-pink" : "text-faint hover:text-muted")}>
-      <Icon d={icon} /><span className="text-[8.5px] font-semibold">{label}</span>
+    <NavLink to={group.tabs[0].to}
+      className={cn("navbtn relative flex w-[68px] flex-col items-center gap-1 rounded-xl py-2 transition", active ? "text-pink" : "text-faint hover:text-muted")}>
+      {active && <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r bg-pink" />}
+      <Icon d={group.icon} /><span className="text-[9px] font-semibold">{group.label}</span>
     </NavLink>
   );
 }
@@ -155,60 +186,39 @@ function RailLink({ to, label, icon }: Item) {
 function Header({ onAdd }: { onAdd: () => void }) {
   const { pathname } = useLocation();
   const monthLabel = fmtDate(monthBoundsCairo().from, "MMMM yyyy");
+  const group = groupForPath(pathname);
+  const title = pathname.startsWith("/product/") ? "Product" : group?.label ?? "BostaOS";
   return (
     <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-line2 bg-rail/95 px-4 py-3 backdrop-blur sm:px-7">
       <div>
-        <div className="font-display text-xl font-semibold leading-tight sm:text-2xl">{pathname.startsWith("/product/") ? "Product" : FULLTITLE[pathname] ?? "BostaOS"}</div>
+        <div className="font-display text-xl font-semibold leading-tight sm:text-2xl">{title}</div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-dim">
           <span>Bosta Bites · {monthLabel}</span>
           <span className="rounded-full bg-good/15 px-2 py-0.5 font-display text-[10px] font-semibold text-good">{WRITE_BADGE}</span>
         </div>
       </div>
       <div className="flex-1" />
-      <div className="hidden items-center gap-2 rounded-xl border border-line bg-panel2 px-3 py-2 text-sm text-faint sm:flex">
-        <Icon d={I.search} className="h-4 w-4" /> Search…
-      </div>
       <button onClick={onAdd} className="lift flex h-9 items-center gap-1.5 rounded-xl bg-pink px-3 font-display text-sm font-semibold text-ink shadow-pink sm:hidden"><Icon d={I.plus} className="h-4 w-4" w={2.6} /></button>
-      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-pink to-berry font-display text-sm font-semibold text-white">B</div>
+      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-line2 bg-panel2"><img src="/mascot-96.png" alt="" className="h-7 w-7 object-contain" /></div>
     </header>
   );
 }
 
 function MobileNav() {
-  const [moreOpen, setMoreOpen] = useState(false);
   const { pathname } = useLocation();
-  const primary = MOBILE_PRIMARY.map((to) => ALL.find((n) => n.to === to)!).filter(Boolean);
-  const rest = ALL.filter((n) => !MOBILE_PRIMARY.includes(n.to));
-  const restActive = rest.some((n) => n.to === pathname);
+  const active = groupForPath(pathname);
+  const primary = GROUPS.slice(0, 5);
   return (
-    <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line2 bg-rail px-1 py-2 md:hidden">
-        {primary.map((n) => (
-          <NavLink key={n.to} to={n.to} className={({ isActive }) => cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", isActive ? "text-pink" : "text-faint")}>
-            <Icon d={n.icon} className="h-5 w-5" /><span className="text-[9px] font-semibold">{n.label}</span>
-          </NavLink>
-        ))}
-        <button onClick={() => setMoreOpen(true)} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", restActive ? "text-pink" : "text-faint")}>
-          <Icon d={I.more} className="h-5 w-5" /><span className="text-[9px] font-semibold">More</span>
-        </button>
-      </nav>
-      {moreOpen && (
-        <div onClick={() => setMoreOpen(false)} className="fixed inset-0 z-[60] flex items-end bg-black/70 md:hidden">
-          <div onClick={(e) => e.stopPropagation()} className="w-full animate-sheetUp rounded-t-3xl border border-line bg-panel2 p-5 pb-8 shadow-sheet">
-            <div className="mb-3 flex items-center justify-between"><div className="font-display text-lg font-semibold">All sections</div>
-              <button onClick={() => setMoreOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-line2 text-muted">✕</button></div>
-            <div className="grid grid-cols-3 gap-2">
-              {rest.map((n) => (
-                <NavLink key={n.to} to={n.to} onClick={() => setMoreOpen(false)}
-                  className={({ isActive }) => cn("flex flex-col items-center gap-1.5 rounded-2xl border border-line bg-panel p-3", isActive ? "text-pink" : "text-muted")}>
-                  <Icon d={n.icon} className="h-5 w-5" /><span className="text-[11px] font-semibold">{n.label}</span>
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line2 bg-rail px-1 py-2 md:hidden">
+      {primary.map((g) => (
+        <NavLink key={g.id} to={g.tabs[0].to} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active?.id === g.id ? "text-pink" : "text-faint")}>
+          <Icon d={g.icon} className="h-5 w-5" /><span className="text-[9px] font-semibold">{g.label}</span>
+        </NavLink>
+      ))}
+      <NavLink to={SETTINGS.tabs[0].to} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active?.id === "settings" || active?.id === "insights" ? "text-pink" : "text-faint")}>
+        <Icon d={I.settings} className="h-5 w-5" /><span className="text-[9px] font-semibold">More</span>
+      </NavLink>
+    </nav>
   );
 }
 
@@ -223,7 +233,10 @@ function Shell() {
           <Suspense fallback={<SkeletonRows rows={6} />}>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              {ALL.map((n) => <Route key={n.to} path={n.to} element={n.el} />)}
+              {ALL_GROUPS.flatMap((g) => g.tabs.map((t) => (
+                <Route key={t.to} path={t.to} element={<Page group={g}>{t.el}</Page>} />
+              )))}
+              <Route path="/imports" element={<Navigate to="/sales/import" replace />} />
               <Route path="/product/:id" element={<ProductDetailScreen />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>

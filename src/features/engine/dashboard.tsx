@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Pill, Ring, GatedButton, Badge, Button } from "@/components/ui";
+import { Card, Eyebrow, Pill, Ring, Badge, Button } from "@/components/ui";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -151,7 +151,9 @@ export function DashboardScreen() {
           <Link to="/sales" className="lift rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">+ Sale</Link>
           <Link to="/stock" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">+ Product</Link>
           <Link to="/purchases" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">+ Purchase</Link>
-          {["Add expense", "Count cash"].map((a) => <GatedButton key={a}>{a}</GatedButton>)}
+          <Link to="/expenses" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">Add expense</Link>
+          <Link to="/money" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">Count cash</Link>
+          <Link to="/sales/import" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">Import receipt</Link>
         </div>
       </Card>
     </div>

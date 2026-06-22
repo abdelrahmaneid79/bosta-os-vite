@@ -232,7 +232,7 @@ export function PurchasesScreen() {
       <div className="flex flex-wrap items-center gap-2">
         <Select value={productId} onChange={(e) => setProductId(e.target.value)} className="max-w-xs">
           <option value="">All products</option>
-          {(prods.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name_en}</option>)}
+          {(prods.data ?? []).filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name_en}</option>)}
         </Select>
         {productId && <Button variant="ghost" onClick={() => setProductId("")}>Clear</Button>}
       </div>
