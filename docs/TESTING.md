@@ -100,3 +100,13 @@ Report any red error toast verbatim (most likely: RLS, or an RPC arg mismatch).
 ## Capability badge
 - [ ] Header + System show "Operational · Imports coming soon".
 - [ ] Global + offers Sale/Purchase/Product/Expense/Count-cash (enabled); only "Upload screenshot" is Coming soon.
+
+---
+
+# Phase 6 — Imports (CSV → preview → approve)
+- [ ] Imports → Daily sales → upload CSV (date,total) → preview shows ready/duplicate/blocked.
+- [ ] Approve → creates sale days; already-present dates are skipped (dedup); counts shown.
+- [ ] Imports → Expenses → upload CSV (date,category,amount) → approve creates expenses (+ new categories).
+- [ ] Nothing saves until **Approve** is clicked (no auto-save).
+- [ ] Reports: Stock / P&L / Expenses / Cheques CSV all export.
+- [ ] Header + System badge read "Fully operational".

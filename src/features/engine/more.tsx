@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, Eyebrow, Stat, Button, Tabs, Field, Input } from "@/components/ui";
-import { EmptyState, ErrorState } from "@/components/feedback";
+import Papa from "papaparse";
+import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge } from "@/components/ui";
+import { EmptyState } from "@/components/feedback";
+import { parseSalesRows, parseExpenseRows, type Row } from "@/core/import/csv";
+import { getChannels } from "@/core/read/common";
+import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
+import type { Enums } from "@/core/db/tables";
 import { egp, egpShort, pct } from "@/core/utils/format";
 import { isEngineConfigured, sb } from "@/core/db/engine";
 import { useAuth, SignOutButton } from "@/features/auth/auth";
@@ -10,7 +15,8 @@ import { getStockSummary } from "@/core/read/stock";
 import { getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
 import { getPurchaseTotal } from "@/core/read/purchases";
-import { getSettings } from "@/core/read/expenses";
+import { getSettings, getExpenses } from "@/core/read/expenses";
+import { getCheques } from "@/core/read/settlements";
 import { getLocations } from "@/core/read/common";
 import { setAppSetting, setLocationTerm } from "@/core/db/mutations";
 import { WRITE_BADGE } from "@/core/capabilities";
@@ -37,6 +43,8 @@ export function ReportsScreen() {
   const sales = useQuery({ queryKey: ["salesStats", r], queryFn: () => getSalesStats(r), enabled: en });
   const profit = useQuery({ queryKey: ["profit", r], queryFn: () => getProfitReadout(r), enabled: en });
   const purch = useQuery({ queryKey: ["purchaseTotal", r], queryFn: () => getPurchaseTotal(r), enabled: en });
+  const expenses = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
+  const cheques = useQuery({ queryKey: ["cheques"], queryFn: getCheques, enabled: en });
   if (!en) return <EmptyState title="Sign in to build reports" />;
   const p = profit.data;
   return (
@@ -64,6 +72,10 @@ export function ReportsScreen() {
             })))}>⤓ Stock CSV</Button>
           <Button variant="outline" disabled={!p}
             onClick={() => downloadCSV("pnl-report.csv", p ? [{ range: k, revenue: Math.round(p.revenue), cogs: Math.round(p.cogs), gross_profit: p.grossProfit == null ? "unknown" : Math.round(p.grossProfit), margin_pct: p.margin == null ? "unknown" : p.margin.toFixed(1) }] : [])}>⤓ P&L CSV</Button>
+          <Button variant="outline" disabled={!expenses.data?.length}
+            onClick={() => downloadCSV("expenses-report.csv", (expenses.data ?? []).map((e) => ({ date: e.date, category: e.category, amount: Math.round(e.amount), payment: e.paymentMethod, notes: e.notes ?? "" })))}>⤓ Expenses CSV</Button>
+          <Button variant="outline" disabled={!cheques.data?.length}
+            onClick={() => downloadCSV("cheques-report.csv", (cheques.data ?? []).map((c) => ({ received_date: c.receivedDate ?? "", expected: Math.round(c.expected), received: c.received ?? "", difference: c.difference ?? "", status: c.status })))}>⤓ Cheques CSV</Button>
         </div>
       </Card>
     </div>
@@ -92,7 +104,7 @@ export function SystemCheckScreen() {
   const env: Chk[] = [
     { name: "Supabase configured", ok: isEngineConfigured, detail: isEngineConfigured ? "URL + anon key present" : "missing env" },
     { name: "Authenticated session", ok: !!session, detail: session ? (email ?? "signed in") : "not signed in" },
-    { name: "Write mode", ok: true, detail: "Operational (Imports gated)" },
+    { name: "Write mode", ok: true, detail: "Fully operational" },
   ];
   return (
     <div className="space-y-4">
@@ -119,19 +131,129 @@ function Group({ title, checks }: { title: string; checks: Chk[] }) {
   );
 }
 
-// ── Imports (read-only) ─────────────────────────────────────────────────────
+// ── Imports (CSV → preview → approve; never auto-saves) ──────────────────────
+const PAY: Enums<"payment_method">[] = ["cash", "cheque", "card", "transfer", "credit", "unknown"];
+type ImpKind = "sales" | "expenses";
+
 export function ImportsScreen() {
-  const q = useQuery({
-    queryKey: ["importsCount"], enabled: en,
-    queryFn: async () => { const { count, error } = await sb!.from("imports").select("id", { count: "exact", head: true }); if (error) throw error; return count ?? 0; },
+  const toast = useUI().toast;
+  const qc = useQueryClient();
+  const [kind, setKind] = useState<ImpKind>("sales");
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [fileName, setFileName] = useState("");
+  const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
+  const channels = useQuery({ queryKey: ["channels"], queryFn: getChannels, enabled: en });
+  const existingDays = useQuery({
+    queryKey: ["sale-days"], enabled: en && kind === "sales",
+    queryFn: async () => { const { data, error } = await sb!.from("sales").select("sale_date").is("voided_at", null); if (error) throw error; return new Set((data ?? []).map((r) => r.sale_date)); },
   });
-  if (!en) return <EmptyState title="Sign in to view imports" />;
-  if (q.isError) return <ErrorState message={String((q.error as Error)?.message)} />;
+
+  const sales = kind === "sales" && rows ? parseSalesRows(rows) : [];
+  const exps = kind === "expenses" && rows ? parseExpenseRows(rows) : [];
+  const dup = (d: string | null) => kind === "sales" && d != null && (existingDays.data?.has(d) ?? false);
+
+  const salesReady = sales.filter((r) => !r.issues.length && !dup(r.date));
+  const salesDup = sales.filter((r) => !r.issues.length && dup(r.date));
+  const expReady = exps.filter((r) => !r.issues.length);
+  const blocked = (kind === "sales" ? sales : exps).filter((r) => r.issues.length).length;
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return;
+    setFileName(f.name);
+    Papa.parse<Row>(f, { header: true, skipEmptyLines: true, complete: (res) => setRows(res.data), error: () => toast("Could not parse CSV", "error") });
+  }
+
+  const approve = useMutation({
+    mutationFn: async () => {
+      let imported = 0, skipped = 0, failed = 0;
+      if (kind === "sales") {
+        const loc = locations.data?.[0], ch = channels.data?.[0];
+        if (!loc || !ch) throw new Error("No active location/channel.");
+        const seen = new Set(existingDays.data ?? []);
+        for (const r of sales) {
+          if (r.issues.length || seen.has(r.date!)) { skipped++; continue; }
+          try { await createSale({ date: r.date!, total: r.total!, locationId: loc.id, channelId: ch.id }); seen.add(r.date!); imported++; }
+          catch { failed++; }
+        }
+      } else {
+        const loc = locations.data?.[0];
+        if (!loc) throw new Error("No active location.");
+        const cache = new Map<string, string>();
+        for (const r of exps) {
+          if (r.issues.length) { skipped++; continue; }
+          try {
+            const key = r.category.toLowerCase();
+            let catId = cache.get(key);
+            if (!catId) { catId = await ensureExpenseCategory(r.category, true); cache.set(key, catId); }
+            const pay = (PAY.includes(r.payment as Enums<"payment_method">) ? r.payment : "cash") as Enums<"payment_method">;
+            await addExpense({ date: r.date!, categoryId: catId, amount: r.amount!, paymentMethod: pay, notes: r.notes || null, locationId: loc.id });
+            imported++;
+          } catch { failed++; }
+        }
+      }
+      return { imported, skipped, failed };
+    },
+    onSuccess: (res) => { toast(`Imported ${res.imported} · skipped ${res.skipped}${res.failed ? ` · failed ${res.failed}` : ""}`, res.failed ? "error" : "success"); qc.invalidateQueries(); setRows(null); setFileName(""); },
+    onError: (e) => toast(e instanceof Error ? e.message : "Import failed", "error"),
+  });
+
+  if (!en) return <EmptyState title="Sign in to import" />;
+  const readyCount = kind === "sales" ? salesReady.length : expReady.length;
+
   return (
-    <Card>
-      <Eyebrow>Import history · read-only</Eyebrow>
-      <p className="mt-1 text-sm text-muted">{q.data ?? 0} approved imports on record. Upload + preview/approve is a write workflow and stays disabled until you approve writes.</p>
-    </Card>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Eyebrow>CSV import · preview → approve (never auto-saves)</Eyebrow>
+        <div className="flex-1" />
+        <Tabs value={kind} onChange={(v) => { setKind(v); setRows(null); }} options={[{ value: "sales", label: "Daily sales" }, { value: "expenses", label: "Expenses" }]} />
+      </div>
+
+      {!rows ? (
+        <Card className="border-dashed">
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <div className="font-display text-base font-semibold">Upload a {kind === "sales" ? "daily sales" : "expenses"} CSV</div>
+            <div className="max-w-md text-sm text-dim">
+              {kind === "sales" ? "Columns: date, total (grand total per day). Duplicate days are skipped." : "Columns: date, category, amount, payment, notes. New categories are created."}
+            </div>
+            <label className="lift cursor-pointer rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">
+              Choose CSV<input type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
+            </label>
+          </div>
+        </Card>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-dim">{fileName}</span>
+            <Badge tone="good">{readyCount} ready</Badge>
+            {kind === "sales" && salesDup.length > 0 && <Badge tone="neutral">{salesDup.length} duplicate</Badge>}
+            {blocked > 0 && <Badge tone="bad">{blocked} blocked</Badge>}
+            <div className="flex-1" />
+            <Button variant="ghost" onClick={() => { setRows(null); setFileName(""); }}>Cancel</Button>
+            <Button disabled={approve.isPending || readyCount === 0} onClick={() => approve.mutate()}>{approve.isPending ? "Importing…" : `Approve ${readyCount}`}</Button>
+          </div>
+          <Card className="!p-0">
+            <div className="max-h-[55vh] divide-y divide-line2 overflow-y-auto">
+              {(kind === "sales" ? sales : exps).slice(0, 200).map((r, i) => {
+                const bad = r.issues.length > 0;
+                const isDup = kind === "sales" && dup((r as { date: string | null }).date);
+                return (
+                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                    <span className={`h-2 w-2 flex-shrink-0 rounded-full ${bad ? "bg-bad" : isDup ? "bg-dim" : "bg-good"}`} />
+                    <div className="min-w-0 flex-1">
+                      {kind === "sales"
+                        ? <span className="text-text">{(r as { date: string | null }).date ?? "—"}</span>
+                        : <span className="text-text">{(r as { date: string | null; category: string }).date ?? "—"} · {(r as { category: string }).category}</span>}
+                      {(bad || isDup) && <span className="ml-2 text-[11px] text-dim">{bad ? r.issues.join(", ") : "already imported"}</span>}
+                    </div>
+                    <div className="font-display font-semibold text-text">{egp(kind === "sales" ? (r as { total: number | null }).total ?? 0 : (r as { amount: number | null }).amount ?? 0)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
   );
 }
 

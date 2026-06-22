@@ -36,13 +36,13 @@ export const CAP = {
   settlementOpen: "enabled",
   // Phase 7 — Settings
   settingsEdit: "enabled",
-  // Phase 6 — Imports (preview/approve flow not wired yet)
-  importApprove: "not-built",
+  // Phase 6 — Imports (CSV preview → approve)
+  importApprove: "enabled",
 } as const satisfies Record<string, Capability>;
 
 export type CapKey = keyof typeof CAP;
 export const cap = (k: CapKey): Capability => CAP[k];
-export const isEnabled = (k: CapKey): boolean => CAP[k] !== "not-built";
+export const isEnabled = (k: CapKey): boolean => (CAP[k] as Capability) !== "not-built";
 
 /** Human label for the header/system badges. */
-export const WRITE_BADGE = "Operational · Imports coming soon";
+export const WRITE_BADGE = "Fully operational";
