@@ -3,9 +3,8 @@
  * the proven Postgres RPCs (WAC, inventory ledger, settlement, money recalc)
  * shipped with the existing Supabase backend. This is the ONLY place those
  * write-path RPCs are invoked, with arguments typed from the generated schema.
- *
- * READ-ONLY MODE: nothing here is called yet. Writes are gated behind explicit
- * owner approval (see SCOPE + project rules). Reads live in src/core/read/*.
+ * Writes run under the owner's authenticated session (RLS). Reads live in
+ * src/core/read/*; all mutations route through src/core/db/mutations.ts.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
@@ -14,7 +13,7 @@ import type { FnArgs, Enums } from "./tables";
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-/** True when read access is configured (anon key — free, no writes implied). */
+/** True when Supabase is configured; the app runs under the owner's session. */
 export const isEngineConfigured = Boolean(url && anonKey);
 
 export const sb: SupabaseClient<Database> | null = isEngineConfigured

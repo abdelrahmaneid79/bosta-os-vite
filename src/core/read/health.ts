@@ -30,6 +30,81 @@ export interface HealthReport {
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 const colorFor = (s: number | null): HealthColor => s == null ? "none" : s >= 80 ? "good" : s >= 55 ? "warn" : "bad";
 
+/** Inputs for the pure scorer — all already-fetched primitives, no I/O. */
+export interface HealthInputs {
+  monthRev: number;
+  lastRev: number;
+  profit: { complete: boolean; margin: number | null; missingCostLines: number };
+  stock: { activeCount: number; costedCount: number; costedNonNegCount: number };
+  issuesCount: number;
+  streakDays: number;
+  cash: { score: number | null; errPct: number };
+}
+
+/** PURE health composition. Every score is real; a category reports `null`
+ *  (incomplete) rather than a fabricated number when its signal is missing.
+ *  Overall excludes the "data quality" category from the "is it meaningful"
+ *  test so a brand-new shop with only data gaps doesn't get a false score. */
+export function composeHealth(i: HealthInputs): HealthReport {
+  const cats: HealthCategory[] = [];
+
+  // Revenue — growth vs last month (null growth = first tracked month)
+  if (i.lastRev > 0 || i.monthRev > 0) {
+    const growth = i.lastRev > 0 ? (i.monthRev - i.lastRev) / i.lastRev : null;
+    const score = growth == null ? 60 : clamp(60 + growth * 200);
+    cats.push({
+      key: "revenue", label: "Revenue", score, trend: growth == null ? null : Math.round(growth * 100),
+      reason: growth == null ? "First tracked month — building a baseline." : `Sales ${growth >= 0 ? "ahead of" : "behind"} last month.`,
+      lift: "Log every sales day to sharpen the trend.", color: colorFor(score),
+    });
+  }
+  // Profit / margin — withheld when COGS incomplete
+  const profitScore = i.profit.complete && i.profit.margin != null ? clamp(i.profit.margin) : null;
+  cats.push({
+    key: "profit", label: "Profit", score: profitScore, trend: null,
+    reason: i.profit.complete ? `Net margin ${Math.round(i.profit.margin ?? 0)}% after cost.` : `Margin can't be scored — ${i.profit.missingCostLines} sold line(s) missing cost.`,
+    lift: "Add cost to every sold product.", color: colorFor(profitScore),
+  });
+  // Cash accuracy — from the latest physical count
+  cats.push({
+    key: "cash", label: "Cash", score: i.cash.score, trend: null,
+    reason: i.cash.score == null ? "No cash count yet." : `Counted cash within ${i.cash.errPct.toFixed(1)}% of expected.`,
+    lift: "Count the drawer daily.", color: colorFor(i.cash.score),
+  });
+  // Inventory — share of active products fully costed and non-negative
+  const stockScore = i.stock.activeCount ? clamp((i.stock.costedNonNegCount / i.stock.activeCount) * 100) : null;
+  cats.push({
+    key: "stock", label: "Inventory", score: stockScore, trend: null,
+    reason: stockScore == null ? "No products yet." : `${i.stock.costedCount}/${i.stock.activeCount} products fully costed.`,
+    lift: "Fix missing costs and negative stock.", color: colorFor(stockScore),
+  });
+  // Data quality — penalised per open gap
+  const dataScore = clamp(100 - i.issuesCount * 12);
+  cats.push({
+    key: "data", label: "Data quality", score: dataScore, trend: null,
+    reason: i.issuesCount === 0 ? "No open data gaps." : `${i.issuesCount} open gap(s) in Missing Data.`,
+    lift: "Clear items in the Missing Data center.", color: colorFor(dataScore),
+  });
+
+  const scored = cats.filter((c): c is HealthCategory & { score: number } => c.score != null);
+  const W: Record<string, number> = { revenue: 0.25, profit: 0.25, cash: 0.15, stock: 0.2, data: 0.15 };
+  const wsum = scored.reduce((s, c) => s + (W[c.key] ?? 0.1), 0);
+  const overallRaw = scored.length ? clamp(scored.reduce((s, c) => s + c.score * (W[c.key] ?? 0.1), 0) / wsum) : null;
+
+  const meaningful = scored.filter((c) => c.key !== "data");
+  const overall = meaningful.length ? overallRaw : null;
+  const sorted = [...scored].sort((a, b) => b.score - a.score);
+  return {
+    overall,
+    status: statusLabel(overall, meaningful.length),
+    level: overall == null ? null : Math.floor(overall / 12) + 1,
+    streakDays: i.streakDays,
+    categories: cats,
+    helping: sorted.filter((c) => c.score >= 75).slice(0, 3).map((c) => ({ label: c.label, score: c.score })),
+    hurting: sorted.filter((c) => c.score < 75).slice(-3).reverse().map((c) => ({ label: c.label, score: c.score })),
+  };
+}
+
 export async function getHealthReport(): Promise<HealthReport> {
   const month = monthBoundsCairo();
   const last = lastMonthBoundsCairo();
@@ -38,69 +113,17 @@ export async function getHealthReport(): Promise<HealthReport> {
     getStockSummary(), getMissingData(), salesStreak(),
   ]);
   const cash = await cashAccuracy();
-
-  const cats: HealthCategory[] = [];
-
-  // Revenue
-  if (lastRev > 0 || monthRev > 0) {
-    const growth = lastRev > 0 ? (monthRev - lastRev) / lastRev : null;
-    cats.push({
-      key: "revenue", label: "Revenue",
-      score: growth == null ? 60 : clamp(60 + growth * 200),
-      trend: growth == null ? null : Math.round(growth * 100),
-      reason: growth == null ? "First tracked month — building a baseline." : `Sales ${growth >= 0 ? "ahead of" : "behind"} last month.`,
-      lift: "Log every sales day to sharpen the trend.", color: colorFor(growth == null ? 60 : clamp(60 + growth * 200)),
-    });
-  }
-  // Profit / margin
-  cats.push({
-    key: "profit", label: "Profit",
-    score: profit.complete && profit.margin != null ? clamp(profit.margin) : null,
-    trend: null,
-    reason: profit.complete ? `Net margin ${Math.round(profit.margin ?? 0)}% after cost.` : `Margin can't be scored — ${profit.missingCostLines} sold line(s) missing cost.`,
-    lift: "Add cost to every sold product.", color: colorFor(profit.complete && profit.margin != null ? clamp(profit.margin) : null),
+  const active = stock.positions.filter((p) => p.active);
+  return composeHealth({
+    monthRev, lastRev,
+    profit: { complete: profit.complete, margin: profit.margin, missingCostLines: profit.missingCostLines },
+    stock: {
+      activeCount: active.length,
+      costedCount: active.filter((p) => p.hasCost).length,
+      costedNonNegCount: active.filter((p) => p.hasCost && p.onHand >= 0).length,
+    },
+    issuesCount: issues.length, streakDays, cash,
   });
-  // Cash accuracy
-  cats.push({
-    key: "cash", label: "Cash",
-    score: cash.score, trend: null,
-    reason: cash.score == null ? "No cash count yet." : `Counted cash within ${cash.errPct.toFixed(1)}% of expected.`,
-    lift: "Count the drawer daily.", color: colorFor(cash.score),
-  });
-  // Stock health
-  const activeStock = stock.positions.filter((p) => p.active);
-  const stockScore = activeStock.length ? clamp((activeStock.filter((p) => p.hasCost && p.onHand >= 0).length / activeStock.length) * 100) : null;
-  cats.push({
-    key: "stock", label: "Inventory",
-    score: stockScore, trend: null,
-    reason: stockScore == null ? "No products yet." : `${activeStock.filter((p) => p.hasCost).length}/${activeStock.length} products fully costed.`,
-    lift: "Fix missing costs and negative stock.", color: colorFor(stockScore),
-  });
-  // Data quality
-  const dataScore = clamp(100 - issues.length * 12);
-  cats.push({
-    key: "data", label: "Data quality",
-    score: dataScore, trend: null,
-    reason: issues.length === 0 ? "No open data gaps." : `${issues.length} open gap(s) in Missing Data.`,
-    lift: "Clear items in the Missing Data center.", color: colorFor(dataScore),
-  });
-
-  const scored = cats.filter((c): c is HealthCategory & { score: number } => c.score != null);
-  const W: Record<string, number> = { revenue: 0.25, profit: 0.25, cash: 0.15, stock: 0.2, data: 0.15 };
-  const wsum = scored.reduce((s, c) => s + (W[c.key] ?? 0.1), 0);
-  const overall = scored.length ? clamp(scored.reduce((s, c) => s + c.score * (W[c.key] ?? 0.1), 0) / wsum) : null;
-
-  const meaningful = scored.filter((c) => c.key !== "data");
-  const sorted = [...scored].sort((a, b) => b.score - a.score);
-  return {
-    overall: meaningful.length ? overall : null,
-    status: statusLabel(overall, meaningful.length),
-    level: overall == null ? null : Math.floor(overall / 12) + 1,
-    streakDays,
-    categories: cats,
-    helping: sorted.filter((c) => c.score >= 75).slice(0, 3).map((c) => ({ label: c.label, score: c.score })),
-    hurting: sorted.filter((c) => c.score < 75).slice(-3).reverse().map((c) => ({ label: c.label, score: c.score })),
-  };
 }
 
 function statusLabel(overall: number | null, meaningful: number): string {

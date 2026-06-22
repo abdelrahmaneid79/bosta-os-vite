@@ -48,7 +48,7 @@ function Centered({ children }: { children: ReactNode }) {
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink"><div className="mascot h-7 w-5" /></div>
           <div>
             <div className="font-display text-2xl font-semibold">BostaOS</div>
-            <div className="text-xs text-dim">Bosta Bites · read-only</div>
+            <div className="text-xs text-dim">Bosta Bites · operating system</div>
           </div>
         </div>
         {children}
@@ -65,7 +65,7 @@ function SetupScreen() {
         <p className="mt-1 text-sm text-muted">
           Add <span className="font-mono text-pink">VITE_SUPABASE_URL</span> and{" "}
           <span className="font-mono text-pink">VITE_SUPABASE_ANON_KEY</span> to <span className="font-mono">.env</span>,
-          then restart. The anon key is read-only here — no writes, no cost.
+          then restart. You'll sign in with your Supabase account; all actions run under that session.
         </p>
       </Card>
     </Centered>
@@ -91,7 +91,7 @@ function LoginScreen() {
         <Field label="Password"><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
         {err && <div className="rounded-lg bg-bad/10 px-3 py-2 text-[12px] text-bad">{err}</div>}
         <Button type="submit" disabled={busy} className="w-full">{busy ? "…" : "Sign in"}</Button>
-        <p className="text-center text-[11px] text-dim">Reads run under your session. RLS is enforced; nothing is written.</p>
+        <p className="text-center text-[11px] text-dim">All reads and writes run under your session. RLS is enforced.</p>
       </form>
     </Centered>
   );

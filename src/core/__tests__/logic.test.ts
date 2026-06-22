@@ -10,6 +10,9 @@ import {
   sortInsights, type StockPositionLite, type Velocity,
 } from "@/core/insights/risk";
 import { reconTolerance as recon } from "@/core/read/sales";
+import { signMoney, affectsProfit, type MoneyType } from "@/core/money/sign";
+import { composeHealth } from "@/core/read/health";
+import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
 
 describe("import CSV parsing", () => {
   it("normalizes dates and numbers", () => {
@@ -213,6 +216,90 @@ describe("insight sorting", () => {
       { key: "w", severity: "warning", title: "", detail: "", action: "", route: "/", confidence: "high" },
     ]).map((x) => x.key);
     expect(order).toEqual(["c", "w", "i"]);
+  });
+});
+
+describe("cash sign logic", () => {
+  it("inflow types are positive", () => {
+    expect(signMoney("cheque_inflow", 100)).toBe(100);
+    expect(signMoney("owner_injection", 100)).toBe(100);
+  });
+  it("outflow types are negative", () => {
+    expect(signMoney("personal_withdrawal", 100)).toBe(-100);
+    expect(signMoney("cash_expense", 100)).toBe(-100);
+    expect(signMoney("salary", 100)).toBe(-100);
+  });
+  it("magnitude sign is ignored — classification decides direction", () => {
+    expect(signMoney("personal_withdrawal", -100)).toBe(-100);
+    expect(signMoney("cheque_inflow", -100)).toBe(100);
+  });
+  it("adjustment respects the caller's direction (defaults to in)", () => {
+    expect(signMoney("adjustment", 50, "out")).toBe(-50);
+    expect(signMoney("adjustment", 50, "in")).toBe(50);
+    expect(signMoney("adjustment", 50)).toBe(50);
+  });
+});
+
+describe("withdrawals (and all cash movements) never affect profit", () => {
+  const all: MoneyType[] = ["cheque_inflow", "owner_injection", "personal_withdrawal", "cash_expense", "salary", "adjustment"];
+  it("no money-movement type is counted in P&L", () => {
+    for (const t of all) expect(affectsProfit(t)).toBe(false);
+  });
+  it("a withdrawal is negative cash but profit-neutral", () => {
+    expect(signMoney("personal_withdrawal", 500)).toBe(-500);
+    expect(affectsProfit("personal_withdrawal")).toBe(false);
+  });
+});
+
+describe("time / date helpers (Africa/Cairo)", () => {
+  const at = (iso: string) => new Date(`${iso}T12:00:00Z`); // midday UTC → same Cairo date
+  it("todayCairo returns the Cairo calendar date", () => {
+    expect(todayCairo(at("2026-06-22"))).toBe("2026-06-22");
+  });
+  it("monthBoundsCairo spans the full month", () => {
+    expect(monthBoundsCairo(at("2026-06-15"))).toEqual({ from: "2026-06-01", to: "2026-06-30" });
+    expect(monthBoundsCairo(at("2026-02-10"))).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+  });
+  it("lastMonthBoundsCairo handles year rollover", () => {
+    expect(lastMonthBoundsCairo(at("2026-06-15"))).toEqual({ from: "2026-05-01", to: "2026-05-31" });
+    expect(lastMonthBoundsCairo(at("2026-01-09"))).toEqual({ from: "2025-12-01", to: "2025-12-31" });
+  });
+  it("isoDaysAgo subtracts calendar days across month boundaries", () => {
+    expect(isoDaysAgo("2026-06-22", 29)).toBe("2026-05-24");
+    expect(isoDaysAgo("2026-03-01", 1)).toBe("2026-02-28");
+  });
+  it("isoRange is inclusive on both ends", () => {
+    expect(isoRange("2026-06-01", "2026-06-03")).toEqual(["2026-06-01", "2026-06-02", "2026-06-03"]);
+    expect(isoRange("2026-06-05", "2026-06-05")).toEqual(["2026-06-05"]);
+  });
+});
+
+describe("health score composition (real or null, never faked)", () => {
+  const base = {
+    monthRev: 12000, lastRev: 10000,
+    profit: { complete: true, margin: 45, missingCostLines: 0 },
+    stock: { activeCount: 4, costedCount: 4, costedNonNegCount: 4 },
+    issuesCount: 0, streakDays: 5, cash: { score: 90, errPct: 1 },
+  };
+  it("scores overall when categories have data", () => {
+    const h = composeHealth(base);
+    expect(h.overall).not.toBeNull();
+    expect(h.categories.find((c) => c.key === "revenue")!.trend).toBe(20);
+    expect(h.level).toBeGreaterThanOrEqual(1);
+  });
+  it("withholds the profit category when COGS is incomplete", () => {
+    const h = composeHealth({ ...base, profit: { complete: false, margin: null, missingCostLines: 2 } });
+    expect(h.categories.find((c) => c.key === "profit")!.score).toBeNull();
+  });
+  it("returns null overall when only data-quality has a score (new shop)", () => {
+    const h = composeHealth({
+      monthRev: 0, lastRev: 0,
+      profit: { complete: false, margin: null, missingCostLines: 0 },
+      stock: { activeCount: 0, costedCount: 0, costedNonNegCount: 0 },
+      issuesCount: 1, streakDays: 0, cash: { score: null, errPct: 0 },
+    });
+    expect(h.overall).toBeNull();
+    expect(h.status).toBe("Not enough data yet");
   });
 });
 

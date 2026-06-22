@@ -13,11 +13,9 @@ import {
 } from "@/core/db/engine";
 import type { Enums } from "@/core/db/tables";
 import type { Database } from "@/core/db/database.types";
+import { signMoney, type MoneyType } from "@/core/money/sign";
 
-type MoneyType = Enums<"money_movement_type">;
 type ChequeStatus = Enums<"cheque_status">;
-const INFLOW: MoneyType[] = ["cheque_inflow", "owner_injection"];
-const OUTFLOW: MoneyType[] = ["personal_withdrawal", "cash_expense", "salary"];
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
@@ -198,16 +196,11 @@ export interface MovementInput {
   accountId: string; type: MoneyType; amount: number; // positive magnitude
   date: string; direction?: "in" | "out"; notes: string | null;
 }
-function signed(type: MoneyType, magnitude: number, direction?: "in" | "out"): number {
-  if (INFLOW.includes(type)) return Math.abs(magnitude);
-  if (OUTFLOW.includes(type)) return -Math.abs(magnitude);
-  return direction === "out" ? -Math.abs(magnitude) : Math.abs(magnitude); // adjustment
-}
 export async function createMovement(i: MovementInput): Promise<void> {
   const sb = requireEngine();
   const { error } = await sb.from("money_movements").insert({
     account_id: i.accountId, movement_date: i.date, movement_type: i.type,
-    amount: signed(i.type, i.amount, i.direction), notes: i.notes, source_type: "manual",
+    amount: signMoney(i.type, i.amount, i.direction), notes: i.notes, source_type: "manual",
   });
   if (error) throw error;
   await recalcMoneyAccount(i.accountId);

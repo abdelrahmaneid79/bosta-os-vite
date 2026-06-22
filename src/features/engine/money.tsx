@@ -43,7 +43,7 @@ export function MoneyScreen() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Cash ledger · withdrawals excluded from profit</Eyebrow>
+        <Eyebrow>Cash ledger · drawer only — separate from profit &amp; expenses</Eyebrow>
         <div className="flex-1" />
         <Tabs value={k} onChange={setK} options={[{ value: "30d", label: "30 days" }, { value: "month", label: "This month" }, { value: "last", label: "Last month" }]} />
       </div>

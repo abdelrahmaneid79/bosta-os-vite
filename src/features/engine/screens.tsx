@@ -1,7 +1,8 @@
 /**
- * Read-only Stock / Sales / Purchases / Reconcile screens, driven entirely by
- * live Supabase reads through the verified engine's caches. No mock data: when
- * the connection isn't configured a Connect panel shows instead of fake numbers.
+ * Stock / Sales / Purchases / Reconcile screens, driven entirely by live
+ * Supabase reads through the verified engine's caches, with full write actions
+ * (create/edit/void) on Goods, Sales and Purchases. No mock data: when the
+ * connection isn't configured a Connect panel shows instead of fake numbers.
  */
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -47,18 +48,18 @@ function Guarded({ q, children, empty }: { q: { isLoading: boolean; isError: boo
   if (!isEngineConfigured) return <ConnectPanel />;
   if (q.isLoading) return <SkeletonRows rows={6} />;
   if (q.isError) return <ErrorState message={String((q.error as Error)?.message ?? "Read failed")} />;
-  if (empty) return <EmptyState title="No data in range" hint="Read-only — nothing recorded for this period yet." />;
+  if (empty) return <EmptyState title="No data in range" hint="Nothing recorded for this period yet — add an entry to get started." />;
   return <>{children}</>;
 }
 
 export function ConnectPanel() {
   return (
     <Card>
-      <Eyebrow>Read-only · not connected</Eyebrow>
+      <Eyebrow>Not connected</Eyebrow>
       <p className="mt-1 text-sm text-muted">
         Add <span className="font-mono text-pink">VITE_SUPABASE_URL</span> and{" "}
         <span className="font-mono text-pink">VITE_SUPABASE_ANON_KEY</span> to a <span className="font-mono">.env</span> file to
-        load your real data. The anon key is free and read-only here — no writes happen, and nothing is created.
+        load your real data, then sign in. All actions run under your authenticated session.
       </p>
     </Card>
   );
@@ -264,7 +265,7 @@ export function PurchasesScreen() {
   );
 }
 
-// ── Reconcile / read-only P&L ─────────────────────────────────────────────────
+// ── Reconcile / P&L (read-derived) ────────────────────────────────────────────
 export function ReconcileScreen() {
   const [range, key, setKey] = useRange();
   const q = useQuery({ queryKey: ["profit", range], queryFn: () => getProfitReadout(range), enabled: isEngineConfigured });

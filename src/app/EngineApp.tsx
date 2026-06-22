@@ -1,7 +1,7 @@
 /**
  * BostaOS v2 shell — matches the Claude Design reference: slim pink-accented
  * rail, central + quick-add (write-gated), big Fredoka header, jet bg with pink
- * glow. Read-only over the verified Supabase engine.
+ * glow. Fully operational over the verified Supabase engine.
  */
 import { lazy, Suspense, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

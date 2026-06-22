@@ -244,7 +244,7 @@ export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void
     onSuccess: () => w.ok(mode === "count" ? "Cash count saved" : mode === "withdraw" ? "Withdrawal recorded (cash, not profit)" : "Cash movement saved"),
     onError: w.fail,
   });
-  const label = mode === "count" ? "Counted cash (actual)" : mode === "in" ? "Cash added (EGP)" : mode === "out" ? "Cash out (EGP)" : "Withdrawal (EGP)";
+  const label = mode === "count" ? "Counted cash (actual)" : mode === "in" ? "Cash in — amount (EGP)" : mode === "out" ? "Cash out — amount (EGP)" : "Withdrawal — amount (EGP)";
   const ready = !!acc && (num(amount) ?? -1) >= 0 && (mode === "count" || (num(amount) ?? 0) > 0);
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
@@ -252,7 +252,9 @@ export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void
       <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       <Field label={label}><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
       <Field label="Note"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" /></Field>
-      {mode === "withdraw" && <p className="text-[11px] text-warn">Recorded as a cash withdrawal — reduces cash, never counts against profit.</p>}
+      {mode === "in" && <p className="text-[11px] text-dim">Cash entering the drawer (owner top-up, change float). Affects cash only — never counted as revenue.</p>}
+      {mode === "out" && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Cash leaving the drawer <b>only</b> — a deposit, transfer, or change. This does <b>not</b> affect profit. To record a business cost that should reduce profit, use <b>Spend → Add expense</b> instead.</p>}
+      {mode === "withdraw" && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Owner taking cash out. Reduces cash <b>only</b> — never counted against profit and never an expense.</p>}
       {mode === "count" && <p className="text-[11px] text-dim">We compare to the expected balance and post a voidable adjustment for any difference.</p>}
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : mode === "count" ? "Save count" : "Save"}</Button>
     </form>

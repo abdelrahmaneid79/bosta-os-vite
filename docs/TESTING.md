@@ -170,3 +170,63 @@ uses, why it matters, an action, and an honest confidence chip (`estimate` / `ne
 - Sale line `unit_price = 0` is allowed; COGS still snapshots from product cost.
 - Any red toast you see is the raw Postgres/RPC message — capture it verbatim; the
   most likely causes are RLS (`permission denied`) or an RPC arg/name mismatch.
+
+---
+
+# Cycle 1 — Production-readiness audit (static-verified, run live to confirm)
+
+## Cash-count path: CONFIRMED CORRECT (no engine bypass)
+A prior audit flagged a possible bypass. **It was wrong.** `record_physical_count`
+is the **inventory** stock-count RPC (`p_product_id`, `p_location_id`,
+`p_counted_qty`) — unrelated to cash. There is **no** cash-count RPC. The cash
+count correctly: inserts `cash_reconciliations`, posts a voidable `adjustment`
+`money_movement` for the difference, then calls the verified `recalc_money_account`
+RPC. Nothing is bypassed. No gating needed.
+
+## Cash vs Profit (fixed this cycle)
+The cash ledger (`money_movements`) is **drawer-only and never touches profit**.
+P&L is driven solely by the `expenses` table + sale-item COGS.
+- **Spend → Add expense** → affects **profit** (and the expense total). Does NOT move cash.
+- **Cash in / Cash out** → affects **cash only**. Does NOT affect profit.
+- **Withdraw** → affects **cash only**, forced to `personal_withdrawal`, never an expense.
+- A cash-paid business cost that should reduce profit must be entered as an **Expense**;
+  if you also want the drawer to drop, additionally record a **Cash out** (or let the
+  next **cash count** reconcile the drift). Each Cash form now states its profit impact.
+
+## Write-flow readiness matrix (UI · mutation · validation · confirm · refresh · test)
+| Flow | UI | Mutation | Validation | Confirm (risky) | Refresh | Local test |
+|---|---|---|---|---|---|---|
+| Goods create | StockScreen +Product | `createProduct` | name required | n/a | `invalidateQueries` | +Product → appears |
+| Goods edit | tap product | `updateProduct` | name required | n/a | invalidate | edit price → persists |
+| Goods active | edit form checkbox | `updateProduct`/`setProductActive` | — | n/a | invalidate | toggle → "inactive" badge |
+| Aliases | (import matcher) | `addAlias` | trims/normalizes | n/a | invalidate | alias matches on import |
+| Purchase create | PurchaseForm | `addPurchase` (RPC) | product + qty>0 + cost≥0 + location | n/a | invalidate | on-hand ↑, WAC shows |
+| Sale create | SaleForm | `createSale` | loc+channel+date, total≥0, **dup-day guard** | n/a | invalidate | dup day → blocked msg |
+| Sale line add | SaleDetail +line | `addSaleItem` (RPC) | product + qty>0 | n/a | invalidate+refetch | on-hand ↓, COGS shown |
+| Sale line edit | ✎ | `editSaleItem` (RPC) | product + qty>0 | n/a | invalidate+refetch | net stock change |
+| Sale line void | ✕ | `voidSaleItem` (RPC) | — | ✅ Confirm | invalidate+refetch | stock restored |
+| Sale day void | "Void whole day" | `voidSale` (RPC) | — | ✅ Confirm | invalidate, close | revenue drops |
+| Expense add | ExpenseForm | `addExpense` | location + amount>0 + category | n/a | invalidate | total ↑, **net profit ↓** |
+| Expense void | ✕ | `voidExpense` | — | ✅ Confirm | invalidate | total reverts |
+| Cash in/out | CashForm | `createMovement` | account + amount>0 | n/a | invalidate (recalc) | balance recalcs |
+| Cash withdraw | CashForm withdraw | `recordWithdrawal` | account + amount>0 | n/a | invalidate (recalc) | balance ↓, profit same |
+| Cash count | CashForm count | `recordCashCount` | account + amount≥0 | n/a | invalidate (recalc) | adjustment lands balance |
+| Movement void | ✕ | `voidMovement` | — | ✅ Confirm | invalidate (recalc) | balance recomputed |
+| Settlement open | "Open this month" | `openSettlementPeriod` (RPC) | location present | n/a | invalidate | period seeded |
+| Cheque record | ChequeForm | `recordCheque` | period + expected≥0; received→amount+date | n/a | invalidate | appears with diff |
+| Cheque reconcile | reconcile link | `reconcileCheque` | — | ✅ Confirm | invalidate | status reconciled |
+| Cheque void | ✕ | `voidCheque` | — | ✅ Confirm | invalidate | removed from totals |
+| Import approve | ImportsScreen | `createSale`/`addExpense` loop | per-row parse + **dedup** | (preview gates) | invalidate, reset | only new days created |
+| Settings tracking/low | SettingsScreen | `setAppSetting` | numeric | n/a | invalidate | persists |
+| Settings rent/share | SettingsScreen | `setLocationTerm` | numeric (button disabled if NaN) | ✅ **Confirm (new)** | invalidate | new effective term |
+
+**Every risky reversal and every settlement-math change now requires a confirmation.**
+Creating new records (products, sales, expenses, movements) does not — that's intentional.
+
+## Exact errors to screenshot (verbatim)
+- `new row violates row-level security policy for table "<t>"` → an INSERT/UPDATE RLS policy is missing for your role.
+- `permission denied for table <t>` / `for function <fn>` → RLS / grant gap.
+- `function <name>(...) does not exist` or `Could not find the function ... in the schema cache` → RPC name/arg drift vs `database.types.ts`.
+- `A sale already exists for that day — open it to add items.` → expected dup-day guard (not a bug).
+- `A received cheque needs an amount received and a received date.` → expected cheque validation.
+- Any balance/stock number that does **not** change after a write, or a cash balance that diverges after a count → screenshot the screen + the value.

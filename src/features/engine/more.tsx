@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge } from "@/components/ui";
+import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState } from "@/components/feedback";
 import { parseSalesRows, parseExpenseRows, type Row } from "@/core/import/csv";
 import { getChannels } from "@/core/read/common";
@@ -309,6 +310,7 @@ export function SettingsScreen() {
   const [lowDefault, setLowDefault] = useState("");
   const [rent, setRent] = useState("");
   const [share, setShare] = useState("");
+  const [confirm, setConfirm] = useState<null | "rent" | "share">(null);
   useEffect(() => {
     const s = settings.data; if (!s) return;
     if (typeof s["inventory_tracking_start_date"] === "string") setTracking(s["inventory_tracking_start_date"] as string);
@@ -325,7 +327,7 @@ export function SettingsScreen() {
       if (what === "rent") return setLocationTerm(loc.id, "rent", num(rent) ?? 0, todayCairo());
       return setLocationTerm(loc.id, "revenue_charge", (num(share) ?? 0) / 100, todayCairo()); // % → rate
     },
-    onSuccess: () => { toast("Saved", "success"); qc.invalidateQueries(); },
+    onSuccess: () => { toast("Saved", "success"); setConfirm(null); qc.invalidateQueries(); },
     onError: (e) => toast(e instanceof Error ? e.message : "Failed", "error"),
   });
 
@@ -360,14 +362,21 @@ export function SettingsScreen() {
         <div className="space-y-3">
           <div className="flex items-end gap-2">
             <Field label="Monthly rent (EGP, flat)"><Input type="number" step="any" value={rent} onChange={(e) => setRent(e.target.value)} placeholder="15000" /></Field>
-            <Button variant="outline" disabled={!loc || save.isPending} onClick={() => save.mutate("rent")}>Save</Button>
+            <Button variant="outline" disabled={!loc || save.isPending || num(rent) == null} onClick={() => setConfirm("rent")}>Save</Button>
           </div>
           <div className="flex items-end gap-2">
             <Field label="Revenue share (%)"><Input type="number" step="any" value={share} onChange={(e) => setShare(e.target.value)} placeholder="3" /></Field>
-            <Button variant="outline" disabled={!loc || save.isPending} onClick={() => save.mutate("share")}>Save</Button>
+            <Button variant="outline" disabled={!loc || save.isPending || num(share) == null} onClick={() => setConfirm("share")}>Save</Button>
           </div>
         </div>
       </Card>
+
+      <Confirm open={confirm === "rent"} title="Change monthly rent?" busy={save.isPending}
+        message={`This adds a new lease term of ${num(rent) ?? 0} EGP/month effective today. Future settlement periods will use it; past periods are unchanged. This affects what you're owed.`}
+        confirmLabel="Set rent" onConfirm={() => save.mutate("rent")} onClose={() => setConfirm(null)} />
+      <Confirm open={confirm === "share"} title="Change revenue share?" busy={save.isPending}
+        message={`This adds a new revenue-share term of ${num(share) ?? 0}% effective today. Future settlements deduct this rate from revenue; past periods are unchanged.`}
+        confirmLabel="Set share" onConfirm={() => save.mutate("share")} onClose={() => setConfirm(null)} />
     </div>
   );
 }

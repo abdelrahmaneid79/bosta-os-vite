@@ -96,9 +96,9 @@ export function Button({ variant = "primary", className, children, ...props }: B
   );
 }
 
-/** A write action that's visible but gated in read-only mode. */
+/** A capability that's visible but not built yet (e.g. screenshot import). */
 export function GatedButton({ children }: { children: ReactNode }) {
-  return <Button variant="outline" disabled title="Writes are disabled in read-only mode">{children}</Button>;
+  return <Button variant="outline" disabled title="Coming soon — not built yet">{children}</Button>;
 }
 
 /* ─ Form controls ──────────────────────────────────────────────────────── */
