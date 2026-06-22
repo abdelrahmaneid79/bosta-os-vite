@@ -5,44 +5,29 @@
  * connection isn't configured a Connect panel shows instead of fake numbers.
  */
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, Eyebrow, Stat, Badge, Tabs, Button, Input } from "@/components/ui";
+import { Card, Eyebrow, Stat, Badge, Button, Input, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { egp, egpShort, num, pct } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
-import { monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, todayCairo } from "@/core/time";
-import type { DateRange } from "@/core/read/common";
+import { useActiveRange } from "@/store/filters";
+import { rangeLabel } from "@/core/range";
+import { useFilters } from "@/store/filters";
 import { getStockSummary } from "@/core/read/stock";
 import { getProducts } from "@/core/read/common";
 import { getRecentSales, getSalesStats, getSaleItems, type SaleRow as SaleRowVM, type SaleLine } from "@/core/read/sales";
-import { getPurchases, getPurchaseTotal } from "@/core/read/purchases";
+import { getPurchases } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
 import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
 import { voidSaleItem, voidSale } from "@/core/db/mutations";
 import { useUI } from "@/store/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Tables } from "@/core/db/tables";
-
-type RangeKey = "30d" | "month" | "last";
-function useRange(): [DateRange, RangeKey, (k: RangeKey) => void] {
-  const [key, setKey] = useState<RangeKey>("month");
-  const range =
-    key === "30d" ? { from: isoDaysAgo(todayCairo(), 29), to: todayCairo() }
-    : key === "last" ? lastMonthBoundsCairo()
-    : monthBoundsCairo();
-  return [range, key, setKey];
-}
-
-function RangeTabs({ value, onChange }: { value: RangeKey; onChange: (k: RangeKey) => void }) {
-  return (
-    <Tabs value={value} onChange={onChange} options={[
-      { value: "30d", label: "30 days" }, { value: "month", label: "This month" }, { value: "last", label: "Last month" },
-    ]} />
-  );
-}
 
 function Guarded({ q, children, empty }: { q: { isLoading: boolean; isError: boolean; error: unknown }; children: React.ReactNode; empty?: boolean }) {
   if (!isEngineConfigured) return <ConnectPanel />;
@@ -93,20 +78,22 @@ export function StockScreen() {
             {positions.map((p) => {
               const prod = byId.get(p.id);
               return (
-                <button key={p.id} onClick={() => prod && setModal({ mode: "edit", product: prod })}
-                  className="row-hover flex w-full items-center gap-3 px-4 py-3 text-left">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate text-sm text-text">{p.nameEn}</span>
-                      {!p.active && <Badge>inactive</Badge>}
+                <div key={p.id} className="row-hover flex w-full items-center gap-3 px-4 py-3">
+                  <Link to={`/product/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-sm text-text">{p.nameEn}</span>
+                        {!p.active && <Badge>inactive</Badge>}
+                      </div>
+                      <div className="text-[12px] text-dim">{num(p.onHand)} {p.baseUnit} · {p.hasCost ? `${egp(p.avgCost)}/${p.baseUnit}` : "no cost"}</div>
                     </div>
-                    <div className="text-[12px] text-dim">{num(p.onHand)} {p.baseUnit} · {p.hasCost ? `${egp(p.avgCost)}/${p.baseUnit}` : "no cost"}</div>
-                  </div>
-                  {p.isNegative && <Badge tone="bad">negative</Badge>}
-                  {!p.isNegative && p.isLow && <Badge tone="warn">low</Badge>}
-                  {p.onHand > 0 && !p.hasCost && <Badge tone="warn">no COGS</Badge>}
-                  <div className="font-display text-sm font-semibold">{egp(p.stockValue)}</div>
-                </button>
+                    {p.isNegative && <Badge tone="bad">negative</Badge>}
+                    {!p.isNegative && p.isLow && <Badge tone="warn">low</Badge>}
+                    {p.onHand > 0 && !p.hasCost && <Badge tone="warn">no COGS</Badge>}
+                    <div className="font-display text-sm font-semibold">{egp(p.stockValue)}</div>
+                  </Link>
+                  <button onClick={() => prod && setModal({ mode: "edit", product: prod })} className="px-1 text-dim hover:text-text" title="Edit product">✎</button>
+                </div>
               );
             })}
           </div>
@@ -121,18 +108,18 @@ export function StockScreen() {
 
 // ── Sales (operational: create day, add/edit/void lines, void day) ───────────
 export function SalesScreen() {
-  const [range, key, setKey] = useRange();
+  const range = useActiveRange();
   const [addOpen, setAddOpen] = useState(false);
   const [detail, setDetail] = useState<SaleRowVM | null>(null);
   const stats = useQuery({ queryKey: ["salesStats", range], queryFn: () => getSalesStats(range), enabled: isEngineConfigured });
-  const recent = useQuery({ queryKey: ["recentSales"], queryFn: () => getRecentSales(60), enabled: isEngineConfigured });
+  const recent = useQuery({ queryKey: ["recentSales", range], queryFn: () => getRecentSales(120, range), enabled: isEngineConfigured });
   const s = stats.data;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Revenue = Σ daily totals (canonical)</Eyebrow>
         <div className="flex-1" />
-        <RangeTabs value={key} onChange={setKey} />
+        <DateRangePicker />
         <Button onClick={() => setAddOpen(true)}>+ Sale</Button>
       </div>
       <div className="grid grid-cols-3 gap-3">
@@ -140,7 +127,7 @@ export function SalesScreen() {
         <Stat label="Sales days" value={s ? s.days : "—"} />
         <Stat label="Unreconciled" value={s ? s.unreconciled : "—"} accent={s?.unreconciled ? "text-warn" : "text-text"} />
       </div>
-      <Eyebrow>Recent sales · tap to open</Eyebrow>
+      <Eyebrow>Sales in range · tap to open</Eyebrow>
       <Guarded q={recent} empty={!!recent.data && recent.data.length === 0}>
         <Card className="!p-0">
           <div className="divide-y divide-line2">
@@ -227,33 +214,43 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
 
 // ── Purchases ─────────────────────────────────────────────────────────────────
 export function PurchasesScreen() {
-  const [range, key, setKey] = useRange();
+  const range = useActiveRange();
   const [addOpen, setAddOpen] = useState(false);
+  const [productId, setProductId] = useState("");
+  const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
   const q = useQuery({ queryKey: ["purchases", range], queryFn: () => getPurchases(range), enabled: isEngineConfigured });
-  const total = useQuery({ queryKey: ["purchaseTotal", range], queryFn: () => getPurchaseTotal(range), enabled: isEngineConfigured });
+  const rows = (q.data ?? []).filter((r) => !productId || r.productId === productId);
+  const filteredTotal = rows.reduce((s, r) => s + r.totalCost, 0);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Purchases feed COGS → WAC</Eyebrow>
         <div className="flex-1" />
-        <RangeTabs value={key} onChange={setKey} />
+        <DateRangePicker />
         <Button onClick={() => setAddOpen(true)}>+ Purchase</Button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Stat label="Spend in range" value={total.data != null ? egp(total.data) : "—"} />
-        <Stat label="Batches" value={q.data ? q.data.length : "—"} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={productId} onChange={(e) => setProductId(e.target.value)} className="max-w-xs">
+          <option value="">All products</option>
+          {(prods.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name_en}</option>)}
+        </Select>
+        {productId && <Button variant="ghost" onClick={() => setProductId("")}>Clear</Button>}
       </div>
-      <Guarded q={q} empty={!!q.data && q.data.length === 0}>
+      <div className="grid grid-cols-2 gap-3">
+        <Stat label={productId ? "Spend (filtered)" : "Spend in range"} value={egp(filteredTotal)} />
+        <Stat label="Batches" value={rows.length} />
+      </div>
+      <Guarded q={q} empty={rows.length === 0}>
         <Card className="!p-0">
           <div className="divide-y divide-line2">
-            {q.data?.map((r) => (
-              <div key={r.id} className="row-hover flex items-center gap-3 px-4 py-3">
+            {rows.map((r) => (
+              <Link key={r.id} to={`/product/${r.productId}`} className="row-hover flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm text-text">{r.productName}</div>
                   <div className="text-[12px] text-dim">{fmtDate(r.date)} · {num(r.quantity)} × {egp(r.unitCost)}</div>
                 </div>
                 <div className="font-display text-sm font-semibold">{egp(r.totalCost)}</div>
-              </div>
+              </Link>
             ))}
           </div>
         </Card>
@@ -267,15 +264,15 @@ export function PurchasesScreen() {
 
 // ── Reconcile / P&L (read-derived) ────────────────────────────────────────────
 export function ReconcileScreen() {
-  const [range, key, setKey] = useRange();
+  const range = useActiveRange();
+  const key = useFilters((s) => s.rangeKey);
   const q = useQuery({ queryKey: ["profit", range], queryFn: () => getProfitReadout(range), enabled: isEngineConfigured });
   const p = q.data;
-  const rangeLabel = key === "month" ? "this month" : key === "last" ? "last month" : "last 30 days";
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Eyebrow>Profit · {rangeLabel}</Eyebrow>
-        <RangeTabs value={key} onChange={setKey} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Eyebrow>Profit · {rangeLabel(key, range)}</Eyebrow>
+        <DateRangePicker />
       </div>
       {!isEngineConfigured ? <ConnectPanel /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : (
         <>

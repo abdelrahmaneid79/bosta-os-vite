@@ -1,33 +1,31 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, Eyebrow, Stat, Badge, Tabs, Button } from "@/components/ui";
+import { Card, Eyebrow, Stat, Badge, Button, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
-import { monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, todayCairo } from "@/core/time";
+import { monthBoundsCairo } from "@/core/time";
+import { useActiveRange } from "@/store/filters";
 import { getMoneyMovements, getCashSummary, getMoneyAccounts } from "@/core/read/money";
 import { getSettlementPeriods, getCheques } from "@/core/read/settlements";
-import { getExpenses, getExpenseTotal } from "@/core/read/expenses";
+import { getExpenses, getExpenseCategories } from "@/core/read/expenses";
 import { getLocations } from "@/core/read/common";
 import { voidMovement, reconcileCheque, voidCheque, openSettlementPeriod, voidExpense } from "@/core/db/mutations";
 import { CashForm, ChequeForm, ExpenseForm } from "./forms";
 import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
-type RK = "30d" | "month" | "last";
-function range(k: RK) {
-  return k === "30d" ? { from: isoDaysAgo(todayCairo(), 29), to: todayCairo() } : k === "last" ? lastMonthBoundsCairo() : monthBoundsCairo();
-}
 
 // ── Money / Cash ───────────────────────────────────────────────────────────
 export function MoneyScreen() {
-  const [k, setK] = useState<RK>("month");
+  const r = useActiveRange();
   const [sheet, setSheet] = useState<null | "count" | "in" | "out" | "withdraw">(null);
   const [voidMv, setVoidMv] = useState<string | null>(null);
-  const r = range(k);
+  const [filter, setFilter] = useState<"all" | "in" | "out" | "withdrawals">("all");
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const sum = useQuery({ queryKey: ["cash", r], queryFn: () => getCashSummary(r), enabled: en });
@@ -35,6 +33,8 @@ export function MoneyScreen() {
   const accounts = useQuery({ queryKey: ["money-accounts"], queryFn: getMoneyAccounts, enabled: en });
   const accId = accounts.data?.[0]?.id;
   const c = sum.data;
+  const movements = (mv.data ?? []).filter((m) =>
+    filter === "all" ? true : filter === "withdrawals" ? m.isWithdrawal : filter === "in" ? m.amount >= 0 : m.amount < 0 && !m.isWithdrawal);
   const del = useMutation({ mutationFn: (id: string) => voidMovement(id, accId!), onSuccess: () => { reportSuccess("Void movement", "Movement voided · balance recalculated"); setVoidMv(null); qc.invalidateQueries(); }, onError: (e) => reportError("Void movement", e) });
   if (!en) return <EmptyState title="Sign in to load money" />;
 
@@ -44,7 +44,7 @@ export function MoneyScreen() {
       <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Cash ledger · drawer only — separate from profit &amp; expenses</Eyebrow>
         <div className="flex-1" />
-        <Tabs value={k} onChange={setK} options={[{ value: "30d", label: "30 days" }, { value: "month", label: "This month" }, { value: "last", label: "Last month" }]} />
+        <DateRangePicker />
       </div>
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => setSheet("count")}>Count cash</Button>
@@ -58,11 +58,20 @@ export function MoneyScreen() {
         <Stat label="Outflow" value={c ? egpShort(Math.abs(c.outflow)) : "—"} accent="text-bad" />
         <Stat label="Withdrawals" value={c ? egpShort(c.withdrawals) : "—"} accent="text-bad" />
       </div>
-      <Eyebrow>Movements</Eyebrow>
+      <div className="flex flex-wrap items-center gap-2">
+        <Eyebrow>Movements</Eyebrow>
+        <div className="flex-1" />
+        <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="max-w-[160px]">
+          <option value="all">All movements</option>
+          <option value="in">Cash in</option>
+          <option value="out">Cash out</option>
+          <option value="withdrawals">Withdrawals</option>
+        </Select>
+      </div>
       {mv.isLoading ? <SkeletonRows /> : mv.isError ? <ErrorState message={String((mv.error as Error)?.message)} /> :
-        (mv.data?.length ?? 0) === 0 ? <EmptyState title="No movements in range" /> : (
+        movements.length === 0 ? <EmptyState title="No movements in range" /> : (
         <Card className="!p-0"><div className="divide-y divide-line2">
-          {mv.data!.map((m) => (
+          {movements.map((m) => (
             <div key={m.id} className="row-hover flex items-center gap-3 px-4 py-3">
               <span className={`h-2.5 w-2.5 rounded-full ${m.amount >= 0 ? "bg-good" : "bg-bad"}`} />
               <div className="min-w-0 flex-1">
@@ -85,14 +94,16 @@ export function MoneyScreen() {
 
 // ── Expenses ─────────────────────────────────────────────────────────────────
 export function ExpensesScreen() {
-  const [k, setK] = useState<RK>("month");
+  const r = useActiveRange();
   const [addOpen, setAddOpen] = useState(false);
   const [voidId, setVoidId] = useState<string | null>(null);
-  const r = range(k);
+  const [cat, setCat] = useState("");
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
-  const total = useQuery({ queryKey: ["expenseTotal", r], queryFn: () => getExpenseTotal(r), enabled: en });
+  const cats = useQuery({ queryKey: ["expense-cats"], queryFn: getExpenseCategories, enabled: en });
+  const rows = (q.data ?? []).filter((e) => !cat || e.category === cat);
+  const filteredTotal = rows.reduce((s, e) => s + e.amount, 0);
   const del = useMutation({ mutationFn: (id: string) => voidExpense(id), onSuccess: () => { reportSuccess("Void expense", "Expense voided · profit restored · kept for audit"); setVoidId(null); qc.invalidateQueries(); }, onError: (e) => reportError("Void expense", e) });
   if (!en) return <EmptyState title="Sign in to load expenses" />;
   return (
@@ -100,17 +111,24 @@ export function ExpensesScreen() {
       <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Operating expenses · withdrawals are on Cash</Eyebrow>
         <div className="flex-1" />
-        <Tabs value={k} onChange={setK} options={[{ value: "30d", label: "30 days" }, { value: "month", label: "This month" }, { value: "last", label: "Last month" }]} />
+        <DateRangePicker />
         <Button onClick={() => setAddOpen(true)}>+ Expense</Button>
       </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={cat} onChange={(e) => setCat(e.target.value)} className="max-w-xs">
+          <option value="">All categories</option>
+          {(cats.data ?? []).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+        </Select>
+        {cat && <Button variant="ghost" onClick={() => setCat("")}>Clear</Button>}
+      </div>
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Spend in range" value={total.data != null ? egp(total.data) : "—"} />
-        <Stat label="Records" value={q.data ? q.data.length : "—"} />
+        <Stat label={cat ? "Spend (filtered)" : "Spend in range"} value={egp(filteredTotal)} />
+        <Stat label="Records" value={rows.length} />
       </div>
       {q.isLoading ? <SkeletonRows /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> :
-        (q.data?.length ?? 0) === 0 ? <EmptyState title="No expenses in range" hint="Add rent, supplies, salary, transport…" /> : (
+        rows.length === 0 ? <EmptyState title="No expenses in range" hint="Add rent, supplies, salary, transport…" /> : (
         <Card className="!p-0"><div className="divide-y divide-line2">
-          {q.data!.map((e) => (
+          {rows.map((e) => (
             <div key={e.id} className="row-hover flex items-center gap-3 px-4 py-3">
               <span className="h-2.5 w-2.5 rounded-full bg-warn" />
               <div className="min-w-0 flex-1">

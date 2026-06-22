@@ -39,13 +39,13 @@ export interface SaleRow {
   reconciled: boolean;
 }
 
-export async function getRecentSales(limit = 60): Promise<SaleRow[]> {
-  const { data, error } = await requireEngine()
+export async function getRecentSales(limit = 60, range?: DateRange): Promise<SaleRow[]> {
+  let q = requireEngine()
     .from("sales")
     .select("id,sale_date,total_amount,payment_method,source_type,reconciled")
-    .is("voided_at", null)
-    .order("sale_date", { ascending: false })
-    .limit(limit);
+    .is("voided_at", null);
+  if (range) q = q.gte("sale_date", range.from).lte("sale_date", range.to);
+  const { data, error } = await q.order("sale_date", { ascending: false }).limit(limit);
   if (error) throw error;
   return data.map((r) => ({
     id: r.id,

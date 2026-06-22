@@ -300,3 +300,31 @@ generic "Save failed" — that's fixed.
   migration** (existing `imports`/`import_rows` tables). Not yet implemented; awaiting go-ahead.
 
 ## Coverage: **66 unit tests** (added QA-catalogue integrity checks).
+
+---
+
+# Cycle 4 — Real interactivity: global date range, filters, product deep-dive
+
+## Global date-range picker (every data screen)
+- [ ] The pink calendar pill appears on Sales, Goods→product, Buy, Cash, Spend, Profit,
+  Reports, Activity. Click → presets **Today / 7d / 30d / This month / Last month /
+  This quarter / This year** + a **Custom** from→to.
+- [ ] Changing it on one screen carries to the others (shared filter).
+- [ ] Custom range: pick any two dates → all stats/lists/CSVs recompute for that window.
+- [ ] Profit & Reports headers show the resolved range and the prior comparison window.
+
+## Filters (choose what you see)
+- [ ] Buy → product dropdown filters batches to one product; "Spend (filtered)" updates.
+- [ ] Spend → category dropdown filters expenses; total updates.
+- [ ] Cash → movement-type dropdown (All / Cash in / Cash out / Withdrawals).
+
+## Product deep-dive (`/product/:id`)
+- [ ] Goods → tap a product row (or a product in Reports / a purchase) → opens its page.
+- [ ] Header: name, badges, on-hand, avg cost, stock value, sell price; **+ Purchase** and **Edit**.
+- [ ] KPIs over the selected range: units sold, revenue, COGS, gross profit (**unknown** if a
+  line lacks cost), margin, bought qty/cost, **days of cover** (warns under a week).
+- [ ] Lists its **sale lines** and **purchase batches** for the range.
+- [ ] The ✎ on a Goods row still opens quick edit without leaving the list.
+
+## Coverage: **70 unit tests** — added the date-range engine (rolling/calendar/quarter/
+year/custom, Jan rollover, Feb end, reversed custom, labels).

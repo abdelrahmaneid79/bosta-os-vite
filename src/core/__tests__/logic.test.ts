@@ -16,6 +16,7 @@ import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRang
 import { explainError, errorMessage, rawMessage } from "@/core/db/errors";
 import { aggregateExpenseCategories } from "@/core/read/expenses";
 import { QA_FLOWS, QA_GROUPS } from "@/features/qa/checklist";
+import { resolveRange, rangeLabel as rangeLabelFn } from "@/core/range";
 
 describe("import CSV parsing", () => {
   it("normalizes dates and numbers", () => {
@@ -380,6 +381,31 @@ describe("QA checklist catalogue", () => {
     for (const g of ["Goods", "Purchases", "Sales", "Expenses", "Cash", "Cheques", "Imports", "Settings"]) {
       expect(QA_GROUPS).toContain(g);
     }
+  });
+});
+
+describe("date-range engine (pinned today)", () => {
+  const T = "2026-06-15";
+  it("resolves rolling windows", () => {
+    expect(resolveRange("today", undefined, T)).toEqual({ from: "2026-06-15", to: "2026-06-15" });
+    expect(resolveRange("7d", undefined, T)).toEqual({ from: "2026-06-09", to: "2026-06-15" });
+    expect(resolveRange("30d", undefined, T)).toEqual({ from: "2026-05-17", to: "2026-06-15" });
+  });
+  it("resolves calendar windows incl. Feb + quarter + year", () => {
+    expect(resolveRange("month", undefined, T)).toEqual({ from: "2026-06-01", to: "2026-06-30" });
+    expect(resolveRange("month", undefined, "2026-02-10")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+    expect(resolveRange("last", undefined, T)).toEqual({ from: "2026-05-01", to: "2026-05-31" });
+    expect(resolveRange("quarter", undefined, T)).toEqual({ from: "2026-04-01", to: "2026-06-30" });
+    expect(resolveRange("year", undefined, T)).toEqual({ from: "2026-01-01", to: "2026-12-31" });
+  });
+  it("handles January rollover for last-month and Q1", () => {
+    expect(resolveRange("last", undefined, "2026-01-10")).toEqual({ from: "2025-12-01", to: "2025-12-31" });
+    expect(resolveRange("quarter", undefined, "2026-01-10")).toEqual({ from: "2026-01-01", to: "2026-03-31" });
+  });
+  it("custom tolerates reversed inputs and labels itself", () => {
+    expect(resolveRange("custom", { from: "2026-06-20", to: "2026-06-10" }, T)).toEqual({ from: "2026-06-10", to: "2026-06-20" });
+    expect(rangeLabelFn("custom", { from: "2026-06-10", to: "2026-06-20" })).toBe("2026-06-10 → 2026-06-20");
+    expect(rangeLabelFn("month", resolveRange("month", undefined, T))).toBe("This month");
   });
 });
 

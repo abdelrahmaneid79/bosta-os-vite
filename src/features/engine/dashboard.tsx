@@ -10,6 +10,8 @@ import { getMissingData } from "@/core/read/missing";
 import { getRiskInsights } from "@/core/read/insights";
 import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
 import { getHealthReport } from "@/core/read/health";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { useActiveRange } from "@/store/filters";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
@@ -266,13 +268,17 @@ export function MissingScreen() {
 
 /* ─ Activity — full business event feed (verify writes here) ─────────────── */
 export function ActivityScreen() {
-  const feed = useQuery({ queryKey: ["activity-full"], queryFn: () => getActivityFeed(60, 60), enabled: en });
+  const range = useActiveRange();
+  const feed = useQuery({ queryKey: ["activity-full", range], queryFn: () => getActivityFeed(60, 200, range), enabled: en });
   if (!en) return <EmptyState title="Sign in to see activity" />;
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Eyebrow>Recent activity · last 60 days</Eyebrow>
-        <Button variant="outline" disabled={feed.isFetching} onClick={() => feed.refetch()}>{feed.isFetching ? "Refreshing…" : "Refresh"}</Button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Eyebrow>Activity in range</Eyebrow>
+        <div className="flex items-center gap-2">
+          <DateRangePicker />
+          <Button variant="outline" disabled={feed.isFetching} onClick={() => feed.refetch()}>{feed.isFetching ? "Refreshing…" : "Refresh"}</Button>
+        </div>
       </div>
       {feed.isLoading ? <SkeletonRows rows={8} />
         : feed.isError ? <ErrorState message={String((feed.error as Error)?.message)} onRetry={() => feed.refetch()} />

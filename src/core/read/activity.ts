@@ -25,10 +25,10 @@ export function mergeActivity(events: ActivityEvent[], limit = 40): ActivityEven
     .slice(0, limit);
 }
 
-export async function getActivityFeed(windowDays = 30, limit = 40): Promise<ActivityEvent[]> {
+export async function getActivityFeed(windowDays = 30, limit = 40, range?: { from: string; to: string }): Promise<ActivityEvent[]> {
   const sb = requireEngine();
-  const today = todayCairo();
-  const from = isoDaysAgo(today, windowDays - 1);
+  const today = range?.to ?? todayCairo();
+  const from = range?.from ?? isoDaysAgo(today, windowDays - 1);
 
   const [sales, purchases, expenses, movements, cheques, products, cats] = await Promise.all([
     sb.from("sales").select("id,sale_date,total_amount,created_at").is("voided_at", null).gte("sale_date", from).lte("sale_date", today),

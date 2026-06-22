@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge } from "@/components/ui";
@@ -11,7 +12,10 @@ import type { Enums } from "@/core/db/tables";
 import { egp, egpShort, pct } from "@/core/utils/format";
 import { isEngineConfigured, sb } from "@/core/db/engine";
 import { useAuth, SignOutButton } from "@/features/auth/auth";
-import { monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, todayCairo, priorRange } from "@/core/time";
+import { todayCairo, priorRange } from "@/core/time";
+import { rangeLabel } from "@/core/range";
+import { useActiveRange, useFilters } from "@/store/filters";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { getStockSummary } from "@/core/read/stock";
 import { getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
@@ -25,9 +29,6 @@ import { WRITE_BADGE } from "@/core/capabilities";
 import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
-type RK = "30d" | "month" | "last" | "custom";
-const presetRange = (k: Exclude<RK, "custom">) => k === "30d" ? { from: isoDaysAgo(todayCairo(), 29), to: todayCairo() } : k === "last" ? lastMonthBoundsCairo() : monthBoundsCairo();
-const rangeLabel = (k: RK) => k === "month" ? "this month" : k === "last" ? "last month" : k === "30d" ? "last 30 days" : "custom range";
 
 function downloadCSV(name: string, rows: Record<string, unknown>[]) {
   if (!rows.length) return;
@@ -40,10 +41,8 @@ function downloadCSV(name: string, rows: Record<string, unknown>[]) {
 
 // ── Reports ─────────────────────────────────────────────────────────────────
 export function ReportsScreen() {
-  const [k, setK] = useState<RK>("month");
-  const [cFrom, setCFrom] = useState(monthBoundsCairo().from);
-  const [cTo, setCTo] = useState(todayCairo());
-  const r = k === "custom" ? { from: cFrom <= cTo ? cFrom : cTo, to: cTo >= cFrom ? cTo : cFrom } : presetRange(k);
+  const r = useActiveRange();
+  const rk = useFilters((s) => s.rangeKey);
   const prior = priorRange(r);
   const stock = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: en });
   const sales = useQuery({ queryKey: ["salesStats", r], queryFn: () => getSalesStats(r), enabled: en });
@@ -60,18 +59,9 @@ export function ReportsScreen() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Eyebrow>P&L · {rangeLabel(k)} {k === "custom" ? `(${r.from} → ${r.to})` : ""}</Eyebrow>
-        <Tabs value={k} onChange={setK} options={[{ value: "30d", label: "30 days" }, { value: "month", label: "This month" }, { value: "last", label: "Last month" }, { value: "custom", label: "Custom" }]} />
+        <Eyebrow>P&L · {rangeLabel(rk, r)} · vs prior {prior.from} → {prior.to}</Eyebrow>
+        <DateRangePicker />
       </div>
-      {k === "custom" && (
-        <Card className="!py-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <Field label="From"><Input type="date" value={cFrom} max={cTo} onChange={(e) => setCFrom(e.target.value)} /></Field>
-            <Field label="To"><Input type="date" value={cTo} max={todayCairo()} onChange={(e) => setCTo(e.target.value)} /></Field>
-            <span className="pb-2 text-[11px] text-dim">vs prior {prior.from} → {prior.to}</span>
-          </div>
-        </Card>
-      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Revenue" value={p ? egp(p.revenue) : "—"} />
         <Stat label="COGS" value={p ? egp(p.cogs) : "—"} />
@@ -92,7 +82,7 @@ export function ReportsScreen() {
               product: x.nameEn, on_hand: x.onHand, unit: x.baseUnit, avg_cost: x.avgCost, stock_value: Math.round(x.stockValue), missing_cost: !x.hasCost,
             })))}>⤓ Stock CSV</Button>
           <Button variant="outline" disabled={!p}
-            onClick={() => downloadCSV("pnl-report.csv", p ? [{ range: k, revenue: Math.round(p.revenue), cogs: Math.round(p.cogs), gross_profit: p.grossProfit == null ? "unknown" : Math.round(p.grossProfit), gross_margin_pct: p.margin == null ? "unknown" : p.margin.toFixed(1), operating_expenses: Math.round(p.operatingExpenses), net_profit: p.netProfit == null ? "unknown" : Math.round(p.netProfit), net_margin_pct: p.netMargin == null ? "unknown" : p.netMargin.toFixed(1) }] : [])}>⤓ P&L CSV</Button>
+            onClick={() => downloadCSV("pnl-report.csv", p ? [{ range: rangeLabel(rk, r), revenue: Math.round(p.revenue), cogs: Math.round(p.cogs), gross_profit: p.grossProfit == null ? "unknown" : Math.round(p.grossProfit), gross_margin_pct: p.margin == null ? "unknown" : p.margin.toFixed(1), operating_expenses: Math.round(p.operatingExpenses), net_profit: p.netProfit == null ? "unknown" : Math.round(p.netProfit), net_margin_pct: p.netMargin == null ? "unknown" : p.netMargin.toFixed(1) }] : [])}>⤓ P&L CSV</Button>
           <Button variant="outline" disabled={!expenses.data?.length}
             onClick={() => downloadCSV("expenses-report.csv", (expenses.data ?? []).map((e) => ({ date: e.date, category: e.category, amount: Math.round(e.amount), payment: e.paymentMethod, notes: e.notes ?? "" })))}>⤓ Expenses CSV</Button>
           <Button variant="outline" disabled={!cheques.data?.length}
@@ -116,7 +106,7 @@ export function ReportsScreen() {
               const w = x.grossProfit != null && top > 0 ? Math.max(2, (x.grossProfit / top) * 100) : 0;
               return (
                 <div key={x.productId} className="px-4 py-2.5">
-                  <div className="flex items-center gap-2">
+                  <Link to={x.productId === "__unmapped__" ? "/sales" : `/product/${x.productId}`} className="row-hover -mx-2 flex items-center gap-2 rounded-lg px-2 py-0.5">
                     <span className="w-5 text-center font-display text-xs font-semibold text-dim">{i + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm text-text">{x.name}</div>
@@ -126,7 +116,7 @@ export function ReportsScreen() {
                       <div className="font-display text-sm font-semibold text-good">{x.grossProfit == null ? "—" : egp(x.grossProfit)}</div>
                       {x.missingCostLines > 0 && <Badge tone="warn">no cost</Badge>}
                     </div>
-                  </div>
+                  </Link>
                   {w > 0 && <div className="ml-7 mt-1.5 h-1.5 overflow-hidden rounded-full bg-line2"><div className="h-full rounded-full bg-pink" style={{ width: `${w}%` }} /></div>}
                 </div>
               );

@@ -21,6 +21,7 @@ const screens = () => import("@/features/engine/screens");
 const dash = () => import("@/features/engine/dashboard");
 const money = () => import("@/features/engine/money");
 const more = () => import("@/features/engine/more");
+const product = () => import("@/features/engine/product");
 const qa = () => import("@/features/qa/QAScreen");
 const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
   lazy(() => load().then((m) => ({ default: m[key] as unknown as React.ComponentType })));
@@ -41,6 +42,7 @@ const SystemCheckScreen = L(more, "SystemCheckScreen");
 const ImportsScreen = L(more, "ImportsScreen");
 const SettingsScreen = L(more, "SettingsScreen");
 const QAScreen = L(qa, "QAScreen");
+const ProductDetailScreen = L(product, "ProductDetailScreen");
 
 const I = {
   today: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
@@ -156,7 +158,7 @@ function Header({ onAdd }: { onAdd: () => void }) {
   return (
     <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-line2 bg-rail/95 px-4 py-3 backdrop-blur sm:px-7">
       <div>
-        <div className="font-display text-xl font-semibold leading-tight sm:text-2xl">{FULLTITLE[pathname] ?? "BostaOS"}</div>
+        <div className="font-display text-xl font-semibold leading-tight sm:text-2xl">{pathname.startsWith("/product/") ? "Product" : FULLTITLE[pathname] ?? "BostaOS"}</div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-dim">
           <span>Bosta Bites · {monthLabel}</span>
           <span className="rounded-full bg-good/15 px-2 py-0.5 font-display text-[10px] font-semibold text-good">{WRITE_BADGE}</span>
@@ -222,6 +224,7 @@ function Shell() {
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               {ALL.map((n) => <Route key={n.to} path={n.to} element={n.el} />)}
+              <Route path="/product/:id" element={<ProductDetailScreen />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Suspense>
