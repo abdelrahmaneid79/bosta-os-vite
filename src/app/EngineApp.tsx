@@ -3,7 +3,7 @@
  * rail, central + quick-add (write-gated), big Fredoka header, jet bg with pink
  * glow. Read-only over the verified Supabase engine.
  */
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { cn } from "@/core/utils/cn";
@@ -11,13 +11,33 @@ import { fmtDate } from "@/core/utils/date";
 import { monthBoundsCairo } from "@/core/time";
 import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { GatedButton } from "@/components/ui";
-import { Toaster } from "@/components/feedback";
+import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
 import { WRITE_BADGE } from "@/core/capabilities";
-import { StockScreen, SalesScreen, PurchasesScreen, ReconcileScreen } from "@/features/engine/screens";
-import { DashboardScreen, HealthScreen, MissingScreen } from "@/features/engine/dashboard";
-import { MoneyScreen, ChequesScreen, ExpensesScreen } from "@/features/engine/money";
-import { ReportsScreen, SystemCheckScreen, ImportsScreen, SettingsScreen } from "@/features/engine/more";
+
+// Lazy route chunks — each feature module is split out of the initial bundle so
+// the shell + Today load fast; the rest stream in on navigation.
+const screens = () => import("@/features/engine/screens");
+const dash = () => import("@/features/engine/dashboard");
+const money = () => import("@/features/engine/money");
+const more = () => import("@/features/engine/more");
+const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
+  lazy(() => load().then((m) => ({ default: m[key] as unknown as React.ComponentType })));
+
+const StockScreen = L(screens, "StockScreen");
+const SalesScreen = L(screens, "SalesScreen");
+const PurchasesScreen = L(screens, "PurchasesScreen");
+const ReconcileScreen = L(screens, "ReconcileScreen");
+const DashboardScreen = L(dash, "DashboardScreen");
+const HealthScreen = L(dash, "HealthScreen");
+const MissingScreen = L(dash, "MissingScreen");
+const MoneyScreen = L(money, "MoneyScreen");
+const ChequesScreen = L(money, "ChequesScreen");
+const ExpensesScreen = L(money, "ExpensesScreen");
+const ReportsScreen = L(more, "ReportsScreen");
+const SystemCheckScreen = L(more, "SystemCheckScreen");
+const ImportsScreen = L(more, "ImportsScreen");
+const SettingsScreen = L(more, "SettingsScreen");
 
 const I = {
   today: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
@@ -161,11 +181,13 @@ function Shell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onAdd={() => setAdd(true)} />
         <main className="mx-auto w-full max-w-[1080px] flex-1 px-4 pb-28 pt-6 sm:px-7 md:pb-10">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            {ALL.map((n) => <Route key={n.to} path={n.to} element={n.el} />)}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <Suspense fallback={<SkeletonRows rows={6} />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              {ALL.map((n) => <Route key={n.to} path={n.to} element={n.el} />)}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
       <MobileNav />

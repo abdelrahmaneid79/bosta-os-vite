@@ -14,6 +14,7 @@ import { monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, todayCairo } from "
 import { getStockSummary } from "@/core/read/stock";
 import { getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
+import { getProductProfit } from "@/core/read/products";
 import { getPurchaseTotal } from "@/core/read/purchases";
 import { getSettings, getExpenses } from "@/core/read/expenses";
 import { getCheques } from "@/core/read/settlements";
@@ -45,8 +46,10 @@ export function ReportsScreen() {
   const purch = useQuery({ queryKey: ["purchaseTotal", r], queryFn: () => getPurchaseTotal(r), enabled: en });
   const expenses = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
   const cheques = useQuery({ queryKey: ["cheques"], queryFn: getCheques, enabled: en });
+  const products = useQuery({ queryKey: ["productProfit", r], queryFn: () => getProductProfit(r), enabled: en });
   if (!en) return <EmptyState title="Sign in to build reports" />;
   const p = profit.data;
+  const prods = products.data ?? [];
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -57,9 +60,11 @@ export function ReportsScreen() {
         <Stat label="Revenue" value={p ? egp(p.revenue) : "—"} />
         <Stat label="COGS" value={p ? egp(p.cogs) : "—"} />
         <Stat label="Gross profit" value={p ? (p.grossProfit == null ? "unknown" : egp(p.grossProfit)) : "—"} accent="text-good" />
-        <Stat label="Margin" value={p ? (p.margin == null ? "unknown" : pct(p.margin)) : "—"} />
+        <Stat label="Gross margin" value={p ? (p.margin == null ? "unknown" : pct(p.margin)) : "—"} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Operating expenses" value={p ? egp(p.operatingExpenses) : "—"} accent="text-warn" />
+        <Stat label="Net profit" value={p ? (p.netProfit == null ? "unknown" : egp(p.netProfit)) : "—"} accent="text-good" />
         <Stat label="Sales days" value={sales.data ? sales.data.days : "—"} />
         <Stat label="Purchases" value={purch.data != null ? egpShort(purch.data) : "—"} />
       </div>
@@ -71,12 +76,47 @@ export function ReportsScreen() {
               product: x.nameEn, on_hand: x.onHand, unit: x.baseUnit, avg_cost: x.avgCost, stock_value: Math.round(x.stockValue), missing_cost: !x.hasCost,
             })))}>⤓ Stock CSV</Button>
           <Button variant="outline" disabled={!p}
-            onClick={() => downloadCSV("pnl-report.csv", p ? [{ range: k, revenue: Math.round(p.revenue), cogs: Math.round(p.cogs), gross_profit: p.grossProfit == null ? "unknown" : Math.round(p.grossProfit), margin_pct: p.margin == null ? "unknown" : p.margin.toFixed(1) }] : [])}>⤓ P&L CSV</Button>
+            onClick={() => downloadCSV("pnl-report.csv", p ? [{ range: k, revenue: Math.round(p.revenue), cogs: Math.round(p.cogs), gross_profit: p.grossProfit == null ? "unknown" : Math.round(p.grossProfit), gross_margin_pct: p.margin == null ? "unknown" : p.margin.toFixed(1), operating_expenses: Math.round(p.operatingExpenses), net_profit: p.netProfit == null ? "unknown" : Math.round(p.netProfit), net_margin_pct: p.netMargin == null ? "unknown" : p.netMargin.toFixed(1) }] : [])}>⤓ P&L CSV</Button>
           <Button variant="outline" disabled={!expenses.data?.length}
             onClick={() => downloadCSV("expenses-report.csv", (expenses.data ?? []).map((e) => ({ date: e.date, category: e.category, amount: Math.round(e.amount), payment: e.paymentMethod, notes: e.notes ?? "" })))}>⤓ Expenses CSV</Button>
           <Button variant="outline" disabled={!cheques.data?.length}
             onClick={() => downloadCSV("cheques-report.csv", (cheques.data ?? []).map((c) => ({ received_date: c.receivedDate ?? "", expected: Math.round(c.expected), received: c.received ?? "", difference: c.difference ?? "", status: c.status })))}>⤓ Cheques CSV</Button>
+          <Button variant="outline" disabled={!prods.length}
+            onClick={() => downloadCSV("product-profit.csv", prods.map((x) => ({ product: x.name, units: x.units, revenue: Math.round(x.revenue), cogs: Math.round(x.cogs), gross_profit: x.grossProfit == null ? "unknown" : Math.round(x.grossProfit), margin_pct: x.margin == null ? "unknown" : x.margin.toFixed(1) })))}>⤓ Products CSV</Button>
         </div>
+      </Card>
+
+      <Card className="!p-0">
+        <div className="flex items-center justify-between px-4 pt-4">
+          <Eyebrow>Most profitable products</Eyebrow>
+          {prods.length > 0 && <span className="text-[11px] text-dim">{prods.length} sold</span>}
+        </div>
+        {products.isLoading ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Loading…</div>
+          : prods.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">No product lines sold in this range.</div>
+          : (
+          <div className="mt-2 divide-y divide-line2">
+            {prods.slice(0, 12).map((x, i) => {
+              const top = prods[0]?.grossProfit ?? 0;
+              const w = x.grossProfit != null && top > 0 ? Math.max(2, (x.grossProfit / top) * 100) : 0;
+              return (
+                <div key={x.productId} className="px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 text-center font-display text-xs font-semibold text-dim">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm text-text">{x.name}</div>
+                      <div className="text-[11px] text-dim">{x.units} sold · {egp(x.revenue)} revenue{x.margin != null ? ` · ${pct(x.margin)} margin` : ""}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-display text-sm font-semibold text-good">{x.grossProfit == null ? "—" : egp(x.grossProfit)}</div>
+                      {x.missingCostLines > 0 && <Badge tone="warn">no cost</Badge>}
+                    </div>
+                  </div>
+                  {w > 0 && <div className="ml-7 mt-1.5 h-1.5 overflow-hidden rounded-full bg-line2"><div className="h-full rounded-full bg-pink" style={{ width: `${w}%` }} /></div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
     </div>
   );

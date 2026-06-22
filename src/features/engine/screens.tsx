@@ -279,19 +279,27 @@ export function ReconcileScreen() {
       {!isEngineConfigured ? <ConnectPanel /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : (
         <>
           <Card glow>
-            <Eyebrow>Gross profit</Eyebrow>
+            <Eyebrow>Net profit · after costs &amp; expenses</Eyebrow>
             <div className="mt-1 flex flex-wrap items-end gap-3">
               <div className="font-display text-5xl font-semibold leading-none text-white">
-                {p ? (p.grossProfit == null ? "unknown" : egp(p.grossProfit)) : "—"}
+                {p ? (p.netProfit == null ? "unknown" : egp(p.netProfit)) : "—"}
               </div>
-              {p && p.margin != null && <Badge tone={p.margin >= 0 ? "good" : "bad"}>{pct(p.margin)} margin</Badge>}
+              {p && p.netMargin != null && <Badge tone={p.netMargin >= 0 ? "good" : "bad"}>{pct(p.netMargin)} net margin</Badge>}
             </div>
             <div className="mt-6 space-y-3">
               <Bar label="Revenue" amount={p ? egp(p.revenue) : "—"} pctWidth={100} tone="bg-good" />
               <Bar label="− Cost of goods" amount={p ? egp(p.cogs) : "—"} pctWidth={p && p.revenue > 0 ? (p.cogs / p.revenue) * 100 : 0} tone="bg-bad/70" />
               <Bar label="= Gross profit" amount={p ? (p.grossProfit == null ? "unknown" : egp(p.grossProfit)) : "—"}
-                pctWidth={p && p.revenue > 0 && p.grossProfit != null ? Math.max(0, (p.grossProfit / p.revenue) * 100) : 0} tone="bg-pink" strong />
+                pctWidth={p && p.revenue > 0 && p.grossProfit != null ? Math.max(0, (p.grossProfit / p.revenue) * 100) : 0} tone="bg-pink/60" />
+              <Bar label="− Operating expenses" amount={p ? egp(p.operatingExpenses) : "—"} pctWidth={p && p.revenue > 0 ? (p.operatingExpenses / p.revenue) * 100 : 0} tone="bg-warn/70" />
+              <Bar label="= Net profit" amount={p ? (p.netProfit == null ? "unknown" : egp(p.netProfit)) : "—"}
+                pctWidth={p && p.revenue > 0 && p.netProfit != null ? Math.max(0, (p.netProfit / p.revenue) * 100) : 0} tone="bg-pink" strong />
             </div>
+            {p && p.grossProfit != null && (
+              <div className="mt-4 text-[11px] text-dim">
+                Gross margin {p.margin != null ? pct(p.margin) : "—"} · personal withdrawals are tracked as cash, never counted as expenses here.
+              </div>
+            )}
           </Card>
           {p && !p.complete && (
             <Card>
