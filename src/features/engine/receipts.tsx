@@ -13,6 +13,7 @@ import {
   scanReceiptRows, scanReceiptText, toIso, toNum, type Row,
   detectSalesMap, detectExpenseMap, rowsWithSalesMap, rowsWithExpenseMap, type SalesMap, type ExpenseMap,
 } from "@/core/import/csv";
+import { dedupeDailySales, dedupeExpenses } from "@/core/accounting/brain";
 import { getChannels, getLocations } from "@/core/read/common";
 import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
 import { egp } from "@/core/utils/format";
@@ -86,7 +87,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
         setRawText(data.text || "");
         if (kind === "sales") {
           const rows = scanReceiptRows(data.text);
-          setSales(rows.length ? rows.map((r) => ({ date: r.date, total: String(r.amount) })) : [{ date: todayCairo(), total: "" }]);
+          setSales(rows.length ? brainSales(rows.map((r) => ({ date: r.date, total: String(r.amount) }))) : [{ date: todayCairo(), total: "" }]);
           toast(rows.length ? `Read ${rows.length} row(s) — check & Approve` : "Couldn't auto-read — type the totals from the image", rows.length ? "info" : "error");
         } else {
           const g = scanReceiptText(data.text);
@@ -111,15 +112,31 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
     if (kind === "sales") {
       const saved = loadSavedMap<SalesMap>("sales");
       const map = saved && validMap(saved, hs) ? saved : detectSalesMap(hs);
-      setSMap(map); setSales(rowsWithSalesMap(rows, map));
+      setSMap(map); setSales(brainSales(rowsWithSalesMap(rows, map)));
     } else {
       const saved = loadSavedMap<ExpenseMap>("expenses");
       const map = saved && validMap(saved, hs) ? saved : detectExpenseMap(hs);
-      setEMap(map); setExps(rowsWithExpenseMap(rows, map));
+      setEMap(map); setExps(brainExp(rowsWithExpenseMap(rows, map)));
     }
   }
-  const remapSales = (m: SalesMap) => { setSMap(m); saveMap("sales", m); if (raw) setSales(rowsWithSalesMap(raw, m)); };
-  const remapExp = (m: ExpenseMap) => { setEMap(m); saveMap("expenses", m); if (raw) setExps(rowsWithExpenseMap(raw, m)); };
+  // Run uploaded rows through the accounting brain: collapse double days /
+  // identical expense rows, keep anything unparseable for the owner to fix.
+  function brainSales(rows: SaleEdit[]): SaleEdit[] {
+    const ok = (r: SaleEdit) => toIso(r.date) && toNum(r.total) != null;
+    const bad = rows.filter((r) => !ok(r));
+    const { clean, dropped } = dedupeDailySales(rows.filter(ok).map((r) => ({ date: toIso(r.date), total: toNum(r.total) })));
+    if (dropped > 0) toast(`Brain removed ${dropped} duplicate day(s)`, "info");
+    return [...clean.map((c) => ({ date: c.date, total: String(c.total) })), ...bad];
+  }
+  function brainExp(rows: ExpenseEdit[]): ExpenseEdit[] {
+    const ok = (r: ExpenseEdit) => toIso(r.date) && toNum(r.amount) != null;
+    const bad = rows.filter((r) => !ok(r));
+    const { clean, dropped } = dedupeExpenses(rows.filter(ok).map((r) => ({ date: toIso(r.date), category: r.category, amount: toNum(r.amount), vendor: null })));
+    if (dropped > 0) toast(`Brain removed ${dropped} duplicate expense(s)`, "info");
+    return [...clean.map((c) => ({ date: c.date, category: c.category, amount: String(c.amount) })), ...bad];
+  }
+  const remapSales = (m: SalesMap) => { setSMap(m); saveMap("sales", m); if (raw) setSales(brainSales(rowsWithSalesMap(raw, m))); };
+  const remapExp = (m: ExpenseMap) => { setEMap(m); saveMap("expenses", m); if (raw) setExps(brainExp(rowsWithExpenseMap(raw, m))); };
 
   const dupSet = existingDays.data ?? new Set<string>();
   const salesView = (sales ?? []).map((r) => {

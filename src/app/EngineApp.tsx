@@ -14,6 +14,8 @@ import { monthBoundsCairo } from "@/core/time";
 import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
+import { CommandPalette } from "@/features/engine/CommandPalette";
+import { useUI } from "@/store/ui";
 import { WRITE_BADGE } from "@/core/capabilities";
 import { NAV_SECTIONS, SETTINGS_SECTION } from "@/core/nav";
 import { usePrefs } from "@/store/prefs";
@@ -212,6 +214,7 @@ function RailGroup({ group }: { group: Group }) {
 
 function Header({ onAdd }: { onAdd: () => void }) {
   const { pathname } = useLocation();
+  const setCommandOpen = useUI((s) => s.setCommandOpen);
   const monthLabel = fmtDate(monthBoundsCairo().from, "MMMM yyyy");
   const group = groupForPath(pathname);
   const title = pathname.startsWith("/product/") ? "Product" : group?.label ?? "BostaOS";
@@ -225,6 +228,11 @@ function Header({ onAdd }: { onAdd: () => void }) {
         </div>
       </div>
       <div className="flex-1" />
+      <button onClick={() => setCommandOpen(true)} className="hidden items-center gap-2 rounded-xl border border-line bg-panel2 px-3 py-2 text-sm text-faint hover:border-pink/40 hover:text-muted sm:flex">
+        <Icon d={I.search} className="h-4 w-4" /> Search…
+        <kbd className="rounded bg-line2 px-1.5 py-0.5 font-mono text-[10px] text-dim">⌘K</kbd>
+      </button>
+      <button onClick={() => setCommandOpen(true)} className="flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-panel2 text-faint sm:hidden"><Icon d={I.search} className="h-4 w-4" /></button>
       <button onClick={onAdd} className="lift flex h-9 items-center gap-1.5 rounded-xl bg-pink px-3 font-display text-sm font-semibold text-ink shadow-pink sm:hidden"><Icon d={I.plus} className="h-4 w-4" w={2.6} /></button>
       <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-line2 bg-panel2"><img src="/mascot-96.png" alt="" className="h-7 w-7 object-contain" /></div>
     </header>
@@ -302,6 +310,7 @@ function Shell() {
       </div>
       <MobileNav />
       <QuickSheet open={add} onClose={() => setAdd(false)} />
+      <CommandPalette />
       <Toaster />
     </div>
   );

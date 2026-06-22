@@ -7,9 +7,10 @@ export interface Prefs {
   landing: string;            // route to open on launch
   defaultRange: RangeKey;     // global period applied on launch
   hiddenSections: string[];   // nav section ids hidden from the rail/mobile nav
+  accountingStart: string;    // bookkeeping start; before it, profit is revenue-only
 }
 
-export const DEFAULT_PREFS: Prefs = { landing: "/dashboard", defaultRange: "month", hiddenSections: [] };
+export const DEFAULT_PREFS: Prefs = { landing: "/dashboard", defaultRange: "month", hiddenSections: [], accountingStart: "2026-03-01" };
 
 const KEY = "bostaos.prefs.v1";
 function load(): Prefs {
@@ -20,6 +21,7 @@ function load(): Prefs {
       landing: typeof p.landing === "string" ? p.landing : DEFAULT_PREFS.landing,
       defaultRange: p.defaultRange ?? DEFAULT_PREFS.defaultRange,
       hiddenSections: Array.isArray(p.hiddenSections) ? p.hiddenSections : [],
+      accountingStart: typeof p.accountingStart === "string" ? p.accountingStart : DEFAULT_PREFS.accountingStart,
     };
   } catch { return { ...DEFAULT_PREFS }; }
 }

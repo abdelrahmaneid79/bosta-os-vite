@@ -5,8 +5,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow } from "@/components/ui";
-import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
+import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import { usePrefs } from "@/store/prefs";
 import { BarChart, LineChart, DonutChart, HBars } from "@/components/charts";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -27,8 +28,10 @@ type ChartMode = "bar" | "line" | "monthly";
 
 export function AnalyticsScreen() {
   const range = useActiveRange();
+  const accStart = usePrefs((s) => s.accountingStart);
   const [mode, setMode] = useState<ChartMode>("bar");
-  const q = useQuery({ queryKey: ["analytics", range], queryFn: () => getAnalytics(range), enabled: isEngineConfigured });
+  const q = useQuery({ queryKey: ["analytics", range, accStart], queryFn: () => getAnalytics(range, accStart), enabled: isEngineConfigured });
+  const partial = range.from < accStart ? accStart : null;
 
   if (!isEngineConfigured) return <EmptyState title="Sign in to see analytics" />;
   if (q.isLoading) return <div className="space-y-4"><SkeletonRows rows={3} /><SkeletonRows rows={6} /></div>;
@@ -42,6 +45,7 @@ export function AnalyticsScreen() {
         <Eyebrow>Overview · {a.rangeLabel}</Eyebrow>
         <DateRangePicker />
       </div>
+      {partial && <PartialNote since={partial} />}
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

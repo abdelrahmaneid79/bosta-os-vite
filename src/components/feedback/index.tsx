@@ -74,6 +74,17 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   );
 }
 
+/** Shown when a P&L/analytics view reaches before bookkeeping started — earlier
+ *  figures are revenue-only because costs weren't tracked yet. */
+export function PartialNote({ since }: { since: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-[12px] text-warn">
+      <span className="font-display font-semibold">Partial before {since}</span>
+      <span className="text-warn/80">— bookkeeping started here; earlier periods are revenue-only (costs incomplete), so profit is shown only from {since} onward.</span>
+    </div>
+  );
+}
+
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="rounded-2xl border border-bad/40 bg-bad/5 p-6 text-center">

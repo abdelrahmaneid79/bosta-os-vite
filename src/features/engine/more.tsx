@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge, Select } from "@/components/ui";
 import { Confirm } from "@/components/ui/Confirm";
-import { EmptyState } from "@/components/feedback";
+import { EmptyState, PartialNote } from "@/components/feedback";
 import { usePrefs } from "@/store/prefs";
 import { LANDING_OPTIONS, HIDEABLE_SECTIONS } from "@/core/nav";
 import { RANGE_PRESETS } from "@/core/range";
@@ -46,10 +46,11 @@ function downloadCSV(name: string, rows: Record<string, unknown>[]) {
 export function ReportsScreen() {
   const r = useActiveRange();
   const rk = useFilters((s) => s.rangeKey);
+  const accStart = usePrefs((s) => s.accountingStart);
   const prior = priorRange(r);
   const stock = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: en });
   const sales = useQuery({ queryKey: ["salesStats", r], queryFn: () => getSalesStats(r), enabled: en });
-  const profit = useQuery({ queryKey: ["profit", r], queryFn: () => getProfitReadout(r), enabled: en });
+  const profit = useQuery({ queryKey: ["profit", r, accStart], queryFn: () => getProfitReadout(r, accStart), enabled: en });
   const purch = useQuery({ queryKey: ["purchaseTotal", r], queryFn: () => getPurchaseTotal(r), enabled: en });
   const expenses = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
   const expTrends = useQuery({ queryKey: ["expTrends", r, prior], queryFn: () => getExpenseCategoryTrends(r, prior), enabled: en });
@@ -65,6 +66,7 @@ export function ReportsScreen() {
         <Eyebrow>P&L · {rangeLabel(rk, r)} · vs prior {prior.from} → {prior.to}</Eyebrow>
         <DateRangePicker />
       </div>
+      {p?.partialBefore && <PartialNote since={p.partialBefore} />}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Revenue" value={p ? egp(p.revenue) : "—"} />
         <Stat label="COGS" value={p ? egp(p.cogs) : "—"} />
@@ -427,7 +429,7 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 
 // ── Preferences (app-wide customization) ─────────────────────────────────────
 export function PreferencesScreen() {
-  const { landing, defaultRange, hiddenSections, set, toggleSection, reset } = usePrefs();
+  const { landing, defaultRange, hiddenSections, accountingStart, set, toggleSection, reset } = usePrefs();
   return (
     <div className="mx-auto max-w-xl space-y-4">
       <Card>
@@ -445,6 +447,14 @@ export function PreferencesScreen() {
           </Field>
         </div>
         <p className="mt-2 text-[11px] text-dim">Applied each time you open the app. Saved in this browser.</p>
+      </Card>
+
+      <Card>
+        <Eyebrow>Bookkeeping start</Eyebrow>
+        <p className="mt-1 text-[12px] text-dim">Costs (purchases/expenses) before this date are incomplete. Revenue is still shown for earlier periods, but <b>profit is only calculated from this date onward</b>, with a “partial before” note. Set it to when your accurate accounting begins.</p>
+        <div className="mt-2 flex items-end gap-2">
+          <Field label="Accounting start date"><Input type="date" value={accountingStart} onChange={(e) => set({ accountingStart: e.target.value })} /></Field>
+        </div>
       </Card>
 
       <Card>

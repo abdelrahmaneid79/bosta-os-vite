@@ -19,6 +19,7 @@ import { getProfitReadout } from "@/core/read/profit";
 import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { useActiveRange } from "@/store/filters";
+import { usePrefs } from "@/store/prefs";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
@@ -119,8 +120,9 @@ export function DashboardScreen() {
   const feed = useQuery({ queryKey: ["activity"], queryFn: () => getActivityFeed(30, 8), enabled: en });
   const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
   const daily = useQuery({ queryKey: ["dailyDash", last.from], queryFn: () => getDailyRevenue({ from: last.from, to: today }), enabled: en });
-  const profitM = useQuery({ queryKey: ["profit", month], queryFn: () => getProfitReadout(month), enabled: en });
-  const profitL = useQuery({ queryKey: ["profit", last], queryFn: () => getProfitReadout(last), enabled: en });
+  const accStart = usePrefs((s) => s.accountingStart);
+  const profitM = useQuery({ queryKey: ["profit", month, accStart], queryFn: () => getProfitReadout(month, accStart), enabled: en });
+  const profitL = useQuery({ queryKey: ["profit", last, accStart], queryFn: () => getProfitReadout(last, accStart), enabled: en });
   const c = cc.data;
   if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
 

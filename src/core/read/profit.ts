@@ -19,13 +19,14 @@ export interface ProfitReadout {
   soldLines: number;
   missingCostLines: number;
   complete: boolean;
+  partialBefore: string | null; // bookkeeping start; data before it is revenue-only
 }
 
 /** Pure profit composition — "hides, never lies". Gross/net profit are null when
  *  any mapped sold line lacks a recorded cost, so we never publish a wrong number.
  *  Personal withdrawals are NOT operating expenses and must be excluded upstream. */
 export function composeProfit(input: {
-  revenue: number; cogs: number; operatingExpenses: number; soldLines: number; missingCostLines: number;
+  revenue: number; cogs: number; operatingExpenses: number; soldLines: number; missingCostLines: number; partialBefore?: string | null;
 }): ProfitReadout {
   const { revenue, cogs, operatingExpenses, soldLines, missingCostLines } = input;
   const complete = soldLines > 0 && missingCostLines === 0;
@@ -37,19 +38,25 @@ export function composeProfit(input: {
     operatingExpenses, netProfit,
     netMargin: netProfit == null || revenue <= 0 ? null : (netProfit / revenue) * 100,
     soldLines, missingCostLines, complete,
+    partialBefore: input.partialBefore ?? null,
   };
 }
 
-export async function getProfitReadout(range: DateRange): Promise<ProfitReadout> {
+/** `since` = the bookkeeping start date. Costs before it are incomplete, so the
+ *  P&L is computed only from `since` onward (revenue + COGS + expenses all in the
+ *  accounted window) and `partialBefore` is set so the UI can flag it. */
+export async function getProfitReadout(range: DateRange, since?: string): Promise<ProfitReadout> {
   const sb = requireEngine();
+  const partialBefore = since && range.from < since ? since : null;
+  const eff: DateRange = { from: partialBefore ?? range.from, to: range.to };
 
-  // 1) Non-voided sales in range → their ids.
+  // 1) Non-voided sales in the accounted window → their ids.
   const sales = await sb
     .from("sales")
     .select("id")
     .is("voided_at", null)
-    .gte("sale_date", range.from)
-    .lte("sale_date", range.to);
+    .gte("sale_date", eff.from)
+    .lte("sale_date", eff.to);
   if (sales.error) throw sales.error;
   const saleIds = sales.data.map((s) => s.id);
 
@@ -72,8 +79,8 @@ export async function getProfitReadout(range: DateRange): Promise<ProfitReadout>
   }
 
   const [revenue, operatingExpenses] = await Promise.all([
-    getRevenueTotal(range),
-    getExpenseTotal(range),
+    getRevenueTotal(eff),
+    getExpenseTotal(eff),
   ]);
-  return composeProfit({ revenue, cogs, operatingExpenses, soldLines: lines, missingCostLines: missing });
+  return composeProfit({ revenue, cogs, operatingExpenses, soldLines: lines, missingCostLines: missing, partialBefore });
 }

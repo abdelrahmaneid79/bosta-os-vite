@@ -127,6 +127,10 @@ describe("profit composition (gross + net, hides never lies)", () => {
     expect(p.netProfit).toBe(-1000);
     expect(p.netMargin).toBeCloseTo(-20);
   });
+  it("carries the partial-before bookkeeping flag (default null)", () => {
+    expect(composeProfit({ revenue: 1, cogs: 0, operatingExpenses: 0, soldLines: 1, missingCostLines: 0 }).partialBefore).toBeNull();
+    expect(composeProfit({ revenue: 1, cogs: 0, operatingExpenses: 0, soldLines: 1, missingCostLines: 0, partialBefore: "2026-03-01" }).partialBefore).toBe("2026-03-01");
+  });
 });
 
 describe("product profitability aggregation", () => {

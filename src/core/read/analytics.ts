@@ -75,7 +75,7 @@ export interface AnalyticsBundle {
   rangeLabel: string;
 }
 
-export async function getAnalytics(range: DateRange): Promise<AnalyticsBundle> {
+export async function getAnalytics(range: DateRange, accountingStart?: string): Promise<AnalyticsBundle> {
   const today = todayCairo();
   const month = monthBoundsCairo();
   const prior = priorRange(range);
@@ -86,7 +86,7 @@ export async function getAnalytics(range: DateRange): Promise<AnalyticsBundle> {
     getExpenseTotal({ from: EPOCH, to: today }),
     getPurchases(range),
     getProductProfit(range),
-    getProfitReadout(month),
+    getProfitReadout(month, accountingStart),
     getSettlementPeriods(),
   ]);
 

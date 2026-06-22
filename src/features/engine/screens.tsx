@@ -10,8 +10,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, Eyebrow, Stat, Badge, Button, Input, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
-import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
+import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import { usePrefs } from "@/store/prefs";
 import { egp, egpShort, num, pct } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
@@ -266,7 +267,8 @@ export function PurchasesScreen() {
 export function ReconcileScreen() {
   const range = useActiveRange();
   const key = useFilters((s) => s.rangeKey);
-  const q = useQuery({ queryKey: ["profit", range], queryFn: () => getProfitReadout(range), enabled: isEngineConfigured });
+  const accStart = usePrefs((s) => s.accountingStart);
+  const q = useQuery({ queryKey: ["profit", range, accStart], queryFn: () => getProfitReadout(range, accStart), enabled: isEngineConfigured });
   const p = q.data;
   return (
     <div className="space-y-4">
@@ -274,6 +276,7 @@ export function ReconcileScreen() {
         <Eyebrow>Profit · {rangeLabel(key, range)}</Eyebrow>
         <DateRangePicker />
       </div>
+      {p?.partialBefore && <PartialNote since={p.partialBefore} />}
       {!isEngineConfigured ? <ConnectPanel /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : (
         <>
           <Card glow>
