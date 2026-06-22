@@ -1,6 +1,9 @@
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Pill, Ring, Badge, Button } from "@/components/ui";
+import { useLayoutStore } from "@/store/layout";
+import { WIDGET_TITLES, type WidgetId } from "@/core/dashboardLayout";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -86,39 +89,37 @@ export function DashboardScreen() {
   const p = profit.data;
   const attention = (miss.data?.length ?? 0) + (insights.data?.filter((i) => i.severity !== "info").length ?? 0);
 
-  return (
-    <div className="space-y-4">
-      <AskBostaPanel />
-      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-        {/* Today + 14-day trend */}
-        <Card glow>
-          <div className="flex items-start justify-between">
-            <div>
-              <Eyebrow>Today · {fmtDate(today, "EEE d MMM")}</Eyebrow>
-              <div className="mt-1 flex items-end gap-3">
-                <div className="font-display text-4xl font-semibold leading-none text-white">{c ? egp(c.todayRevenue) : "—"}</div>
-                <div className="pb-1 text-sm text-muted">sold today</div>
-              </div>
-              <div className="mt-1 text-sm text-good">{c ? `${egp(c.monthRevenue)} this month` : "—"}</div>
+  // ── widget registry: every Today block is a customizable widget ──────────
+  const widgets: Record<WidgetId, ReactNode> = {
+    ask: <AskBostaPanel />,
+    today: (
+      <Card glow>
+        <div className="flex items-start justify-between">
+          <div>
+            <Eyebrow>Today · {fmtDate(today, "EEE d MMM")}</Eyebrow>
+            <div className="mt-1 flex items-end gap-3">
+              <div className="font-display text-4xl font-semibold leading-none text-white">{c ? egp(c.todayRevenue) : "—"}</div>
+              <div className="pb-1 text-sm text-muted">sold today</div>
             </div>
-            <Link to="/sales" className="rounded-lg bg-pink px-3 py-1.5 font-display text-xs font-semibold text-ink shadow-pink">+ Sale</Link>
+            <div className="mt-1 text-sm text-good">{c ? `${egp(c.monthRevenue)} this month` : "—"}</div>
           </div>
-          <div className="mt-4">
-            {daily.isLoading ? <div className="h-24 animate-pulse rounded-lg bg-line2" /> : <Sparkbars series={series} />}
-            <div className="mt-1.5 flex justify-between text-[10px] text-dim"><span>{fmtDate(chartFrom, "d MMM")}</span><span>last 14 days</span><span>today</span></div>
-          </div>
-        </Card>
-
-        {/* KPI tiles */}
-        <div className="grid grid-cols-2 gap-3">
-          <Kpi label="Net profit · month" value={p ? (p.netProfit == null ? "unknown" : egpShort(p.netProfit)) : "—"} accent="text-good" to="/reports" />
-          <Kpi label="Cash on hand" value={c ? (c.cashBalance == null ? "—" : egpShort(c.cashBalance)) : "—"} to="/money" />
-          <Kpi label="Stock value" value={c ? egpShort(c.stockValue) : "—"} to="/stock" />
-          <Kpi label="Owed to you" value={c ? egpShort(c.owed) : "—"} accent={c && c.owed > 0 ? "text-warn" : "text-text"} to="/cheques" />
+          <Link to="/sales" className="rounded-lg bg-pink px-3 py-1.5 font-display text-xs font-semibold text-ink shadow-pink">+ Sale</Link>
         </div>
+        <div className="mt-4">
+          {daily.isLoading ? <div className="h-24 animate-pulse rounded-lg bg-line2" /> : <Sparkbars series={series} />}
+          <div className="mt-1.5 flex justify-between text-[10px] text-dim"><span>{fmtDate(chartFrom, "d MMM")}</span><span>last 14 days</span><span>today</span></div>
+        </div>
+      </Card>
+    ),
+    kpis: (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Net profit · month" value={p ? (p.netProfit == null ? "unknown" : egpShort(p.netProfit)) : "—"} accent="text-good" to="/reports" />
+        <Kpi label="Cash on hand" value={c ? (c.cashBalance == null ? "—" : egpShort(c.cashBalance)) : "—"} to="/money" />
+        <Kpi label="Stock value" value={c ? egpShort(c.stockValue) : "—"} to="/stock" />
+        <Kpi label="Owed to you" value={c ? egpShort(c.owed) : "—"} accent={c && c.owed > 0 ? "text-warn" : "text-text"} to="/cheques" />
       </div>
-
-      {/* Needs attention */}
+    ),
+    attention: (
       <Card>
         <div className="mb-2 flex items-center justify-between">
           <Eyebrow>Needs attention{attention > 0 ? ` · ${attention}` : ""}</Eyebrow>
@@ -137,25 +138,23 @@ export function DashboardScreen() {
           </div>
         )}
       </Card>
-
-      {/* Risk & intelligence insights */}
-      {en && (insights.isLoading || (insights.data?.length ?? 0) > 0) && (
-        <Card>
-          <div className="mb-2 flex items-center justify-between">
-            <Eyebrow>Risks &amp; signals</Eyebrow>
-            {(insights.data?.length ?? 0) > 3 && <Link to="/missing" className="text-xs text-pink">All {insights.data!.length} →</Link>}
-          </div>
-          {insights.isLoading ? <SkeletonRows rows={2} /> : (
-            <div className="space-y-2">{insights.data!.slice(0, 3).map((i) => <InsightRow key={i.key} i={i} />)}</div>
-          )}
-        </Card>
-      )}
-
-      {/* Activity feed */}
+    ),
+    risks: (
+      <Card>
+        <div className="mb-2 flex items-center justify-between">
+          <Eyebrow>Risks &amp; signals</Eyebrow>
+          {(insights.data?.length ?? 0) > 3 && <Link to="/missing" className="text-xs text-pink">All {insights.data!.length} →</Link>}
+        </div>
+        {insights.isLoading ? <SkeletonRows rows={2} /> : (insights.data?.length ?? 0) === 0
+          ? <div className="py-2 text-sm text-good">● No risks flagged.</div>
+          : <div className="space-y-2">{insights.data!.slice(0, 3).map((i) => <InsightRow key={i.key} i={i} />)}</div>}
+      </Card>
+    ),
+    activity: (
       <Card className="!p-0">
         <div className="flex items-center justify-between px-4 pt-4">
           <Eyebrow>Recent activity</Eyebrow>
-          <span className="text-[11px] text-dim">last 30 days</span>
+          <Link to="/activity" className="text-[11px] text-pink">All →</Link>
         </div>
         {!en ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Sign in to load.</div>
           : feed.isLoading ? <div className="px-4 pb-4"><SkeletonRows rows={4} /></div>
@@ -179,8 +178,8 @@ export function DashboardScreen() {
           </div>
         )}
       </Card>
-
-      {/* Health teaser */}
+    ),
+    health: (
       <Card glow className="flex items-center gap-5">
         <Ring value={health.data?.overall ?? null} size={96} stroke={11}>
           <span className="font-display text-2xl font-semibold text-white">{health.data?.overall ?? "—"}</span>
@@ -196,7 +195,8 @@ export function DashboardScreen() {
         </div>
         <Link to="/health" className="rounded-lg border border-line px-3 py-1.5 text-xs text-text hover:bg-line2">Open →</Link>
       </Card>
-
+    ),
+    quick: (
       <Card>
         <Eyebrow>Quick actions</Eyebrow>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -208,6 +208,57 @@ export function DashboardScreen() {
           <Link to="/sales/import" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">Import receipt</Link>
         </div>
       </Card>
+    ),
+  };
+
+  return <CustomizableDashboard widgets={widgets} />;
+}
+
+/** Renders the Today widgets in the owner's saved order, with an edit mode to
+ *  reorder, hide/show and reset — persisted per-browser. */
+function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNode> }) {
+  const { layout, move, toggle, reset } = useLayoutStore();
+  const [edit, setEdit] = useState(false);
+  const hidden = layout.filter((x) => !x.on);
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="font-display text-sm font-semibold text-dim">Your dashboard</div>
+        <button onClick={() => setEdit((e) => !e)}
+          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${edit ? "border-pink bg-pink/15 text-pink" : "border-line bg-panel2 text-muted hover:text-text"}`}>
+          {edit ? "✓ Done" : "✎ Customize"}
+        </button>
+      </div>
+
+      {layout.filter((x) => x.on).map((item) => (
+        <div key={item.id} className={edit ? "rounded-2xl border border-dashed border-pink/40 p-2" : ""}>
+          {edit && (
+            <div className="mb-2 flex items-center gap-2 px-1">
+              <span className="flex-1 font-mono text-[11px] uppercase tracking-wider text-faint">{WIDGET_TITLES[item.id]}</span>
+              <button onClick={() => move(item.id, "up")} className="rounded-md bg-line2 px-2 py-1 text-xs text-muted hover:text-text" title="Move up">↑</button>
+              <button onClick={() => move(item.id, "down")} className="rounded-md bg-line2 px-2 py-1 text-xs text-muted hover:text-text" title="Move down">↓</button>
+              <button onClick={() => toggle(item.id)} className="rounded-md bg-line2 px-2 py-1 text-xs text-muted hover:text-bad" title="Hide">Hide</button>
+            </div>
+          )}
+          {widgets[item.id]}
+        </div>
+      ))}
+
+      {edit && (
+        <Card>
+          <div className="flex items-center justify-between">
+            <Eyebrow>Hidden widgets</Eyebrow>
+            <button onClick={reset} className="text-xs text-pink hover:underline">Reset to default</button>
+          </div>
+          {hidden.length === 0 ? <p className="mt-2 text-sm text-dim">All widgets are visible.</p> : (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {hidden.map((h) => (
+                <button key={h.id} onClick={() => toggle(h.id)} className="rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12px] text-muted hover:border-pink/40 hover:text-text">+ {WIDGET_TITLES[h.id]}</button>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

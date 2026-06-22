@@ -6,12 +6,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow } from "@/components/ui";
 import { isEngineConfigured } from "@/core/db/engine";
 import { getAssistantContext } from "@/core/read/assistant";
-import { askBosta, SUGGESTIONS, type BostaAnswer } from "@/core/assistant/askBosta";
+import { askBosta, proactiveInsights, SUGGESTIONS, type BostaAnswer } from "@/core/assistant/askBosta";
 
 export function AskBostaPanel() {
   const [q, setQ] = useState("");
   const [answer, setAnswer] = useState<BostaAnswer | null>(null);
   const ctx = useQuery({ queryKey: ["assistant-ctx"], queryFn: getAssistantContext, enabled: isEngineConfigured });
+  const briefing = ctx.data ? proactiveInsights(ctx.data) : [];
 
   const ask = (question: string) => {
     setQ(question);
@@ -24,7 +25,20 @@ export function AskBostaPanel() {
         <img src="/mascot-96.png" alt="" className="h-7 w-7 object-contain" />
         <Eyebrow>Ask Bosta</Eyebrow>
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) ask(q); }} className="mt-2 flex gap-2">
+
+      {/* Proactive briefing — shows before you even ask */}
+      {!answer && briefing.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {briefing.map((b, i) => (
+            <Link key={i} to={b.route ?? "#"} className="row-hover flex items-center gap-2 rounded-lg border border-line2 bg-panel px-3 py-2 text-[13px] text-text">
+              <span className="flex-1">{b.text}</span>
+              {b.route && <span className="text-[11px] text-pink">→</span>}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) ask(q); }} className="mt-2.5 flex gap-2">
         <input
           value={q} onChange={(e) => setQ(e.target.value)}
           placeholder="Ask about revenue, profit, cash, products…"
@@ -36,7 +50,10 @@ export function AskBostaPanel() {
       {answer ? (
         <div className="mt-3 rounded-xl border border-line2 bg-panel p-3.5">
           <p className="text-[15px] leading-relaxed text-text">{answer.text}</p>
-          {answer.route && <Link to={answer.route} className="mt-1.5 inline-block text-[12px] font-semibold text-pink">Open →</Link>}
+          <div className="mt-1.5 flex items-center gap-3">
+            {answer.route && <Link to={answer.route} className="text-[12px] font-semibold text-pink">Open →</Link>}
+            <button onClick={() => { setAnswer(null); setQ(""); }} className="text-[12px] text-dim hover:text-text">Ask another</button>
+          </div>
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap gap-1.5">

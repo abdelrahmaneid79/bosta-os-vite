@@ -17,9 +17,35 @@ export interface BostaContext {
   topProduct: { name: string; revenue: number } | null;
   bestDay: { date: string; total: number } | null;
   lowStock: { name: string; onHand: number; unit: string }[];
+  // optional signals used by the proactive briefing
+  yesterdayRevenue?: number;
+  avgDailyMonth?: number;
+  soonestStockout?: { name: string; days: number } | null;
+  isYesterdayBest?: boolean;
 }
 
 export interface BostaAnswer { text: string; route?: string }
+
+/** Proactive briefing — short, ranked, friendly nudges Bosta surfaces without
+ *  being asked. Pure: every line is backed by a real number; nothing is shown
+ *  when the data doesn't support it. */
+export function proactiveInsights(c: BostaContext): { text: string; route?: string }[] {
+  const out: { text: string; route?: string }[] = [];
+  const y = c.yesterdayRevenue ?? 0;
+  if (c.isYesterdayBest && y > 0) out.push({ text: `🎉 Yesterday (${egp(y)}) was your best day this month.`, route: "/sales" });
+  if (c.soonestStockout && c.soonestStockout.days < 7) out.push({ text: `⚠️ ${c.soonestStockout.name} runs out in ~${Math.round(c.soonestStockout.days)} day(s) — restock soon.`, route: "/purchases" });
+  if (c.revenue.today > 0) {
+    const vs = c.avgDailyMonth && c.avgDailyMonth > 0 ? c.revenue.today / c.avgDailyMonth : 1;
+    out.push({ text: vs >= 1.3 ? `🔥 ${egp(c.revenue.today)} so far today — well above your daily average.` : `You've sold ${egp(c.revenue.today)} so far today.`, route: "/sales" });
+  }
+  if (c.revenue.lastMonth > 0) {
+    const g = pct(c.revenue.month, c.revenue.lastMonth);
+    if (g != null && Math.abs(g) >= 5) out.push({ text: `This month is ${dir(g)} ${Math.abs(Math.round(g))}% vs last month.`, route: "/reports" });
+  }
+  if (c.cash != null && c.cash < 0) out.push({ text: `Cash balance is negative (${egp(c.cash)}) — review movements.`, route: "/money" });
+  if (c.owed > 0) out.push({ text: `You're owed ${egp(c.owed)} from open settlements.`, route: "/cheques" });
+  return out.slice(0, 4);
+}
 
 export const SUGGESTIONS = [
   "How much did I make today?",

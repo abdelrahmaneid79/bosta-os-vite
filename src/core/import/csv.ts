@@ -39,6 +39,41 @@ export function toNum(v: unknown): number | null {
 
 export type Row = Record<string, string>;
 
+export interface SalesMap { date: string; total: string }
+export interface ExpenseMap { date: string; category: string; amount: string }
+
+/** Best-guess column mapping for a sales sheet (owner can override in the UI). */
+export function detectSalesMap(headers: string[]): SalesMap {
+  return {
+    date: pick(headers, ["date", "day", "sale date", "تاريخ"]) ?? headers[0] ?? "",
+    total: pick(headers, ["total", "grand total", "amount", "sales", "net", "المبيعات", "الاجمالي"]) ?? "",
+  };
+}
+export function detectExpenseMap(headers: string[]): ExpenseMap {
+  return {
+    date: pick(headers, ["date", "day", "تاريخ"]) ?? headers[0] ?? "",
+    category: pick(headers, ["category", "type", "account", "البيان", "الفئة"]) ?? "",
+    amount: pick(headers, ["amount", "total", "cost", "value", "المبلغ"]) ?? "",
+  };
+}
+/** Build editable sales rows from raw rows + an explicit column mapping. Dates
+ *  are normalised to ISO; totals to a clean number string. Pure. */
+export function rowsWithSalesMap(rows: Row[], map: SalesMap): { date: string; total: string }[] {
+  return rows.map((r) => {
+    const iso = toIso(r[map.date]);
+    const n = toNum(r[map.total]);
+    return { date: iso ?? "", total: n != null ? String(n) : "" };
+  });
+}
+export function rowsWithExpenseMap(rows: Row[], map: ExpenseMap): { date: string; category: string; amount: string }[] {
+  return rows.map((r) => {
+    const iso = toIso(r[map.date]);
+    const n = toNum(r[map.amount]);
+    const cat = (map.category ? r[map.category] : "")?.toString().trim() || "Other";
+    return { date: iso ?? "", category: cat, amount: n != null ? String(n) : "" };
+  });
+}
+
 export interface SaleRowParsed { date: string | null; total: number | null; issues: string[] }
 export function parseSalesRows(rows: Row[]): SaleRowParsed[] {
   if (!rows.length) return [];

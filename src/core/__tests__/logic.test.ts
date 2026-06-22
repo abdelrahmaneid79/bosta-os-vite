@@ -436,6 +436,72 @@ describe("date-range engine (pinned today)", () => {
   });
 });
 
+describe("dashboard layout customization", () => {
+  it("moves a widget up/down, clamped at edges", async () => {
+    const { DEFAULT_LAYOUT, moveWidget } = await import("@/core/dashboardLayout");
+    const m = moveWidget(DEFAULT_LAYOUT, "today", "up"); // today is index 1
+    expect(m.map((x) => x.id).slice(0, 2)).toEqual(["today", "ask"]);
+    expect(moveWidget(DEFAULT_LAYOUT, "ask", "up")).toEqual(DEFAULT_LAYOUT); // top can't go up
+  });
+  it("toggles visibility", async () => {
+    const { DEFAULT_LAYOUT, toggleWidget } = await import("@/core/dashboardLayout");
+    expect(toggleWidget(DEFAULT_LAYOUT, "health").find((x) => x.id === "health")!.on).toBe(false);
+  });
+  it("normalizes a saved layout: keeps order, drops unknown, appends new", async () => {
+    const { normalizeLayout, ALL_WIDGETS } = await import("@/core/dashboardLayout");
+    const saved = [{ id: "health", on: false }, { id: "bogus", on: true }, { id: "ask", on: true }];
+    const out = normalizeLayout(saved);
+    expect(out[0]).toEqual({ id: "health", on: false });
+    expect(out.map((x) => x.id).filter((id) => !ALL_WIDGETS.includes(id))).toEqual([]); // no unknowns
+    expect(out).toHaveLength(ALL_WIDGETS.length); // all present
+  });
+});
+
+describe("import column mapping", () => {
+  it("detects sales columns by header synonyms", async () => {
+    const { detectSalesMap } = await import("@/core/import/csv");
+    expect(detectSalesMap(["Day", "Grand Total", "Notes"])).toEqual({ date: "Day", total: "Grand Total" });
+  });
+  it("applies an explicit mapping, normalizing date + number", async () => {
+    const { rowsWithSalesMap } = await import("@/core/import/csv");
+    const rows = [{ d: "1/6/2026", amt: "EGP 4,200" }, { d: "2/6/2026", amt: "980.5" }];
+    expect(rowsWithSalesMap(rows, { date: "d", total: "amt" })).toEqual([
+      { date: "2026-06-01", total: "4200" }, { date: "2026-06-02", total: "980.5" },
+    ]);
+  });
+  it("defaults expense category to Other when unmapped", async () => {
+    const { rowsWithExpenseMap } = await import("@/core/import/csv");
+    expect(rowsWithExpenseMap([{ d: "2026-06-02", a: "100" }], { date: "d", category: "", amount: "a" }))
+      .toEqual([{ date: "2026-06-02", category: "Other", amount: "100" }]);
+  });
+});
+
+describe("Ask Bosta proactive briefing", () => {
+  it("surfaces best-day, stockout, growth and owed lines (ranked, real-only)", async () => {
+    const { proactiveInsights } = await import("@/core/assistant/askBosta");
+    const lines = proactiveInsights({
+      revenue: { today: 0, week: 0, month: 12000, lastMonth: 10000, all: 0 },
+      profitMonthNet: null, marginMonth: null, expensesMonth: 0, expensesLastMonth: 0,
+      cash: 100, owed: 3000, rentMonthly: null, topProduct: null, bestDay: null, lowStock: [],
+      yesterdayRevenue: 9000, isYesterdayBest: true,
+      soonestStockout: { name: "Pistachio", days: 3 }, avgDailyMonth: 1000,
+    }).map((x) => x.text);
+    expect(lines.some((t) => /best day/.test(t))).toBe(true);
+    expect(lines.some((t) => /Pistachio runs out/.test(t))).toBe(true);
+    expect(lines.some((t) => /up 20%/.test(t))).toBe(true);
+    expect(lines.some((t) => /owed/.test(t))).toBe(true);
+  });
+  it("shows nothing it can't back with data", async () => {
+    const { proactiveInsights } = await import("@/core/assistant/askBosta");
+    const lines = proactiveInsights({
+      revenue: { today: 0, week: 0, month: 0, lastMonth: 0, all: 0 },
+      profitMonthNet: null, marginMonth: null, expensesMonth: 0, expensesLastMonth: 0,
+      cash: 50, owed: 0, rentMonthly: null, topProduct: null, bestDay: null, lowStock: [],
+    });
+    expect(lines).toEqual([]);
+  });
+});
+
 describe("capability system", () => {
   it("Goods / Purchases / Sales creation are enabled", () => {
     expect(CAP.productCreate).toBe("enabled");

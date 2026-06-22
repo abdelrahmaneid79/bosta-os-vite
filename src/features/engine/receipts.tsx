@@ -7,9 +7,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
-import { Card, Eyebrow, Button, Tabs, Input, Badge } from "@/components/ui";
+import { Card, Eyebrow, Button, Tabs, Input, Badge, Select } from "@/components/ui";
 import { EmptyState } from "@/components/feedback";
-import { parseSalesRows, parseExpenseRows, scanReceiptRows, scanReceiptText, toIso, toNum, type Row } from "@/core/import/csv";
+import {
+  scanReceiptRows, scanReceiptText, toIso, toNum, type Row,
+  detectSalesMap, detectExpenseMap, rowsWithSalesMap, rowsWithExpenseMap, type SalesMap, type ExpenseMap,
+} from "@/core/import/csv";
 import { getChannels, getLocations } from "@/core/read/common";
 import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
 import { egp } from "@/core/utils/format";
@@ -43,6 +46,10 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [status, setStatus] = useState("");       // OCR progress
   const [rawText, setRawText] = useState("");      // what OCR actually read
+  const [headers, setHeaders] = useState<string[]>([]); // file columns (CSV/Excel)
+  const [raw, setRaw] = useState<Row[] | null>(null);   // raw parsed rows for re-mapping
+  const [sMap, setSMap] = useState<SalesMap>({ date: "", total: "" });
+  const [eMap, setEMap] = useState<ExpenseMap>({ date: "", category: "", amount: "" });
 
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
   const channels = useQuery({ queryKey: ["channels"], queryFn: getChannels, enabled: en });
@@ -51,7 +58,12 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
     queryFn: async () => { const { data, error } = await sb!.from("sales").select("sale_date").is("voided_at", null); if (error) throw error; return new Set((data ?? []).map((r) => r.sale_date)); },
   });
 
-  const reset = () => { setSales(null); setExps(null); setFileName(""); setImgUrl(null); setStatus(""); setRawText(""); };
+  const reset = () => { setSales(null); setExps(null); setFileName(""); setImgUrl(null); setStatus(""); setRawText(""); setHeaders([]); setRaw(null); };
+  const savedMapKey = (k: Kind) => `bostaos.import.map.${k}`;
+  const loadSavedMap = <T,>(k: Kind): T | null => { try { return JSON.parse(localStorage.getItem(savedMapKey(k)) ?? "null"); } catch { return null; } };
+  const saveMap = (k: Kind, m: unknown) => { try { localStorage.setItem(savedMapKey(k), JSON.stringify(m)); } catch { /* ignore */ } };
+  const valid = (m: Record<string, string>, hs: string[]) => Object.values(m).every((c) => !c || hs.includes(c));
+  const validMap = (m: SalesMap | ExpenseMap, hs: string[]) => valid(m as unknown as Record<string, string>, hs);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -94,9 +106,20 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
 
   function loadRows(rows: Row[]) {
     if (!rows.length) { toast("No rows found in that file", "error"); return; }
-    if (kind === "sales") setSales(parseSalesRows(rows).map((r) => ({ date: r.date ?? "", total: r.total != null ? String(r.total) : "" })));
-    else setExps(parseExpenseRows(rows).map((r) => ({ date: r.date ?? "", category: r.category, amount: r.amount != null ? String(r.amount) : "" })));
+    const hs = Object.keys(rows[0]);
+    setHeaders(hs); setRaw(rows);
+    if (kind === "sales") {
+      const saved = loadSavedMap<SalesMap>("sales");
+      const map = saved && validMap(saved, hs) ? saved : detectSalesMap(hs);
+      setSMap(map); setSales(rowsWithSalesMap(rows, map));
+    } else {
+      const saved = loadSavedMap<ExpenseMap>("expenses");
+      const map = saved && validMap(saved, hs) ? saved : detectExpenseMap(hs);
+      setEMap(map); setExps(rowsWithExpenseMap(rows, map));
+    }
   }
+  const remapSales = (m: SalesMap) => { setSMap(m); saveMap("sales", m); if (raw) setSales(rowsWithSalesMap(raw, m)); };
+  const remapExp = (m: ExpenseMap) => { setEMap(m); saveMap("expenses", m); if (raw) setExps(rowsWithExpenseMap(raw, m)); };
 
   const dupSet = existingDays.data ?? new Set<string>();
   const salesView = (sales ?? []).map((r) => {
@@ -191,6 +214,26 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
             </Card>
           )}
 
+          {headers.length > 0 && (
+            <Card className="!py-3">
+              <div className="mb-1.5 flex items-center gap-2"><Eyebrow>Map your columns</Eyebrow><span className="text-[11px] text-dim">(remembered for next time)</span></div>
+              <div className="flex flex-wrap items-end gap-3">
+                {kind === "sales" ? (
+                  <>
+                    <MapSel label="Date column" value={sMap.date} headers={headers} onChange={(v) => remapSales({ ...sMap, date: v })} />
+                    <MapSel label="Total column" value={sMap.total} headers={headers} onChange={(v) => remapSales({ ...sMap, total: v })} />
+                  </>
+                ) : (
+                  <>
+                    <MapSel label="Date column" value={eMap.date} headers={headers} onChange={(v) => remapExp({ ...eMap, date: v })} />
+                    <MapSel label="Category column" value={eMap.category} headers={headers} onChange={(v) => remapExp({ ...eMap, category: v })} />
+                    <MapSel label="Amount column" value={eMap.amount} headers={headers} onChange={(v) => remapExp({ ...eMap, amount: v })} />
+                  </>
+                )}
+              </div>
+            </Card>
+          )}
+
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-dim">{fileName || "manual entry"}</span>
             <Badge tone="good">{readyCount} ready</Badge>
@@ -230,5 +273,17 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
         </>
       )}
     </div>
+  );
+}
+
+function MapSel({ label, value, headers, onChange }: { label: string; value: string; headers: string[]; onChange: (v: string) => void }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-dim">{label}</span>
+      <Select value={value} onChange={(e) => onChange(e.target.value)} className="min-w-[140px]">
+        <option value="">— none —</option>
+        {headers.map((h) => <option key={h} value={h}>{h}</option>)}
+      </Select>
+    </label>
   );
 }
