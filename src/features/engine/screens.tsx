@@ -5,7 +5,8 @@
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Stat, Badge, Tabs } from "@/components/ui";
+import { Card, Eyebrow, Stat, Badge, Tabs, Button, Input } from "@/components/ui";
+import { Modal } from "@/components/ui/Modal";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort, num, pct } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -13,9 +14,12 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, todayCairo } from "@/core/time";
 import type { DateRange } from "@/core/read/common";
 import { getStockSummary } from "@/core/read/stock";
+import { getProducts } from "@/core/read/common";
 import { getRecentSales, getSalesStats } from "@/core/read/sales";
 import { getPurchases, getPurchaseTotal } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
+import { ProductForm, PurchaseForm } from "./forms";
+import type { Tables } from "@/core/db/tables";
 
 type RangeKey = "30d" | "month" | "last";
 function useRange(): [DateRange, RangeKey, (k: RangeKey) => void] {
@@ -56,42 +60,56 @@ export function ConnectPanel() {
   );
 }
 
-// ── Stock ───────────────────────────────────────────────────────────────────
+// ── Stock / Goods (operational: create + edit) ───────────────────────────────
 export function StockScreen() {
   const q = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: isEngineConfigured });
+  const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState<null | { mode: "add" } | { mode: "edit"; product: Tables<"products"> }>(null);
   const s = q.data;
+  const byId = new Map((prods.data ?? []).map((p) => [p.id, p]));
+  const term = search.trim().toLowerCase();
+  const positions = (s?.positions ?? []).filter((p) => !term || p.nameEn.toLowerCase().includes(term) || (byId.get(p.id)?.name_ar ?? "").toLowerCase().includes(term));
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Stock value" value={s ? egpShort(s.totalValue) : "—"} />
-        <Stat label="Items" value={s ? s.positions.length : "—"} />
+        <Stat label="Products" value={s ? s.positions.length : "—"} />
         <Stat label="Missing COGS" value={s ? s.missingCostCount : "—"} accent={s?.missingCostCount ? "text-warn" : "text-text"} />
         <Stat label="Negative" value={s ? s.negativeCount : "—"} accent={s?.negativeCount ? "text-bad" : "text-text"} />
       </div>
-      <Eyebrow>Positions (live caches)</Eyebrow>
+      <div className="flex items-center gap-2">
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…" className="flex-1" />
+        <Button onClick={() => setModal({ mode: "add" })}>+ Product</Button>
+      </div>
       <Guarded q={q} empty={!!s && s.positions.length === 0}>
         <Card className="!p-0">
           <div className="divide-y divide-line2">
-            {s?.positions.map((p) => (
-              <div key={p.id} className="row-hover flex items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm text-text">{p.nameEn}</span>
-                    {!p.active && <Badge>inactive</Badge>}
+            {positions.map((p) => {
+              const prod = byId.get(p.id);
+              return (
+                <button key={p.id} onClick={() => prod && setModal({ mode: "edit", product: prod })}
+                  className="row-hover flex w-full items-center gap-3 px-4 py-3 text-left">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm text-text">{p.nameEn}</span>
+                      {!p.active && <Badge>inactive</Badge>}
+                    </div>
+                    <div className="text-[12px] text-dim">{num(p.onHand)} {p.baseUnit} · {p.hasCost ? `${egp(p.avgCost)}/${p.baseUnit}` : "no cost"}</div>
                   </div>
-                  <div className="text-[12px] text-dim">
-                    {num(p.onHand)} {p.baseUnit} · {p.hasCost ? `${egp(p.avgCost)}/${p.baseUnit}` : "no cost"}
-                  </div>
-                </div>
-                {p.isNegative && <Badge tone="bad">negative</Badge>}
-                {!p.isNegative && p.isLow && <Badge tone="warn">low</Badge>}
-                {p.onHand > 0 && !p.hasCost && <Badge tone="warn">no COGS</Badge>}
-                <div className="font-display text-sm font-semibold">{egp(p.stockValue)}</div>
-              </div>
-            ))}
+                  {p.isNegative && <Badge tone="bad">negative</Badge>}
+                  {!p.isNegative && p.isLow && <Badge tone="warn">low</Badge>}
+                  {p.onHand > 0 && !p.hasCost && <Badge tone="warn">no COGS</Badge>}
+                  <div className="font-display text-sm font-semibold">{egp(p.stockValue)}</div>
+                </button>
+              );
+            })}
           </div>
         </Card>
       </Guarded>
+      <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit product" : "Add product"}>
+        <ProductForm product={modal?.mode === "edit" ? modal.product : undefined} onDone={() => setModal(null)} />
+      </Modal>
     </div>
   );
 }
@@ -138,13 +156,16 @@ export function SalesScreen() {
 // ── Purchases ─────────────────────────────────────────────────────────────────
 export function PurchasesScreen() {
   const [range, key, setKey] = useRange();
+  const [addOpen, setAddOpen] = useState(false);
   const q = useQuery({ queryKey: ["purchases", range], queryFn: () => getPurchases(range), enabled: isEngineConfigured });
   const total = useQuery({ queryKey: ["purchaseTotal", range], queryFn: () => getPurchaseTotal(range), enabled: isEngineConfigured });
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Purchases feed COGS → WAC</Eyebrow>
+        <div className="flex-1" />
         <RangeTabs value={key} onChange={setKey} />
+        <Button onClick={() => setAddOpen(true)}>+ Purchase</Button>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Stat label="Spend in range" value={total.data != null ? egp(total.data) : "—"} />
@@ -165,6 +186,9 @@ export function PurchasesScreen() {
           </div>
         </Card>
       </Guarded>
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add purchase">
+        <PurchaseForm onDone={() => setAddOpen(false)} />
+      </Modal>
     </div>
   );
 }

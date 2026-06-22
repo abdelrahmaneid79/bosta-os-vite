@@ -11,6 +11,7 @@ import { fmtDate } from "@/core/utils/date";
 import { monthBoundsCairo } from "@/core/time";
 import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { GatedButton } from "@/components/ui";
+import { Toaster } from "@/components/feedback";
 import { StockScreen, SalesScreen, PurchasesScreen, ReconcileScreen } from "@/features/engine/screens";
 import { DashboardScreen, HealthScreen, MissingScreen } from "@/features/engine/dashboard";
 import { MoneyScreen, ChequesScreen } from "@/features/engine/money";
@@ -142,6 +143,7 @@ function Shell() {
       </div>
       <MobileNav />
       <QuickSheet open={add} onClose={() => setAdd(false)} />
+      <Toaster />
     </div>
   );
 }

@@ -25,3 +25,11 @@ export function productMap(products: Tables<"products">[]): Map<string, Tables<"
 export function displayQty(p: Pick<Tables<"products">, "current_stock">): number {
   return p.current_stock;
 }
+
+/** Active business locations (the stall). Needed when posting purchases/sales. */
+export async function getLocations(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await requireEngine()
+    .from("locations").select("id,name").eq("active", true).order("name");
+  if (error) throw error;
+  return data;
+}
