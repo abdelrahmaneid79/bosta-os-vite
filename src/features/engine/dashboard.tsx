@@ -15,6 +15,7 @@ import { getProfitReadout } from "@/core/read/profit";
 import { todayCairo, monthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { useActiveRange } from "@/store/filters";
+import { AskBostaPanel } from "./AskBosta";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
@@ -87,6 +88,7 @@ export function DashboardScreen() {
 
   return (
     <div className="space-y-4">
+      <AskBostaPanel />
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         {/* Today + 14-day trend */}
         <Card glow>

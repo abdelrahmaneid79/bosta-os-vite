@@ -23,6 +23,7 @@ const money = () => import("@/features/engine/money");
 const more = () => import("@/features/engine/more");
 const product = () => import("@/features/engine/product");
 const receipts = () => import("@/features/engine/receipts");
+const analytics = () => import("@/features/engine/analytics");
 const qa = () => import("@/features/qa/QAScreen");
 const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
   lazy(() => load().then((m) => ({ default: m[key] as unknown as React.ComponentType })));
@@ -42,6 +43,7 @@ const ReportsScreen = L(more, "ReportsScreen");
 const SystemCheckScreen = L(more, "SystemCheckScreen");
 const SettingsScreen = L(more, "SettingsScreen");
 const ReceiptsScreen = lazy(() => receipts().then((m) => ({ default: m.ReceiptsScreen })));
+const AnalyticsScreen = L(analytics, "AnalyticsScreen");
 const QAScreen = L(qa, "QAScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
 
@@ -81,8 +83,9 @@ const GROUPS: Group[] = [
     { to: "/expenses/import", label: "Import expenses", el: <ReceiptsScreen fixedKind="expenses" /> },
   ] },
   { id: "reports", label: "Reports", icon: I.reports, tabs: [
-    { to: "/reports", label: "Summary", el: <ReportsScreen /> },
+    { to: "/reports", label: "Overview", el: <AnalyticsScreen /> },
     { to: "/reconcile", label: "Profit", el: <ReconcileScreen /> },
+    { to: "/reports/tables", label: "Tables & export", el: <ReportsScreen /> },
   ] },
   { id: "insights", label: "Insights", icon: I.insights, tabs: [
     { to: "/health", label: "Health", el: <HealthScreen /> },
