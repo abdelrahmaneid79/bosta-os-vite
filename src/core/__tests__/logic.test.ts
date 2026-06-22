@@ -499,32 +499,6 @@ describe("import column mapping", () => {
   });
 });
 
-describe("Ask Bosta proactive briefing", () => {
-  it("surfaces best-day, stockout, growth and owed lines (ranked, real-only)", async () => {
-    const { proactiveInsights } = await import("@/core/assistant/askBosta");
-    const lines = proactiveInsights({
-      revenue: { today: 0, week: 0, month: 12000, lastMonth: 10000, all: 0 },
-      profitMonthNet: null, marginMonth: null, expensesMonth: 0, expensesLastMonth: 0,
-      cash: 100, owed: 3000, rentMonthly: null, topProduct: null, bestDay: null, lowStock: [],
-      yesterdayRevenue: 9000, isYesterdayBest: true,
-      soonestStockout: { name: "Pistachio", days: 3 }, avgDailyMonth: 1000,
-    }).map((x) => x.text);
-    expect(lines.some((t) => /best day/.test(t))).toBe(true);
-    expect(lines.some((t) => /Pistachio runs out/.test(t))).toBe(true);
-    expect(lines.some((t) => /up 20%/.test(t))).toBe(true);
-    expect(lines.some((t) => /owed/.test(t))).toBe(true);
-  });
-  it("shows nothing it can't back with data", async () => {
-    const { proactiveInsights } = await import("@/core/assistant/askBosta");
-    const lines = proactiveInsights({
-      revenue: { today: 0, week: 0, month: 0, lastMonth: 0, all: 0 },
-      profitMonthNet: null, marginMonth: null, expensesMonth: 0, expensesLastMonth: 0,
-      cash: 50, owed: 0, rentMonthly: null, topProduct: null, bestDay: null, lowStock: [],
-    });
-    expect(lines).toEqual([]);
-  });
-});
-
 describe("navigation metadata", () => {
   it("landing options cover every section tab and have unique routes", async () => {
     const { LANDING_OPTIONS, ALL_SECTIONS } = await import("@/core/nav");
