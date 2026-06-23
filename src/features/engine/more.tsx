@@ -22,7 +22,7 @@ import { DateRangePicker } from "@/components/DateRangePicker";
 import { getStockSummary } from "@/core/read/stock";
 import { getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
-import { getProductProfit } from "@/core/read/products";
+import { getProductProfit, getLifetimeProducts } from "@/core/read/products";
 import { getPurchaseTotal } from "@/core/read/purchases";
 import { getSettings, getExpenses, getExpenseCategoryTrends } from "@/core/read/expenses";
 import { getCheques } from "@/core/read/settlements";
@@ -56,9 +56,11 @@ export function ReportsScreen() {
   const expTrends = useQuery({ queryKey: ["expTrends", r, prior], queryFn: () => getExpenseCategoryTrends(r, prior), enabled: en });
   const cheques = useQuery({ queryKey: ["cheques"], queryFn: getCheques, enabled: en });
   const products = useQuery({ queryKey: ["productProfit", r], queryFn: () => getProductProfit(r), enabled: en });
+  const lifetime = useQuery({ queryKey: ["lifetime-products"], queryFn: getLifetimeProducts, enabled: en });
   if (!en) return <EmptyState title="Sign in to build reports" />;
   const p = profit.data;
   const prods = products.data ?? [];
+  const lifeProds = (lifetime.data ?? []).slice().sort((a, b) => b.revenue - a.revenue);
   const cats = expTrends.data ?? [];
   return (
     <div className="space-y-4">
@@ -97,13 +99,39 @@ export function ReportsScreen() {
         </div>
       </Card>
 
+      {prods.length === 0 && lifeProds.length > 0 && (
+        <Card className="!p-0">
+          <div className="flex items-center justify-between px-4 pt-4">
+            <Eyebrow>Top products · revenue (lifetime)</Eyebrow>
+            <Badge tone="neutral">since launch</Badge>
+          </div>
+          <p className="px-4 pt-1 text-[11px] text-dim">From the POS product report — per-range profit needs daily product lines (not in the historical export).</p>
+          <div className="mt-2 divide-y divide-line">
+            {lifeProds.slice(0, 12).map((x, i) => {
+              const top = lifeProds[0]?.revenue ?? 0;
+              const w = top > 0 ? Math.max(2, (x.revenue / top) * 100) : 0;
+              return (
+                <div key={x.barcode || x.name} className="px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 text-center font-display text-xs font-bold text-dim">{i + 1}</span>
+                    <div className="min-w-0 flex-1"><div dir="auto" className="truncate text-sm text-text">{x.name}</div><div className="text-[11px] text-dim">{Math.round(x.units)} units sold</div></div>
+                    <div className="tnum font-display text-sm font-bold text-good">{egp(x.revenue)}</div>
+                  </div>
+                  <div className="ml-7 mt-1.5 h-1.5 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-pink" style={{ width: `${w}%` }} /></div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <Card className="!p-0">
         <div className="flex items-center justify-between px-4 pt-4">
           <Eyebrow>Most profitable products</Eyebrow>
           {prods.length > 0 && <span className="text-[11px] text-dim">{prods.length} sold</span>}
         </div>
         {products.isLoading ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Loading…</div>
-          : prods.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">No product lines sold in this range.</div>
+          : prods.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Per-range product profit needs daily product lines (sale items). Lifetime ranking shown above.</div>
           : (
           <div className="mt-2 divide-y divide-line">
             {prods.slice(0, 12).map((x, i) => {

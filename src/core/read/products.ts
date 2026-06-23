@@ -53,6 +53,17 @@ export function aggregateProductProfit(
   return out.sort((a, b) => (b.grossProfit ?? -Infinity) - (a.grossProfit ?? -Infinity) || b.revenue - a.revenue);
 }
 
+/** Lifetime per-product sales captured from the historical POS export (stored in
+ *  app_settings.product_lifetime). Used as a real fallback for the product
+ *  leaderboards when per-line sale_items don't exist for the selected range. */
+export interface LifetimeProduct { name: string; barcode: string; units: number; revenue: number }
+export async function getLifetimeProducts(): Promise<LifetimeProduct[]> {
+  const { data, error } = await requireEngine().from("app_settings").select("value").eq("key", "product_lifetime").maybeSingle();
+  if (error) throw error;
+  const v = data?.value as { items?: LifetimeProduct[] } | null;
+  return Array.isArray(v?.items) ? v!.items! : [];
+}
+
 export async function getProductProfit(range: DateRange): Promise<ProductProfit[]> {
   const sb = requireEngine();
   const sales = await sb.from("sales").select("id").is("voided_at", null)

@@ -4,7 +4,7 @@
  *  revenue days, and product leaderboards. All data is live; nothing is faked. */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow } from "@/components/ui";
+import { Card, Eyebrow, Badge } from "@/components/ui";
 import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { usePrefs } from "@/store/prefs";
@@ -14,6 +14,7 @@ import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getAnalytics, type Kpi } from "@/core/read/analytics";
+import { getLifetimeProducts } from "@/core/read/products";
 
 const CURRENCY = new Set(["periodRevenue", "dailyAvg", "avg30", "monthProfit", "owed", "allTime", "totalExp"]);
 function fmtKpi(k: Kpi): string {
@@ -31,6 +32,7 @@ export function AnalyticsScreen() {
   const accStart = usePrefs((s) => s.accountingStart);
   const [mode, setMode] = useState<ChartMode>("bar");
   const q = useQuery({ queryKey: ["analytics", range, accStart], queryFn: () => getAnalytics(range, accStart), enabled: isEngineConfigured });
+  const lifetime = useQuery({ queryKey: ["lifetime-products"], queryFn: getLifetimeProducts, enabled: isEngineConfigured });
   const partial = range.from < accStart ? accStart : null;
 
   if (!isEngineConfigured) return <EmptyState title="Sign in to see analytics" />;
@@ -38,6 +40,12 @@ export function AnalyticsScreen() {
   if (q.isError) return <ErrorState message={String((q.error as Error)?.message)} onRetry={() => q.refetch()} />;
   const a = q.data!;
   const hasData = a.daily.length > 0;
+  // Product leaderboards: prefer per-line sale_items; fall back to real lifetime
+  // POS totals when no product lines exist in range (honest, clearly labelled).
+  const lp = lifetime.data ?? [];
+  const lifeMode = a.productsByRevenue.length === 0 && lp.length > 0;
+  const revLeaders = lifeMode ? lp.slice().sort((x, y) => y.revenue - x.revenue).slice(0, 10).map((p) => ({ label: p.name, value: p.revenue })) : a.productsByRevenue;
+  const volLeaders = lifeMode ? lp.slice().sort((x, y) => y.units - x.units).slice(0, 10).map((p) => ({ label: p.name, value: p.units })) : a.productsByVolume;
 
   return (
     <div className="space-y-4">
@@ -122,12 +130,12 @@ export function AnalyticsScreen() {
               </div>
             </Card>
             <Card>
-              <Eyebrow>Top products · revenue</Eyebrow>
-              <div className="mt-3"><HBars data={a.productsByRevenue} color="rgb(var(--pink))" format={(n) => egpShort(n)} /></div>
+              <div className="flex items-center justify-between"><Eyebrow>Top products · revenue</Eyebrow>{lifeMode && <Badge tone="neutral">lifetime</Badge>}</div>
+              <div className="mt-3">{revLeaders.length ? <HBars data={revLeaders} color="rgb(var(--pink))" format={(n) => egpShort(n)} /> : <p className="text-sm text-dim">No product sales recorded.</p>}</div>
             </Card>
             <Card>
-              <Eyebrow>Top products · volume</Eyebrow>
-              <div className="mt-3"><HBars data={a.productsByVolume} color="rgb(var(--good))" format={(n) => String(Math.round(n))} /></div>
+              <div className="flex items-center justify-between"><Eyebrow>Top products · volume</Eyebrow>{lifeMode && <Badge tone="neutral">lifetime</Badge>}</div>
+              <div className="mt-3">{volLeaders.length ? <HBars data={volLeaders} color="rgb(var(--good))" format={(n) => String(Math.round(n))} /> : <p className="text-sm text-dim">No product sales recorded.</p>}</div>
             </Card>
           </div>
         </>
