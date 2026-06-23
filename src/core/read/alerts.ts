@@ -9,6 +9,8 @@ import { todayCairo } from "@/core/time";
 import { getRiskInsights } from "./insights";
 import { getMissingData } from "./missing";
 import { getBudgetStatus } from "./budgets";
+import { getSettlementOverview } from "./settlements";
+import { egp } from "@/core/utils/format";
 import { composeAlerts, type Alert } from "@/core/alerts/engine";
 
 // Missing-issue keys already represented (richer) by risk insights.
@@ -38,13 +40,22 @@ async function budgetAlerts(): Promise<Alert[]> {
   } catch { return []; } // budgets are optional; never block the alert feed
 }
 
+async function settlementAlerts(): Promise<Alert[]> {
+  const rows = await getSettlementOverview();
+  return rows.filter((r) => r.view.overdue).map((r) => ({
+    key: `settle-overdue-${r.id}`, severity: "warning", category: "settlement",
+    title: "Settlement overdue", detail: `${egp(r.view.outstanding)} still outstanding ${r.view.daysOutstanding} days after the period closed.`,
+    action: "Open the settlement to reconcile", route: `/settlement/${r.id}`, metric: `${r.view.daysOutstanding}d`, confidence: "high",
+  }));
+}
+
 export async function getAlerts(): Promise<Alert[]> {
-  const [insights, missing, stale, budget] = await Promise.all([
-    getRiskInsights(), getMissingData(), staleSalesAlerts(), budgetAlerts(),
+  const [insights, missing, stale, budget, settle] = await Promise.all([
+    getRiskInsights(), getMissingData(), staleSalesAlerts(), budgetAlerts(), settlementAlerts(),
   ]);
   return composeAlerts({
     insights,
     missing: missing.filter((m) => !REDUNDANT_MISSING.has(m.key)),
-    extra: [...stale, ...budget],
+    extra: [...stale, ...budget, ...settle],
   });
 }

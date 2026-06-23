@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHead, Eyebrow, StatCard, Badge, Button, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
@@ -13,7 +13,8 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { monthBoundsCairo } from "@/core/time";
 import { useActiveRange } from "@/store/filters";
 import { getMoneyMovements, getCashSummary, getMoneyAccounts } from "@/core/read/money";
-import { getSettlementPeriods, getCheques } from "@/core/read/settlements";
+import { getCheques, getSettlementOverview, getSettlementDetail } from "@/core/read/settlements";
+import type { SettlementStatus } from "@/core/settlement/logic";
 import { getExpenses, getExpenseCategories } from "@/core/read/expenses";
 import { getLocations } from "@/core/read/common";
 import { voidMovement, reconcileCheque, voidCheque, openSettlementPeriod, voidExpense } from "@/core/db/mutations";
@@ -181,14 +182,94 @@ export function ExpensesScreen() {
   );
 }
 
+const SETTLE_TONE: Record<SettlementStatus, { tone: "good" | "warn" | "neutral" | "info"; label: string }> = {
+  settled: { tone: "good", label: "settled" }, partial: { tone: "warn", label: "partial" },
+  awaiting: { tone: "neutral", label: "awaiting" }, over: { tone: "info", label: "overpaid" },
+};
+function SettlementBadge({ status }: { status: SettlementStatus }) {
+  const m = SETTLE_TONE[status];
+  return <Badge tone={m.tone}>{m.label}</Badge>;
+}
+const DEDUCTION_LABEL: Record<string, string> = { rent: "Rent / stand fee", revenue_charge: "Revenue share", other: "Other deduction" };
+
+// ── Settlement detail (one period: revenue − deductions vs cheques) ──────────
+export function SettlementDetailScreen() {
+  const { id = "" } = useParams();
+  const d = useQuery({ queryKey: ["settlement", id], queryFn: () => getSettlementDetail(id), enabled: en && !!id });
+  if (!en) return <EmptyState title="Sign in to view settlement" />;
+  if (d.isLoading) return <SkeletonRows rows={6} />;
+  if (d.isError) return <ErrorState message={String((d.error as Error)?.message)} onRetry={() => d.refetch()} />;
+  const s = d.data;
+  if (!s) return <EmptyState title="Settlement not found" />;
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to="/cheques" className="text-sm font-semibold text-pink">← Cheques</Link>
+        <div className="flex-1" />
+        {s.overdue && <Badge tone="bad">overdue {s.daysOutstanding}d</Badge>}
+        <SettlementBadge status={s.status} />
+      </div>
+
+      <Card glow>
+        <Eyebrow accent="text-pink">Settlement · {fmtDate(s.start, "MMMM yyyy")}</Eyebrow>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <StatCard label="Expected (net)" accent="pink" icon={MI.bank} value={egp(s.expected)} sub="revenue − deductions" />
+          <StatCard label="Received" accent="mint" icon={MI.in} value={egp(s.received)} sub={`${s.cheques.length} cheque${s.cheques.length === 1 ? "" : "s"}`} />
+          <StatCard label={s.outstanding < 0 ? "Overpaid" : "Outstanding"} accent={s.outstanding > 0 ? (s.overdue ? "red" : "amber") : "mint"} icon={MI.out} value={egp(Math.abs(s.outstanding))} sub={s.daysOutstanding != null ? `${s.daysOutstanding} days outstanding` : "fully settled"} />
+        </div>
+      </Card>
+
+      <Card>
+        <CardHead title="Breakdown" sub="How the expected cheque is calculated" accent="violet" icon={MI.bank} />
+        <div className="divide-y divide-line text-sm">
+          <Row2 label="Revenue (period)" value={egp(s.revenue)} strong />
+          {s.deductions.map((x, i) => (
+            <Row2 key={i} label={`− ${DEDUCTION_LABEL[x.type] ?? x.type}${x.rate != null ? ` (${Math.round(x.rate * 100)}%)` : ""}`} value={`−${egp(x.amount)}`} tone="text-bad" />
+          ))}
+          <Row2 label="= Expected net" value={egp(s.expected)} strong accent="text-pink" />
+          <Row2 label="Cheques received" value={egp(s.received)} tone="text-good" />
+          <Row2 label={s.outstanding < 0 ? "Overpaid" : "Still outstanding"} value={egp(Math.abs(s.outstanding))} strong accent={s.outstanding > 0 ? "text-warn" : "text-good"} />
+        </div>
+      </Card>
+
+      <Eyebrow>Cheques in this period</Eyebrow>
+      {s.cheques.length === 0 ? <EmptyState title="No cheque recorded yet" hint="Record the cheque on the Cheques screen when it arrives." /> : (
+        <Card className="!p-0"><div className="divide-y divide-line">
+          {s.cheques.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 px-5 py-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-good/10 text-good"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={MI.bank} /></svg></span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-text">{c.receivedDate ? fmtDate(c.receivedDate, "d MMM yyyy") : "pending"}</div>
+                <div className="text-[12px] text-dim">expected {egp(c.expected)}{c.received != null ? ` · received ${egp(c.received)}` : ""}</div>
+              </div>
+              <Badge tone={c.status === "reconciled" ? "good" : "neutral"}>{c.status}</Badge>
+              <div className="tnum font-display text-sm font-bold text-good">{c.received != null ? egp(c.received) : "—"}</div>
+            </div>
+          ))}
+        </div></Card>
+      )}
+    </div>
+  );
+}
+function Row2({ label, value, tone, accent, strong }: { label: string; value: string; tone?: string; accent?: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-2.5">
+      <span className={`text-[13px] ${strong ? "font-display font-bold text-text" : "text-muted"}`}>{label}</span>
+      <span className={`tnum font-display text-sm font-bold ${accent ?? tone ?? "text-text"}`}>{value}</span>
+    </div>
+  );
+}
+
 // ── Cheques / Settlements ────────────────────────────────────────────────────
 export function ChequesScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | { kind: "reconcile" | "void"; id: string }>(null);
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
-  const periods = useQuery({ queryKey: ["periods"], queryFn: getSettlementPeriods, enabled: en });
+  const periods = useQuery({ queryKey: ["settlement-overview"], queryFn: getSettlementOverview, enabled: en });
   const cheques = useQuery({ queryKey: ["cheques"], queryFn: getCheques, enabled: en });
+  const outstanding = (periods.data ?? []).reduce((s, p) => s + Math.max(0, p.view.outstanding), 0);
+  const overdueCount = (periods.data ?? []).filter((p) => p.view.overdue).length;
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
   const openPeriod = useMutation({ mutationFn: () => openSettlementPeriod(locations.data![0].id, monthBoundsCairo().from), onSuccess: () => { reportSuccess("Open settlement", "Settlement period ready for this month (rent + share seeded)"); qc.invalidateQueries(); }, onError: (e) => reportError("Open settlement", e) });
   const rec = useMutation({ mutationFn: (id: string) => reconcileCheque(id), onSuccess: () => { reportSuccess("Reconcile cheque", "Cheque reconciled · difference settled"); setConfirm(null); qc.invalidateQueries(); }, onError: (e) => reportError("Reconcile cheque", e) });
@@ -204,18 +285,24 @@ export function ChequesScreen() {
         <Button disabled={!periods.data?.length} onClick={() => setAddOpen(true)}>+ Cheque</Button>
       </div>
 
-      <Eyebrow>Periods</Eyebrow>
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Outstanding" accent={overdueCount ? "red" : "amber"} icon={MI.bank} value={periods.data ? egpShort(outstanding) : "—"} sub={`${(periods.data ?? []).length} periods`} />
+        <StatCard label="Overdue periods" accent={overdueCount ? "red" : "mint"} icon={MI.out} value={periods.data ? overdueCount : "—"} sub={`>${45} days unpaid`} />
+      </div>
+
+      <Eyebrow>Settlement periods · tap to reconcile</Eyebrow>
       {periods.isLoading ? <SkeletonRows /> : (periods.data?.length ?? 0) === 0 ? <EmptyState title="No settlement periods" hint="Open this month to start." /> : (
         <Card className="!p-0"><div className="divide-y divide-line">
           {periods.data!.map((p) => (
-            <div key={p.id} className="row-hover flex items-center gap-3 px-4 py-3">
+            <Link key={p.id} to={`/settlement/${p.id}`} className="row-hover flex items-center gap-3 px-5 py-3">
               <div className="min-w-0 flex-1">
-                <div className="text-sm text-text">{fmtDate(p.start)}{p.end ? ` → ${fmtDate(p.end)}` : ""}</div>
-                <div className="text-[12px] text-dim">{egp(p.revenue)} − {egp(p.deductions)} deductions</div>
+                <div className="text-sm font-medium text-text">{fmtDate(p.start, "MMMM yyyy")}</div>
+                <div className="text-[12px] text-dim">expected {egp(p.view.expected)} · received {egp(p.view.received)}</div>
               </div>
-              <Badge tone={p.status === "reconciled" ? "good" : p.status === "open" ? "pink" : "neutral"}>{p.status}</Badge>
-              <div className="font-display text-sm font-semibold">{egp(p.netExpected)}</div>
-            </div>
+              {p.view.overdue && <Badge tone="bad">overdue</Badge>}
+              <SettlementBadge status={p.view.status} />
+              <div className={`tnum font-display text-sm font-bold ${p.view.outstanding > 0 ? "text-warn" : p.view.outstanding < 0 ? "text-info" : "text-good"}`}>{p.view.outstanding > 0 ? egp(p.view.outstanding) : p.view.outstanding < 0 ? `+${egp(-p.view.outstanding)}` : "settled"}</div>
+            </Link>
           ))}
         </div></Card>
       )}
