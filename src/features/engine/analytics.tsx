@@ -17,6 +17,8 @@ import { useActiveRange } from "@/store/filters";
 import { getAnalytics, type Kpi } from "@/core/read/analytics";
 import { getLifetimeProducts } from "@/core/read/products";
 import { getBudgetStatus, type BudgetStatus } from "@/core/read/budgets";
+import { getRevenueForecast } from "@/core/read/forecast";
+import type { RevenueForecast } from "@/core/forecast/logic";
 import { Link } from "react-router-dom";
 
 const CURRENCY = new Set(["periodRevenue", "dailyAvg", "avg30", "monthProfit", "owed", "allTime", "totalExp"]);
@@ -35,6 +37,44 @@ const BUDGET_TONE: Record<string, { bar: string; text: string; label: string }> 
   over: { bar: "bg-bad", text: "text-bad", label: "over budget" },
   unknown: { bar: "bg-dim", text: "text-dim", label: "needs data" },
 };
+
+const CONF_TONE: Record<string, "good" | "warn" | "neutral"> = { high: "good", estimate: "warn", "low-data": "neutral" };
+const CONF_LABEL: Record<string, string> = { high: "high confidence", estimate: "estimate", "low-data": "needs more data" };
+const DOW_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+
+/** Revenue forecast — day-of-week seasonality × recent level, honest confidence. */
+function ForecastCard({ f }: { f: RevenueForecast }) {
+  const maxF = Math.max(1, ...f.dowFactors);
+  return (
+    <Card>
+      <div className="mb-3 flex items-center justify-between">
+        <Eyebrow>Revenue forecast</Eyebrow>
+        <Badge tone={CONF_TONE[f.confidence]}>{CONF_LABEL[f.confidence]}</Badge>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-[1fr_1fr_auto]">
+        <div className="rounded-2xl border border-line bg-panel2 p-4">
+          <div className="text-[12px] font-medium text-muted">Next 7 days</div>
+          <div className="mt-1 tnum font-display text-2xl font-extrabold text-text">{egpShort(f.next7)}</div>
+          <div className="mt-0.5 text-[11px] text-dim">≈ {egpShort(f.avgPerDay)}/day</div>
+        </div>
+        <div className="rounded-2xl border border-line bg-panel2 p-4">
+          <div className="text-[12px] font-medium text-muted">Next 30 days</div>
+          <div className="mt-1 tnum font-display text-2xl font-extrabold text-text">{egpShort(f.next30)}</div>
+          <div className="mt-0.5 text-[11px] text-dim">projected</div>
+        </div>
+        <div className="flex items-end gap-1.5">
+          {f.dowFactors.map((v, i) => (
+            <div key={i} className="flex flex-col items-center gap-1">
+              <div className="flex h-16 w-5 items-end overflow-hidden rounded-md bg-line"><div className="w-full rounded-md bg-pink/70" style={{ height: `${Math.max(6, (v / maxF) * 100)}%` }} /></div>
+              <span className="text-[10px] text-faint">{DOW_LABELS[i]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className="mt-3 text-[12px] leading-relaxed text-dim">{f.basis}</p>
+    </Card>
+  );
+}
 
 /** Targets vs actual — month-to-date progress with a pace marker. */
 function BudgetBars({ b }: { b: BudgetStatus }) {
@@ -79,6 +119,7 @@ export function AnalyticsScreen() {
   const q = useQuery({ queryKey: ["analytics", range, accStart], queryFn: () => getAnalytics(range, accStart), enabled: isEngineConfigured });
   const lifetime = useQuery({ queryKey: ["lifetime-products"], queryFn: getLifetimeProducts, enabled: isEngineConfigured });
   const budgets = useQuery({ queryKey: ["budget-status"], queryFn: getBudgetStatus, enabled: isEngineConfigured });
+  const forecast = useQuery({ queryKey: ["revenue-forecast"], queryFn: () => getRevenueForecast(), enabled: isEngineConfigured });
   const partial = range.from < accStart ? accStart : null;
 
   if (!isEngineConfigured) return <EmptyState title="Sign in to see analytics" />;
@@ -102,6 +143,8 @@ export function AnalyticsScreen() {
       {partial && <PartialNote since={partial} />}
 
       {budgets.data?.configured && <BudgetBars b={budgets.data} />}
+
+      {forecast.data && forecast.data.tradingDays > 0 && <ForecastCard f={forecast.data} />}
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
