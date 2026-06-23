@@ -8,6 +8,7 @@ import { getProducts, getLocations, getChannels } from "@/core/read/common";
 import { getExpenseCategories } from "@/core/read/expenses";
 import { getMoneyAccounts } from "@/core/read/money";
 import { getSettlementPeriods } from "@/core/read/settlements";
+import { ProductPicker } from "@/components/ProductPicker";
 import type { Tables, Enums } from "@/core/db/tables";
 import type { SaleLine } from "@/core/read/sales";
 import {
@@ -123,10 +124,7 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
       {!loc && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No active location found — set one up in Supabase first.</div>}
       <Field label="Product">
-        <Select value={productId} onChange={(e) => setProductId(e.target.value)} required>
-          <option value="">Select a product…</option>
-          {(products.data ?? []).filter((p) => p.active || p.id === productId).map((p) => <option key={p.id} value={p.id}>{p.name_en}{p.name_ar ? ` · ${p.name_ar}` : ""}</option>)}
-        </Select>
+        <ProductPicker value={productId} onChange={setProductId} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Quantity (base units)"><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 5000 g" /></Field>
@@ -172,7 +170,6 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
 /* ─ Sale line: add or edit a product line (deducts stock + COGS) ────────── */
 export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: SaleLine; onDone?: () => void }) {
   const w = useWrite(item ? "Edit sale line" : "Add sale line", onDone);
-  const products = useQuery({ queryKey: ["products-list"], queryFn: getProducts });
   const [productId, setProductId] = useState(item?.productId ?? "");
   const [qty, setQty] = useState(item ? String(item.qty) : "");
   const [price, setPrice] = useState(item?.unitPrice != null ? String(item.unitPrice) : "");
@@ -193,10 +190,7 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
       <Field label="Product">
-        <Select value={productId} onChange={(e) => setProductId(e.target.value)} required>
-          <option value="">Select a product…</option>
-          {(products.data ?? []).filter((p) => p.active || p.id === productId).map((p) => <option key={p.id} value={p.id}>{p.name_en}{p.name_ar ? ` · ${p.name_ar}` : ""}</option>)}
-        </Select>
+        <ProductPicker value={productId} onChange={setProductId} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Quantity (base units)"><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>

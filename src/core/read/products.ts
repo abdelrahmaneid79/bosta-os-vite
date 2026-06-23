@@ -4,7 +4,25 @@
  *  withheld (null) for a product when ANY of its sold lines lacks a recorded
  *  cost, so we never publish a wrong per-product number. READ-ONLY. */
 import { requireEngine } from "@/core/db/engine";
+import type { SearchableProduct } from "@/core/products/match";
 import type { DateRange } from "./common";
+
+/** Products + their aliases, for the searchable product picker / import matcher. */
+export async function getSearchableProducts(): Promise<(SearchableProduct & { active: boolean })[]> {
+  const sb = requireEngine();
+  const [pRes, aRes] = await Promise.all([
+    sb.from("products").select("id,name_en,name_ar,active").order("name_en"),
+    sb.from("product_aliases").select("product_id,alias"),
+  ]);
+  if (pRes.error) throw pRes.error;
+  if (aRes.error) throw aRes.error;
+  const aliasByP = new Map<string, string[]>();
+  for (const a of aRes.data ?? []) {
+    if (!a.product_id || !a.alias) continue;
+    const arr = aliasByP.get(a.product_id) ?? []; arr.push(a.alias); aliasByP.set(a.product_id, arr);
+  }
+  return (pRes.data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, aliases: aliasByP.get(p.id) ?? [], active: p.active }));
+}
 
 export interface ProductProfit {
   productId: string;
