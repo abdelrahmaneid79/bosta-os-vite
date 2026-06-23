@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Badge } from "@/components/ui";
+import { cn } from "@/core/utils/cn";
 import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { usePrefs } from "@/store/prefs";
@@ -15,6 +16,8 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getAnalytics, type Kpi } from "@/core/read/analytics";
 import { getLifetimeProducts } from "@/core/read/products";
+import { getBudgetStatus, type BudgetStatus } from "@/core/read/budgets";
+import { Link } from "react-router-dom";
 
 const CURRENCY = new Set(["periodRevenue", "dailyAvg", "avg30", "monthProfit", "owed", "allTime", "totalExp"]);
 function fmtKpi(k: Kpi): string {
@@ -25,6 +28,48 @@ function fmtKpi(k: Kpi): string {
 }
 const toneClass = (t?: string) => t === "good" ? "text-good" : t === "warn" ? "text-warn" : "text-text";
 
+const BUDGET_TONE: Record<string, { bar: string; text: string; label: string }> = {
+  ahead: { bar: "bg-good", text: "text-good", label: "ahead" },
+  "on-track": { bar: "bg-good", text: "text-good", label: "on track" },
+  behind: { bar: "bg-warn", text: "text-warn", label: "behind" },
+  over: { bar: "bg-bad", text: "text-bad", label: "over budget" },
+  unknown: { bar: "bg-dim", text: "text-dim", label: "needs data" },
+};
+
+/** Targets vs actual — month-to-date progress with a pace marker. */
+function BudgetBars({ b }: { b: BudgetStatus }) {
+  return (
+    <Card>
+      <div className="mb-3 flex items-center justify-between">
+        <Eyebrow>Targets · this month</Eyebrow>
+        <Link to="/settings" className="text-[12px] font-semibold text-pink">Edit →</Link>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {b.rows.map((r) => {
+          const tone = BUDGET_TONE[r.status] ?? BUDGET_TONE.unknown;
+          return (
+            <div key={r.key} className="rounded-2xl border border-line bg-panel2 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-medium text-muted">{r.label}</span>
+                <Badge tone={r.status === "over" ? "bad" : r.status === "behind" ? "warn" : r.status === "unknown" ? "neutral" : "good"}>{tone.label}</Badge>
+              </div>
+              <div className="mt-1.5 flex items-end gap-1.5">
+                <span className="tnum font-display text-xl font-extrabold text-text">{r.actual == null ? "—" : egpShort(r.actual)}</span>
+                <span className="pb-0.5 text-[12px] text-dim">/ {egpShort(r.target)}</span>
+              </div>
+              <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-line">
+                <div className={cn("h-full rounded-full transition-all", tone.bar)} style={{ width: `${Math.min(100, r.progressPct)}%` }} />
+                <div className="absolute top-[-2px] h-3 w-0.5 bg-text/40" style={{ left: `${Math.min(100, r.pacePct)}%` }} title="month pace" />
+              </div>
+              <div className="mt-1.5 tnum text-[11px] text-dim">{r.progressPct}% · {r.kind === "expense" ? (r.remaining >= 0 ? `${egpShort(r.remaining)} left` : `${egpShort(-r.remaining)} over`) : `${egpShort(Math.max(0, r.remaining))} to go`}</div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 type ChartMode = "bar" | "line" | "monthly";
 
 export function AnalyticsScreen() {
@@ -33,6 +78,7 @@ export function AnalyticsScreen() {
   const [mode, setMode] = useState<ChartMode>("bar");
   const q = useQuery({ queryKey: ["analytics", range, accStart], queryFn: () => getAnalytics(range, accStart), enabled: isEngineConfigured });
   const lifetime = useQuery({ queryKey: ["lifetime-products"], queryFn: getLifetimeProducts, enabled: isEngineConfigured });
+  const budgets = useQuery({ queryKey: ["budget-status"], queryFn: getBudgetStatus, enabled: isEngineConfigured });
   const partial = range.from < accStart ? accStart : null;
 
   if (!isEngineConfigured) return <EmptyState title="Sign in to see analytics" />;
@@ -54,6 +100,8 @@ export function AnalyticsScreen() {
         <DateRangePicker />
       </div>
       {partial && <PartialNote since={partial} />}
+
+      {budgets.data?.configured && <BudgetBars b={budgets.data} />}
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

@@ -23,6 +23,7 @@ import { getStockSummary } from "@/core/read/stock";
 import { getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
 import { getProductProfit, getLifetimeProducts } from "@/core/read/products";
+import { getTargets } from "@/core/read/budgets";
 import { getPurchaseTotal } from "@/core/read/purchases";
 import { getSettings, getExpenses, getExpenseCategoryTrends } from "@/core/read/expenses";
 import { getCheques } from "@/core/read/settlements";
@@ -369,6 +370,43 @@ export function ImportsScreen() {
   );
 }
 
+// ── Targets & budgets (owner-editable monthly goals → app_settings.budgets) ──
+function TargetsCard() {
+  const { reportSuccess, reportError } = useUI();
+  const qc = useQueryClient();
+  const t = useQuery({ queryKey: ["targets"], queryFn: getTargets, enabled: en });
+  const [rev, setRev] = useState("");
+  const [prof, setProf] = useState("");
+  const [exp, setExp] = useState("");
+  useEffect(() => {
+    const d = t.data; if (!d) return;
+    setRev(d.monthlyRevenue != null ? String(d.monthlyRevenue) : "");
+    setProf(d.monthlyProfit != null ? String(d.monthlyProfit) : "");
+    setExp(d.monthlyExpenseBudget != null ? String(d.monthlyExpenseBudget) : "");
+  }, [t.data]);
+  const numOrNull = (v: string) => { const n = parseFloat(v); return Number.isFinite(n) && n > 0 ? n : null; };
+  const save = useMutation({
+    mutationFn: () => setAppSetting("budgets", {
+      monthlyRevenue: numOrNull(rev), monthlyProfit: numOrNull(prof), monthlyExpenseBudget: numOrNull(exp),
+      categoryBudgets: t.data?.categoryBudgets ?? {},
+    }),
+    onSuccess: () => { reportSuccess("Targets", "Monthly targets saved"); qc.invalidateQueries(); },
+    onError: (e) => reportError("Targets", e),
+  });
+  return (
+    <Card>
+      <Eyebrow>Monthly targets & budgets</Eyebrow>
+      <p className="mt-1 text-[12px] text-dim">Set monthly goals — progress and off-track alerts appear on Reports and in your alerts. Leave blank to disable a target.</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <Field label="Revenue target (EGP)"><Input type="number" step="any" value={rev} onChange={(e) => setRev(e.target.value)} placeholder="150000" /></Field>
+        <Field label="Profit target (EGP)"><Input type="number" step="any" value={prof} onChange={(e) => setProf(e.target.value)} placeholder="40000" /></Field>
+        <Field label="Expense budget (EGP)"><Input type="number" step="any" value={exp} onChange={(e) => setExp(e.target.value)} placeholder="30000" /></Field>
+      </div>
+      <div className="mt-3"><Button disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save targets"}</Button></div>
+    </Card>
+  );
+}
+
 // ── Settings (editable: tracking start, low-stock default, rent, revenue share)
 export function SettingsScreen() {
   const { email } = useAuth();
@@ -422,6 +460,8 @@ export function SettingsScreen() {
         <Row label="Backend" value="Verified Supabase engine" last />
         <div className="mt-3"><SignOutButton /></div>
       </Card>
+
+      <TargetsCard />
 
       <Card>
         <Eyebrow>Tracking & stock</Eyebrow>

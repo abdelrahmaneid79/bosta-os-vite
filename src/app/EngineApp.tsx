@@ -6,7 +6,7 @@
  * Insights = health + gaps + activity, Settings = general + system + QA).
  */
 import { lazy, Suspense, useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/core/utils/cn";
 import { fmtDate } from "@/core/utils/date";
@@ -19,6 +19,10 @@ import { useUI } from "@/store/ui";
 import { NAV_SECTIONS, SETTINGS_SECTION } from "@/core/nav";
 import { usePrefs, useApplyTheme, type ThemeMode } from "@/store/prefs";
 import { useFilters } from "@/store/filters";
+import { isEngineConfigured } from "@/core/db/engine";
+import { getAlerts } from "@/core/read/alerts";
+import { useAlertDismissals } from "@/store/alerts";
+import { partitionAlerts, bellCount, type Alert, type AlertSeverity } from "@/core/alerts/engine";
 
 // Lazy route chunks — split out of the initial bundle.
 const screens = () => import("@/features/engine/screens");
@@ -209,6 +213,80 @@ function RailGroup({ group }: { group: Group }) {
   );
 }
 
+const SEV_DOT: Record<AlertSeverity, string> = { critical: "bg-bad", warning: "bg-warn", info: "bg-dim" };
+
+function AlertBell() {
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const dismissed = useAlertDismissals((s) => s.dismissed);
+  const dismiss = useAlertDismissals((s) => s.dismiss);
+  const restoreAll = useAlertDismissals((s) => s.restoreAll);
+  const prune = useAlertDismissals((s) => s.prune);
+  const q = useQuery({ queryKey: ["alerts"], queryFn: getAlerts, enabled: isEngineConfigured, staleTime: 60_000, refetchInterval: 300_000 });
+  const all = q.data ?? [];
+  const { open: openAlerts, staleKeys } = partitionAlerts(all, dismissed);
+  useEffect(() => { if (staleKeys.length) prune(staleKeys); }, [staleKeys, prune]);
+  const count = bellCount(openAlerts);
+
+  const go = (a: Alert) => { setOpen(false); navigate(a.route); };
+  return (
+    <div className="relative">
+      <button title="Alerts" onClick={() => setOpen((o) => !o)}
+        className="lift relative flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-panel text-muted hover:text-text">
+        <Icon d={I.bell} className="h-[18px] w-[18px]" />
+        {count > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-pink px-1 text-[10px] font-bold text-ink ring-2 ring-bg">{count > 9 ? "9+" : count}</span>}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-[61] mt-2 w-[340px] max-w-[92vw] animate-rise overflow-hidden rounded-3xl border border-line bg-panel shadow-pop">
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <div className="font-display text-sm font-bold">Alerts {openAlerts.length > 0 && <span className="text-dim">· {openAlerts.length}</span>}</div>
+              <NavLink to="/missing" onClick={() => setOpen(false)} className="text-[12px] font-semibold text-pink">Open center →</NavLink>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto">
+              {q.isLoading ? <div className="px-4 py-6 text-center text-sm text-dim">Checking…</div>
+                : openAlerts.length === 0 ? (
+                  <div className="px-4 py-8 text-center">
+                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-good/10 text-good"><Icon d="M5 13l4 4L19 7" className="h-5 w-5" /></div>
+                    <div className="text-sm font-semibold text-good">All clear</div>
+                    <div className="mt-0.5 text-[12px] text-dim">Nothing needs you right now.</div>
+                  </div>
+                ) : (
+                <div className="divide-y divide-line">
+                  {openAlerts.map((a) => (
+                    <div key={a.key} className="row-hover px-4 py-3">
+                      <div className="flex items-start gap-2.5">
+                        <span className={cn("mt-1.5 h-2 w-2 flex-shrink-0 rounded-full", SEV_DOT[a.severity])} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-display text-[13px] font-bold text-text">{a.title}</span>
+                            {a.metric && <span className="ml-auto tnum text-[11px] text-dim">{a.metric}</span>}
+                          </div>
+                          <div className="mt-0.5 text-[12px] leading-snug text-muted">{a.detail}</div>
+                          <div className="mt-1.5 flex items-center gap-3">
+                            <button onClick={() => go(a)} className="text-[12px] font-semibold text-pink">→ {a.action}</button>
+                            <button onClick={() => dismiss(a.key)} className="text-[12px] text-faint hover:text-text">Dismiss</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {dismissed.length > 0 && (
+              <div className="border-t border-line px-4 py-2.5 text-center">
+                <button onClick={restoreAll} className="text-[12px] font-semibold text-dim hover:text-text">Restore {dismissed.length} dismissed</button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ThemeToggle() {
   const theme = usePrefs((s) => s.theme);
   const set = usePrefs((s) => s.set);
@@ -242,10 +320,7 @@ function Header({ onAdd }: { onAdd: () => void }) {
       </button>
       <button onClick={() => setCommandOpen(true)} className="lift flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-panel text-muted hover:text-text lg:hidden"><Icon d={I.search} className="h-[18px] w-[18px]" /></button>
       <ThemeToggle />
-      <button title="Notifications" className="lift relative hidden h-10 w-10 items-center justify-center rounded-2xl border border-line bg-panel text-muted hover:text-text sm:flex">
-        <Icon d={I.bell} className="h-[18px] w-[18px]" />
-        <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-pink ring-2 ring-panel" />
-      </button>
+      <AlertBell />
       <button onClick={onAdd} className="lift flex h-10 items-center gap-1.5 rounded-2xl bg-pink px-3 font-display text-sm font-bold text-ink shadow-pink sm:hidden"><Icon d={I.plus} className="h-4 w-4" w={2.6} /></button>
       <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-line bg-panel2"><img src="/mascot-96.png" alt="" className="h-7 w-7 object-contain" /></div>
     </header>
