@@ -17,8 +17,19 @@ import { rangeLabel } from "@/core/range";
 import { useFilters } from "@/store/filters";
 import { getProductDetail } from "@/core/read/product-detail";
 import { getProducts } from "@/core/read/common";
+import { getLifetimeProducts } from "@/core/read/products";
+import { normalize } from "@/core/products/match";
+import { recommendProductAction, type AdviceTone } from "@/core/products/advice";
+import { egpShort } from "@/core/utils/format";
 import { PurchaseForm, ProductForm } from "./forms";
 import type { Tables } from "@/core/db/tables";
+
+const ADVICE_TONE: Record<AdviceTone, { wrap: string; text: string }> = {
+  critical: { wrap: "border-bad/40 bg-bad/[0.06]", text: "text-bad" },
+  warn: { wrap: "border-warn/40 bg-warn/[0.06]", text: "text-warn" },
+  good: { wrap: "border-good/40 bg-good/[0.06]", text: "text-good" },
+  info: { wrap: "border-line bg-panel2", text: "text-info" },
+};
 
 export function ProductDetailScreen() {
   const { id = "" } = useParams();
@@ -28,12 +39,24 @@ export function ProductDetailScreen() {
   const [edit, setEdit] = useState(false);
   const d = useQuery({ queryKey: ["product-detail", id, range], queryFn: () => getProductDetail(id, range), enabled: isEngineConfigured && !!id });
   const prod = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
+  const lifetime = useQuery({ queryKey: ["lifetime-products"], queryFn: getLifetimeProducts, enabled: isEngineConfigured });
   const productRow = (prod.data ?? []).find((p) => p.id === id) as Tables<"products"> | undefined;
 
   if (!isEngineConfigured) return <EmptyState title="Sign in to view a product" />;
   if (d.isLoading) return <SkeletonRows rows={6} />;
   if (d.isError) return <ErrorState message={String((d.error as Error)?.message)} onRetry={() => d.refetch()} />;
   const p = d.data!;
+
+  // Match this product to its lifetime POS totals (by Arabic/English name) + rank.
+  const lifeRanked = (lifetime.data ?? []).slice().sort((a, b) => b.revenue - a.revenue);
+  const names = new Set([normalize(p.nameEn), p.nameAr ? normalize(p.nameAr) : ""].filter(Boolean));
+  const lifeIdx = lifeRanked.findIndex((x) => names.has(normalize(x.name)));
+  const life = lifeIdx >= 0 ? lifeRanked[lifeIdx] : null;
+  const advice = recommendProductAction({
+    onHand: p.onHand, isNegative: p.isNegative, hasCost: p.hasCost, daysCover: p.daysCover,
+    lifetimeRank: lifeIdx >= 0 ? lifeIdx + 1 : null, lifetimeCount: lifeRanked.length, active: p.active,
+  });
+  const at = ADVICE_TONE[advice.tone];
 
   return (
     <div className="space-y-4">
@@ -69,6 +92,29 @@ export function ProductDetailScreen() {
           <Stat label="Sells at" value={p.sellingPrice != null ? egp(p.sellingPrice) : "—"} />
         </div>
       </Card>
+
+      {/* Recommended action */}
+      <div className={`rounded-3xl border p-5 shadow-card ${at.wrap}`}>
+        <div className="flex items-start gap-3">
+          <span className={`mt-0.5 ${at.text}`}>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>
+          </span>
+          <div className="min-w-0 flex-1">
+            <Eyebrow accent={at.text}>Recommended action</Eyebrow>
+            <div className="mt-0.5 font-display text-base font-bold text-text">{advice.title}</div>
+            <div className="mt-0.5 text-[13px] text-muted">{advice.detail}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Lifetime performance (from the POS product report) */}
+      {life && (
+        <div className="grid grid-cols-3 gap-3">
+          <Stat label="Lifetime revenue" value={egpShort(life.revenue)} accent="text-good" />
+          <Stat label="Lifetime units" value={num(life.units)} />
+          <Stat label="Lifetime rank" value={`#${lifeIdx + 1} of ${lifeRanked.length}`} accent={lifeIdx < 10 ? "text-pink" : "text-text"} />
+        </div>
+      )}
 
       {/* Period KPIs */}
       <div className="flex items-center justify-between">
