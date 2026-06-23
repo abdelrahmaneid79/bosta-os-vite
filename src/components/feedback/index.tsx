@@ -54,12 +54,12 @@ export function EmptyState({
 }
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-shimmer rounded-md bg-line2", className)} />;
+  return <div className={cn("animate-shimmer rounded-md bg-panel2", className)} />;
 }
 
 export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="panel divide-y divide-line2 overflow-hidden">
+    <div className="panel divide-y divide-line overflow-hidden">
       {Array.from({ length: rows }).map((_, i) => (
         <div key={i} className="flex items-center gap-4 p-4">
           <Skeleton className="h-2.5 w-2.5 rounded-full" />
@@ -91,7 +91,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       <div className="font-display font-semibold text-bad">Something went wrong</div>
       <div className="mt-1 text-sm text-muted">{message}</div>
       {onRetry && (
-        <button onClick={onRetry} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-sm text-text hover:bg-line2">
+        <button onClick={onRetry} className="mt-3 rounded-lg border border-line px-3 py-1.5 text-sm text-text hover:bg-panel2">
           Retry
         </button>
       )}

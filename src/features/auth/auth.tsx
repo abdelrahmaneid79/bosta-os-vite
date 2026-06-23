@@ -45,7 +45,7 @@ function Centered({ children }: { children: ReactNode }) {
       style={{ backgroundImage: "radial-gradient(circle at 50% -10%, rgba(248,104,200,0.12), transparent 50%)" }}>
       <div className="w-full max-w-sm">
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-line2 bg-panel2"><img src="/mascot-96.png" alt="Bosta Bites" className="h-9 w-9 object-contain" /></div>
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-line bg-panel2"><img src="/mascot-96.png" alt="Bosta Bites" className="h-9 w-9 object-contain" /></div>
           <div>
             <div className="font-display text-2xl font-semibold">BostaOS</div>
             <div className="text-xs text-dim">Bosta Bites · operating system</div>

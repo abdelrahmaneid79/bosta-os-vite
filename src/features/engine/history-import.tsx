@@ -89,7 +89,7 @@ export function HistoryImportScreen() {
                 <span className="font-display font-semibold capitalize">Importing {progress.phase}…</span>
                 <span className="text-dim">{progress.done} / {progress.total}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-line2"><div className="h-full rounded-full bg-pink transition-all" style={{ width: `${pct}%` }} /></div>
+              <div className="h-2 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-pink transition-all" style={{ width: `${pct}%` }} /></div>
             </Card>
           ) : (
             <div className="flex items-center gap-2">
@@ -104,7 +104,7 @@ export function HistoryImportScreen() {
           {report && (
             <Card>
               <Eyebrow>Import summary</Eyebrow>
-              <div className="mt-2 divide-y divide-line2">
+              <div className="mt-2 divide-y divide-line">
                 {KINDS.filter((k) => opts[k.key]).map((k) => {
                   const r = report[k.key];
                   return (
@@ -130,7 +130,7 @@ function PickCard({ kind, on, onToggle, stat, sub }: { kind: SeedKind; on: boole
   return (
     <button onClick={onToggle} className={`lift rounded-2xl border p-4 text-left transition ${on ? "border-pink/50 bg-pink/[0.06]" : "border-line bg-panel2 opacity-70"}`}>
       <div className="flex items-start gap-3">
-        <span className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border ${on ? "border-pink bg-pink text-ink" : "border-line2 text-transparent"}`}>
+        <span className={`mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border ${on ? "border-pink bg-pink text-ink" : "border-line text-transparent"}`}>
           <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
         </span>
         <div className="min-w-0 flex-1">

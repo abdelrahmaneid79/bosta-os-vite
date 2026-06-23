@@ -49,7 +49,7 @@ export function ProductDetailScreen() {
           <div className="min-w-0 flex-1">
             <Eyebrow>Product</Eyebrow>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-display text-2xl font-semibold text-white">{p.nameEn}</span>
+              <span className="font-display text-2xl font-semibold text-text">{p.nameEn}</span>
               {p.nameAr && <span dir="rtl" className="text-sm text-dim">{p.nameAr}</span>}
               {!p.active && <Badge>inactive</Badge>}
               {p.isNegative && <Badge tone="bad">negative</Badge>}
@@ -62,7 +62,7 @@ export function ProductDetailScreen() {
             {productRow && <Button variant="outline" onClick={() => setEdit(true)}>Edit</Button>}
           </div>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-line2 pt-4 sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 border-t border-line pt-4 sm:grid-cols-4">
           <Stat label="On hand" value={`${num(p.onHand)} ${p.baseUnit}`} accent={p.isNegative ? "text-bad" : "text-text"} />
           <Stat label="Avg cost" value={p.hasCost ? `${egp(p.avgCost)}/${p.baseUnit}` : "—"} />
           <Stat label="Stock value" value={egp(p.stockValue)} />
@@ -96,7 +96,7 @@ export function ProductDetailScreen() {
       {/* Sale lines */}
       <Eyebrow>Sale lines · {p.saleLines.length}</Eyebrow>
       {p.saleLines.length === 0 ? <Card><p className="text-sm text-dim">No sales of this product in range.</p></Card> : (
-        <Card className="!p-0"><div className="divide-y divide-line2">
+        <Card className="!p-0"><div className="divide-y divide-line">
           {p.saleLines.slice(0, 40).map((l, i) => (
             <Link key={i} to="/sales" className="row-hover flex items-center gap-3 px-4 py-2.5">
               <div className="min-w-0 flex-1">
@@ -112,7 +112,7 @@ export function ProductDetailScreen() {
       {/* Purchases */}
       <Eyebrow>Purchase batches · {p.purchases.length}</Eyebrow>
       {p.purchases.length === 0 ? <Card><p className="text-sm text-dim">No purchases of this product in range.</p></Card> : (
-        <Card className="!p-0"><div className="divide-y divide-line2">
+        <Card className="!p-0"><div className="divide-y divide-line">
           {p.purchases.map((b) => (
             <div key={b.id} className="flex items-center gap-3 px-4 py-2.5">
               <div className="min-w-0 flex-1">

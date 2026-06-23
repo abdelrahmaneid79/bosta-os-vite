@@ -216,7 +216,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
           {imgUrl && (
             <Card className="!p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                <img src={imgUrl} alt="receipt" className="max-h-56 rounded-lg border border-line2 object-contain" />
+                <img src={imgUrl} alt="receipt" className="max-h-56 rounded-lg border border-line object-contain" />
                 <div className="min-w-0 flex-1 text-[12px] text-dim">
                   <div className="font-display text-sm font-semibold text-text">{fileName}</div>
                   {status ? <div className="mt-1 text-pink">{status}</div> : <div className="mt-1">Confirm the values on the right. Add rows if the sheet has more days.</div>}
@@ -261,7 +261,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
           </div>
 
           <Card className="!p-0">
-            <div className="max-h-[55vh] divide-y divide-line2 overflow-y-auto">
+            <div className="max-h-[55vh] divide-y divide-line overflow-y-auto">
               {kind === "sales" ? salesView.map((r, i) => (
                 <div key={i} className="flex items-center gap-2 px-3 py-2 text-sm">
                   <span className={`h-2 w-2 flex-shrink-0 rounded-full ${r.issues.length ? "bg-bad" : r.dup ? "bg-dim" : "bg-good"}`} />
@@ -296,7 +296,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
 function MapSel({ label, value, headers, onChange }: { label: string; value: string; headers: string[]; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="font-mono text-[10px] uppercase tracking-wider text-dim">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-wider text-dim">{label}</span>
       <Select value={value} onChange={(e) => onChange(e.target.value)} className="min-w-[140px]">
         <option value="">— none —</option>
         {headers.map((h) => <option key={h} value={h}>{h}</option>)}

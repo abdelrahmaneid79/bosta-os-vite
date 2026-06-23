@@ -2,6 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===================================================================
+   THEME TOKENS — all colours are space-separated RGB channels so that
+   Tailwind's  rgb(var(--x) / <alpha-value>)  opacity modifiers work
+   (e.g. bg-pink/15, border-line/60). Light is the default; .dark on
+   <html> swaps the palette. Premium fintech: clean neutrals + brand pink.
+   =================================================================== */
+:root {
+  /* surfaces */
+  --bg: 246 247 249;        /* app canvas            */
+  --rail: 255 255 255;      /* sidebar               */
+  --panel: 255 255 255;     /* cards                 */
+  --panel2: 244 245 248;    /* insets / inputs       */
+  --line: 228 231 236;      /* borders               */
+  --line2: 238 240 244;     /* subtle borders / hover*/
+  /* brand */
+  --pink: 219 45 152;       /* deep brand pink (contrast on white) */
+  --pink-bright: 248 104 200;
+  --berry: 136 24 72;
+  --ink: 255 255 255;       /* text ON pink/accent   */
+  /* text */
+  --text: 16 19 26;
+  --muted: 90 99 112;
+  --dim: 132 142 156;
+  --faint: 168 176 188;
+  /* semantic */
+  --good: 22 163 100;
+  --bad: 224 49 67;
+  --warn: 217 142 12;
+  --info: 47 112 240;
+  --violet: 124 92 255;
+  /* effects */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 26px -12px rgba(16, 24, 40, 0.14);
+  --shadow-pop: 0 12px 40px -12px rgba(16, 24, 40, 0.22);
+  --shadow-pink: 0 10px 26px -8px rgba(219, 45, 152, 0.45);
+  --glow: rgba(219, 45, 152, 0.10);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: 11 13 16;
+  --rail: 14 16 20;
+  --panel: 22 25 31;
+  --panel2: 28 32 39;
+  --line: 39 44 53;
+  --line2: 31 36 44;
+  --pink: 248 104 200;
+  --pink-bright: 248 104 200;
+  --berry: 136 24 72;
+  --ink: 26 7 16;
+  --text: 240 243 247;
+  --muted: 158 167 179;
+  --dim: 112 122 135;
+  --faint: 80 90 104;
+  --good: 84 214 154;
+  --bad: 255 107 107;
+  --warn: 242 179 61;
+  --info: 92 141 255;
+  --violet: 155 108 255;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px -14px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 18px 50px -16px rgba(0, 0, 0, 0.7);
+  --shadow-pink: 0 12px 30px -8px rgba(248, 104, 200, 0.5);
+  --glow: rgba(248, 104, 200, 0.16);
+  color-scheme: dark;
+}
+
 @layer base {
   * {
     @apply box-border;
@@ -13,49 +78,52 @@
   }
   body {
     @apply bg-bg text-text font-sans antialiased;
+    background-image: radial-gradient(120% 70% at 100% -10%, var(--glow), transparent 55%);
+    background-attachment: fixed;
   }
   ::selection {
-    background: #f868c8;
-    color: #160910;
+    background: rgb(var(--pink));
+    color: rgb(var(--ink));
+  }
+  /* Friendly, premium number rendering */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 }
 
 @layer components {
-  /* Card / panel primitives shared across features */
   .panel {
-    @apply bg-panel border border-line rounded-2xl;
+    @apply bg-panel border border-line rounded-3xl shadow-card;
   }
   .panel-2 {
     @apply bg-panel2 border border-line rounded-2xl;
   }
+  /* Eyebrow — clean uppercase label (no more mono "terminal" look) */
   .eyebrow {
-    @apply font-mono text-[11px] tracking-[0.06em] text-dim;
+    @apply font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-dim;
   }
   .lift {
-    transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.15s;
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s, background 0.18s, border-color 0.18s;
   }
   .lift:active {
-    transform: scale(0.97);
-  }
-  .navbtn:hover {
-    background: #1c0f16 !important;
+    transform: scale(0.985);
   }
   .row-hover {
     transition: background 0.15s;
   }
   .row-hover:hover {
-    background: #1c0f16;
+    background: rgb(var(--panel2));
   }
   /* The Bosta peanut mascot rendered as a tintable mask */
   .mascot {
-    background: #f868c8;
+    background: rgb(var(--pink));
     -webkit-mask: url(/assets/bosta-mascot.svg) center/contain no-repeat;
     mask: url(/assets/bosta-mascot.svg) center/contain no-repeat;
   }
 }
 
 @layer utilities {
-  /* Hide the rail scrollbar — keep a clean divider line (per design feedback) */
   .no-scrollbar {
     scrollbar-width: none;
     -ms-overflow-style: none;

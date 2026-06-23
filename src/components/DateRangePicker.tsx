@@ -36,14 +36,14 @@ export function DateRangePicker({ className }: { className?: string }) {
                   key={p.key}
                   onClick={() => { setRangeKey(p.key as RangeKey); if (p.key !== "custom") setOpen(false); }}
                   className={cn("rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition",
-                    rangeKey === p.key ? "bg-pink/15 text-pink" : "text-muted hover:bg-line2 hover:text-text")}
+                    rangeKey === p.key ? "bg-pink/15 text-pink" : "text-muted hover:bg-panel2 hover:text-text")}
                 >
                   {p.label}
                 </button>
               ))}
             </div>
-            <div className="mt-3 border-t border-line2 pt-3">
-              <div className="mb-1.5 font-mono text-[10px] uppercase tracking-wider text-dim">Custom range</div>
+            <div className="mt-3 border-t border-line pt-3">
+              <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-dim">Custom range</div>
               <div className="flex items-center gap-2">
                 <input type="date" value={customFrom} max={customTo || todayCairo()}
                   onChange={(e) => setCustom(e.target.value, customTo)}

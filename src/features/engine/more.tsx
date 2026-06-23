@@ -105,7 +105,7 @@ export function ReportsScreen() {
         {products.isLoading ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Loading…</div>
           : prods.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">No product lines sold in this range.</div>
           : (
-          <div className="mt-2 divide-y divide-line2">
+          <div className="mt-2 divide-y divide-line">
             {prods.slice(0, 12).map((x, i) => {
               const top = prods[0]?.grossProfit ?? 0;
               const w = x.grossProfit != null && top > 0 ? Math.max(2, (x.grossProfit / top) * 100) : 0;
@@ -122,7 +122,7 @@ export function ReportsScreen() {
                       {x.missingCostLines > 0 && <Badge tone="warn">no cost</Badge>}
                     </div>
                   </Link>
-                  {w > 0 && <div className="ml-7 mt-1.5 h-1.5 overflow-hidden rounded-full bg-line2"><div className="h-full rounded-full bg-pink" style={{ width: `${w}%` }} /></div>}
+                  {w > 0 && <div className="ml-7 mt-1.5 h-1.5 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-pink" style={{ width: `${w}%` }} /></div>}
                 </div>
               );
             })}
@@ -139,7 +139,7 @@ export function ReportsScreen() {
         {expTrends.isLoading ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Loading…</div>
           : cats.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">No expenses in this range.</div>
           : (
-          <div className="mt-2 divide-y divide-line2">
+          <div className="mt-2 divide-y divide-line">
             {cats.slice(0, 12).map((c) => (
               <div key={c.category} className="px-4 py-2.5">
                 <div className="flex items-center gap-2">
@@ -150,13 +150,13 @@ export function ReportsScreen() {
                   <div className="text-right">
                     <div className="font-display text-sm font-semibold text-bad">−{egp(c.amount)}</div>
                     {c.changePct != null && (
-                      <span className={`font-mono text-[11px] ${c.changePct > 0 ? "text-bad" : "text-good"}`}>
+                      <span className={`tnum text-[11px] ${c.changePct > 0 ? "text-bad" : "text-good"}`}>
                         {c.changePct > 0 ? "▲ +" : "▼ −"}{Math.abs(Math.round(c.changePct))}%
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line2"><div className="h-full rounded-full bg-warn/70" style={{ width: `${Math.max(2, Math.min(100, c.sharePct))}%` }} /></div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-warn/70" style={{ width: `${Math.max(2, Math.min(100, c.sharePct))}%` }} /></div>
               </div>
             ))}
           </div>
@@ -200,8 +200,8 @@ export function SystemCheckScreen() {
 function Group({ title, checks }: { title: string; checks: Chk[] }) {
   return (
     <Card className="!p-0">
-      <div className="border-b border-line2 px-4 py-3 font-display text-sm font-semibold">{title}</div>
-      <div className="divide-y divide-line2">
+      <div className="border-b border-line px-4 py-3 font-display text-sm font-semibold">{title}</div>
+      <div className="divide-y divide-line">
         {checks.length === 0 && <div className="px-4 py-3 text-sm text-dim">…</div>}
         {checks.map((c) => (
           <div key={c.name} className="flex items-center gap-3 px-4 py-3">
@@ -316,7 +316,7 @@ export function ImportsScreen() {
             <Button disabled={approve.isPending || readyCount === 0} onClick={() => approve.mutate()}>{approve.isPending ? "Importing…" : `Approve ${readyCount}`}</Button>
           </div>
           <Card className="!p-0">
-            <div className="max-h-[55vh] divide-y divide-line2 overflow-y-auto">
+            <div className="max-h-[55vh] divide-y divide-line overflow-y-auto">
               {(kind === "sales" ? sales : exps).slice(0, 200).map((r, i) => {
                 const bad = r.issues.length > 0;
                 const isDup = kind === "sales" && dup((r as { date: string | null }).date);
@@ -434,14 +434,23 @@ export function SettingsScreen() {
   );
 }
 function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
-  return <div className={`flex items-center justify-between py-2.5 ${last ? "" : "border-b border-line2"}`}><span className="text-sm text-muted">{label}</span><span className="text-sm text-text">{value}</span></div>;
+  return <div className={`flex items-center justify-between py-2.5 ${last ? "" : "border-b border-line"}`}><span className="text-sm text-muted">{label}</span><span className="text-sm text-text">{value}</span></div>;
 }
 
 // ── Preferences (app-wide customization) ─────────────────────────────────────
 export function PreferencesScreen() {
-  const { landing, defaultRange, hiddenSections, accountingStart, set, toggleSection, reset } = usePrefs();
+  const { landing, defaultRange, hiddenSections, accountingStart, theme, set, toggleSection, reset } = usePrefs();
   return (
     <div className="mx-auto max-w-xl space-y-4">
+      <Card>
+        <Eyebrow>Appearance</Eyebrow>
+        <p className="mt-1 text-[12px] text-dim">Choose the look. “System” follows your device’s light/dark setting.</p>
+        <div className="mt-3">
+          <Tabs value={theme} onChange={(t) => set({ theme: t })}
+            options={[{ value: "light", label: "☀ Light" }, { value: "dark", label: "🌙 Dark" }, { value: "system", label: "Auto" }]} />
+        </div>
+      </Card>
+
       <Card>
         <Eyebrow>How BostaOS opens</Eyebrow>
         <div className="mt-2 space-y-3">

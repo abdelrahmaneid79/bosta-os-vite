@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, Eyebrow, Stat, Badge, Button, Input, Select } from "@/components/ui";
+import { Card, Eyebrow, StatCard, Badge, Button, Input, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
@@ -29,6 +29,17 @@ import { voidSaleItem, voidSale } from "@/core/db/mutations";
 import { useUI } from "@/store/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Tables } from "@/core/db/tables";
+
+const SI = {
+  box: "M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10",
+  tag: "M20.6 13.4 12 22l-9-9V3h10zM7.5 7.5h.01",
+  warn: "M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
+  neg: "M12 8v4m0 4h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
+  rev: "M3 3v18h18M7 14l3-3 3 3 5-6",
+  cal: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
+  spend: "M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+  batch: "M21 16V8l-9-5-9 5v8l9 5z",
+} as const;
 
 function Guarded({ q, children, empty }: { q: { isLoading: boolean; isError: boolean; error: unknown }; children: React.ReactNode; empty?: boolean }) {
   if (!isEngineConfigured) return <ConnectPanel />;
@@ -64,10 +75,10 @@ export function StockScreen() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Stock value" value={s ? egpShort(s.totalValue) : "—"} />
-        <Stat label="Products" value={s ? s.positions.length : "—"} />
-        <Stat label="Missing COGS" value={s ? s.missingCostCount : "—"} accent={s?.missingCostCount ? "text-warn" : "text-text"} />
-        <Stat label="Negative" value={s ? s.negativeCount : "—"} accent={s?.negativeCount ? "text-bad" : "text-text"} />
+        <StatCard label="Stock value" accent="blue" icon={SI.box} value={s ? egpShort(s.totalValue) : "—"} />
+        <StatCard label="Products" accent="pink" icon={SI.tag} value={s ? s.positions.length : "—"} />
+        <StatCard label="Missing COGS" accent="amber" icon={SI.warn} value={s ? s.missingCostCount : "—"} />
+        <StatCard label="Negative" accent="red" icon={SI.neg} value={s ? s.negativeCount : "—"} />
       </div>
       <div className="flex items-center gap-2">
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…" className="flex-1" />
@@ -75,7 +86,7 @@ export function StockScreen() {
       </div>
       <Guarded q={q} empty={!!s && s.positions.length === 0}>
         <Card className="!p-0">
-          <div className="divide-y divide-line2">
+          <div className="divide-y divide-line">
             {positions.map((p) => {
               const prod = byId.get(p.id);
               return (
@@ -124,14 +135,14 @@ export function SalesScreen() {
         <Button onClick={() => setAddOpen(true)}>+ Sale</Button>
       </div>
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Revenue" value={s ? egp(s.total) : "—"} />
-        <Stat label="Sales days" value={s ? s.days : "—"} />
-        <Stat label="Unreconciled" value={s ? s.unreconciled : "—"} accent={s?.unreconciled ? "text-warn" : "text-text"} />
+        <StatCard label="Revenue" accent="mint" icon={SI.rev} value={s ? egpShort(s.total) : "—"} />
+        <StatCard label="Sales days" accent="pink" icon={SI.cal} value={s ? s.days : "—"} />
+        <StatCard label="Unreconciled" accent="amber" icon={SI.warn} value={s ? s.unreconciled : "—"} />
       </div>
       <Eyebrow>Sales in range · tap to open</Eyebrow>
       <Guarded q={recent} empty={!!recent.data && recent.data.length === 0}>
         <Card className="!p-0">
-          <div className="divide-y divide-line2">
+          <div className="divide-y divide-line">
             {recent.data?.map((r) => (
               <button key={r.id} onClick={() => setDetail(r)} className="row-hover flex w-full items-center gap-3 px-4 py-3 text-left">
                 <span className={`h-2.5 w-2.5 rounded-full ${r.reconciled ? "bg-good" : "bg-warn"}`} />
@@ -179,7 +190,7 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
       {items.isLoading ? <SkeletonRows rows={3} /> : (items.data?.length ?? 0) === 0 ? (
         <p className="py-2 text-sm text-dim">No product lines yet. Add lines to deduct stock and track COGS.</p>
       ) : (
-        <div className="divide-y divide-line2 rounded-xl border border-line">
+        <div className="divide-y divide-line rounded-xl border border-line">
           {items.data!.map((l) => (
             <div key={l.id} className="flex items-center gap-2 px-3 py-2.5">
               <div className="min-w-0 flex-1">
@@ -238,12 +249,12 @@ export function PurchasesScreen() {
         {productId && <Button variant="ghost" onClick={() => setProductId("")}>Clear</Button>}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Stat label={productId ? "Spend (filtered)" : "Spend in range"} value={egp(filteredTotal)} />
-        <Stat label="Batches" value={rows.length} />
+        <StatCard label={productId ? "Spend (filtered)" : "Spend in range"} accent="amber" icon={SI.spend} value={egp(filteredTotal)} />
+        <StatCard label="Batches" accent="blue" icon={SI.batch} value={rows.length} />
       </div>
       <Guarded q={q} empty={rows.length === 0}>
         <Card className="!p-0">
-          <div className="divide-y divide-line2">
+          <div className="divide-y divide-line">
             {rows.map((r) => (
               <Link key={r.id} to={`/product/${r.productId}`} className="row-hover flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
@@ -282,7 +293,7 @@ export function ReconcileScreen() {
           <Card glow>
             <Eyebrow>Net profit · after costs &amp; expenses</Eyebrow>
             <div className="mt-1 flex flex-wrap items-end gap-3">
-              <div className="font-display text-5xl font-semibold leading-none text-white">
+              <div className="tnum font-display text-5xl font-extrabold leading-none text-text">
                 {p ? (p.netProfit == null ? "unknown" : egp(p.netProfit)) : "—"}
               </div>
               {p && p.netMargin != null && <Badge tone={p.netMargin >= 0 ? "good" : "bad"}>{pct(p.netMargin)} net margin</Badge>}
@@ -323,7 +334,7 @@ function Bar({ label, amount, pctWidth, tone, strong }: { label: string; amount:
         <span className={`text-xs ${strong ? "font-display font-semibold text-text" : "text-muted"}`}>{label}</span>
         <span className={`font-display text-sm font-semibold ${strong ? "text-pink" : "text-text"}`}>{amount}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-line2">
+      <div className="h-2 overflow-hidden rounded-full bg-panel2">
         <div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.min(100, Math.max(0, pctWidth))}%`, transition: "width .5s ease" }} />
       </div>
     </div>

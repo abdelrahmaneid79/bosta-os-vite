@@ -18,7 +18,7 @@ export function Modal({ open, onClose, title, children }: {
         className="max-h-[92vh] w-full max-w-md animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 shadow-sheet sm:rounded-3xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold">{title}</h3>
-          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg bg-line2 text-muted hover:text-text">✕</button>
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg bg-panel2 text-muted hover:text-text">✕</button>
         </div>
         {children}
       </div>

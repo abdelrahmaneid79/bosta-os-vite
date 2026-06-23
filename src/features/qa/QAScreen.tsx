@@ -76,7 +76,7 @@ export function QAScreen() {
         {diagnostics.length === 0 ? (
           <Card><p className="text-sm text-dim">Nothing yet. Perform a write — successes and errors will appear here with copyable details.</p></Card>
         ) : (
-          <Card className="!p-0"><div className="divide-y divide-line2">
+          <Card className="!p-0"><div className="divide-y divide-line">
             {diagnostics.map((d) => (
               <div key={d.id} className="flex items-start gap-3 px-4 py-2.5">
                 <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${d.kind === "error" ? "bg-bad" : "bg-good"}`} />

@@ -22,7 +22,7 @@ function fmtKpi(k: Kpi): string {
   if (CURRENCY.has(k.key)) return egpShort(k.value);
   return String(Math.round(k.value));
 }
-const toneClass = (t?: string) => t === "good" ? "text-good" : t === "warn" ? "text-warn" : "text-white";
+const toneClass = (t?: string) => t === "good" ? "text-good" : t === "warn" ? "text-warn" : "text-text";
 
 type ChartMode = "bar" | "line" | "monthly";
 
@@ -50,9 +50,9 @@ export function AnalyticsScreen() {
       {/* KPI grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {a.kpis.map((k) => (
-          <Card key={k.key} className="!p-3.5">
-            <div className="font-mono text-[10px] uppercase tracking-wider text-dim">{k.label}</div>
-            <div className={`mt-1.5 font-display text-xl font-semibold ${toneClass(k.tone)}`}>{fmtKpi(k)}</div>
+          <Card key={k.key} className="!p-4">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-dim">{k.label}</div>
+            <div className={`mt-1.5 tnum font-display text-xl font-extrabold ${toneClass(k.tone)}`}>{fmtKpi(k)}</div>
             <div className="mt-1 truncate text-[11px] text-faint">{k.sub}</div>
           </Card>
         ))}
@@ -67,14 +67,14 @@ export function AnalyticsScreen() {
                 <Eyebrow>Daily revenue</Eyebrow>
                 <div className="text-[11px] text-dim">{a.daily.length} days · {egp(a.daily.reduce((s, d) => s + d.value, 0))} total</div>
               </div>
-              <div className="flex gap-1">
+              <div className="inline-flex gap-1 rounded-full border border-line bg-panel2 p-1">
                 {(["bar", "line", "monthly"] as ChartMode[]).map((m) => (
                   <button key={m} onClick={() => setMode(m)}
-                    className={`rounded-lg px-3 py-1 text-[12px] font-semibold capitalize ${mode === m ? "bg-pink text-ink" : "border border-line bg-panel2 text-muted"}`}>{m}</button>
+                    className={`rounded-full px-3.5 py-1.5 text-[12px] font-semibold capitalize transition ${mode === m ? "bg-pink text-ink shadow-pink" : "text-muted hover:text-text"}`}>{m}</button>
                 ))}
               </div>
             </div>
-            {mode === "line" ? <LineChart data={a.daily} color="#F868C8" />
+            {mode === "line" ? <LineChart data={a.daily} color="rgb(var(--pink))" />
               : mode === "monthly" ? <BarChart data={a.monthlyRevenue} />
               : <BarChart data={a.daily} />}
           </Card>
@@ -84,8 +84,8 @@ export function AnalyticsScreen() {
             <Card>
               <Eyebrow>Monthly revenue vs purchases</Eyebrow>
               <div className="mt-3 space-y-3">
-                <div><div className="mb-1 text-[11px] text-good">Revenue</div><BarChart data={a.monthlyRevenue} height={150} color="#2BD4C4" /></div>
-                <div><div className="mb-1 text-[11px] text-warn">Purchases (stock-in)</div><BarChart data={a.monthlyPurchases} height={120} color="#F7A23B" /></div>
+                <div><div className="mb-1 text-[11px] font-semibold text-good">Revenue</div><BarChart data={a.monthlyRevenue} height={150} color="rgb(var(--good))" /></div>
+                <div><div className="mb-1 text-[11px] font-semibold text-warn">Purchases (stock-in)</div><BarChart data={a.monthlyPurchases} height={120} color="rgb(var(--warn))" /></div>
               </div>
             </Card>
             <Card>
@@ -99,35 +99,35 @@ export function AnalyticsScreen() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <Eyebrow>Average by day of week</Eyebrow>
-              <div className="mt-3"><BarChart data={a.dayOfWeek} height={180} color="#5C8DFF" /></div>
+              <div className="mt-3"><BarChart data={a.dayOfWeek} height={180} color="rgb(var(--info))" /></div>
             </Card>
             <Card>
               <Eyebrow>7-day rolling average · last 90 days</Eyebrow>
-              <div className="mt-3"><LineChart data={a.rolling} height={180} color="#2BD4C4" /></div>
+              <div className="mt-3"><LineChart data={a.rolling} height={180} color="rgb(var(--good))" /></div>
             </Card>
           </div>
 
           {/* Top days + product leaderboards */}
           <div className="grid gap-4 lg:grid-cols-3">
-            <Card className="!p-0">
-              <div className="px-4 pt-4"><Eyebrow>Top revenue days</Eyebrow></div>
-              <div className="mt-2 divide-y divide-line2">
+            <Card>
+              <Eyebrow>Top revenue days</Eyebrow>
+              <div className="mt-2 -mb-1 divide-y divide-line">
                 {a.topRevenueDays.map((d, i) => (
-                  <div key={d.date} className="flex items-center gap-3 px-4 py-2">
-                    <span className="w-5 text-center font-mono text-[11px] text-dim">#{i + 1}</span>
-                    <span className="flex-1 text-sm text-text">{fmtDate(d.date)}</span>
-                    <span className="font-display text-sm font-semibold text-good">{egp(d.total)}</span>
+                  <div key={d.date} className="flex items-center gap-3 py-2.5">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-panel2 tnum text-[11px] font-bold text-dim">{i + 1}</span>
+                    <span className="flex-1 text-sm font-medium text-text">{fmtDate(d.date)}</span>
+                    <span className="tnum font-display text-sm font-bold text-good">{egp(d.total)}</span>
                   </div>
                 ))}
               </div>
             </Card>
             <Card>
               <Eyebrow>Top products · revenue</Eyebrow>
-              <div className="mt-3"><HBars data={a.productsByRevenue} color="#F868C8" format={(n) => egpShort(n)} /></div>
+              <div className="mt-3"><HBars data={a.productsByRevenue} color="rgb(var(--pink))" format={(n) => egpShort(n)} /></div>
             </Card>
             <Card>
               <Eyebrow>Top products · volume</Eyebrow>
-              <div className="mt-3"><HBars data={a.productsByVolume} color="#2BD4C4" format={(n) => String(Math.round(n))} /></div>
+              <div className="mt-3"><HBars data={a.productsByVolume} color="rgb(var(--good))" format={(n) => String(Math.round(n))} /></div>
             </Card>
           </div>
         </>

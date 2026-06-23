@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useState, useRef, useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Pill, Ring, Badge, Button } from "@/components/ui";
+import { Card, CardHead, Eyebrow, Pill, Ring, Badge, Button, StatCard, IconChip, DeltaChip, Sparkline, Tabs, type Accent } from "@/components/ui";
 import { cn } from "@/core/utils/cn";
 import { useLayoutStore } from "@/store/layout";
 import { WIDGET_TITLES, type WidgetId } from "@/core/dashboardLayout";
@@ -17,172 +17,262 @@ import { getHealthReport } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
 import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
-import { DateRangePicker } from "@/components/DateRangePicker";
-import { useActiveRange } from "@/store/filters";
 import { usePrefs } from "@/store/prefs";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
 
-/** Per-widget / per-metric accent palette — gives the dashboard real colour
- *  differentiation instead of one flat pink. */
-const ACCENT = {
-  pink:  { hex: "#F868C8", text: "text-pink",  bar: "bg-pink",  soft: "bg-pink/35",  border: "border-t-pink" },
-  mint:  { hex: "#2BD4C4", text: "text-good",  bar: "bg-good",  soft: "bg-good/35",  border: "border-t-good" },
-  blue:  { hex: "#5C8DFF", text: "text-info",  bar: "bg-info",  soft: "bg-info/35",  border: "border-t-info" },
-  amber: { hex: "#F7A23B", text: "text-warn",  bar: "bg-warn",  soft: "bg-warn/35",  border: "border-t-warn" },
-  violet:{ hex: "#9B6CFF", text: "text-violet",bar: "bg-violet",soft: "bg-violet/35",border: "border-t-violet" },
-  red:   { hex: "#FF5C6C", text: "text-bad",   bar: "bg-bad",   soft: "bg-bad/35",   border: "border-t-bad" },
+const I = {
+  revenue: "M3 3v18h18M7 14l3-3 3 3 5-6",
+  profit: "M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+  cash: "M3 7h18v11H3zM3 11h18M7 15h2",
+  owed: "M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
+  stock: "M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10",
+  bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
+  sale: "M3 3v18h18M7 14l3-3 3 3 5-6",
 } as const;
-type AccentKey = keyof typeof ACCENT;
 
-/** 14-day sales bar chart — pure SVG, no deps. Highlights today and the peak. */
-function Sparkbars({ series, accent = "pink", height = "h-24" }: { series: { date: string; total: number }[]; accent?: AccentKey; height?: string }) {
-  const max = Math.max(1, ...series.map((p) => p.total));
+const delta = (cur: number, prev: number): number | null => (prev > 0 ? ((cur - prev) / prev) * 100 : null);
+
+/* ─ Interactive revenue chart ──────────────────────────────────────────────
+   Selectable period (3M/6M/12M/All) with automatic granularity, a labeled
+   value axis, dated x-axis, and hover read-out. Pure SVG + a little state. */
+type Period = "3M" | "6M" | "12M" | "All";
+const PERIOD_OPTS: { value: Period; label: string }[] = [
+  { value: "3M", label: "3M" }, { value: "6M", label: "6M" }, { value: "12M", label: "12M" }, { value: "All", label: "All" },
+];
+interface ChartPoint { key: string; label: string; full: string; value: number }
+
+const monthsAgoIso = (iso: string, m: number) => { const d = new Date(iso + "T00:00:00"); d.setMonth(d.getMonth() - m); return d.toISOString().slice(0, 10); };
+const mondayOf = (iso: string) => { const d = new Date(iso + "T00:00:00"); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return d.toISOString().slice(0, 10); };
+
+function buildPoints(daily: { date: string; total: number }[], period: Period, today: string): { points: ChartPoint[]; gran: "day" | "week" | "month"; prevTotal: number } {
+  const byDay = new Map(daily.map((d) => [d.date, d.total]));
+  const dates = daily.map((d) => d.date).sort();
+  const earliest = dates[0] ?? today;
+  const sumRange = (a: string, b: string) => daily.reduce((s, d) => (d.date >= a && d.date <= b ? s + d.total : s), 0);
+
+  let from: string, gran: "day" | "week" | "month";
+  if (period === "3M") { from = monthsAgoIso(today, 3); gran = "day"; }
+  else if (period === "6M") { from = monthsAgoIso(today, 6); gran = "week"; }
+  else if (period === "12M") { from = monthsAgoIso(today, 12); gran = "month"; }
+  else { from = earliest; gran = "month"; }
+  if (from < earliest && period !== "All") { /* keep window even if empty for honesty */ }
+
+  const points: ChartPoint[] = [];
+  if (gran === "day") {
+    for (const d of isoRange(from, today)) points.push({ key: d, label: fmtDate(d, "d MMM"), full: fmtDate(d, "EEE d MMM"), value: byDay.get(d) ?? 0 });
+  } else if (gran === "week") {
+    let ws = mondayOf(from);
+    while (ws <= today) {
+      const we = isoDaysAgo(ws, -6);
+      points.push({ key: ws, label: fmtDate(ws, "d MMM"), full: `Week of ${fmtDate(ws, "d MMM")}`, value: sumRange(ws, we > today ? today : we) });
+      ws = isoDaysAgo(ws, -7);
+    }
+  } else {
+    const start = new Date(from + "T00:00:00"); start.setDate(1);
+    const end = new Date(today + "T00:00:00");
+    for (const d = start; d <= end; d.setMonth(d.getMonth() + 1)) {
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      let v = 0; for (const r of daily) if (r.date.slice(0, 7) === ym) v += r.total;
+      points.push({ key: ym, label: fmtDate(ym + "-01", "MMM"), full: fmtDate(ym + "-01", "MMM yyyy"), value: v });
+    }
+  }
+  // previous equal-length window (for the period delta)
+  const spanDays = Math.max(1, Math.round((Date.parse(today) - Date.parse(from)) / 86400000));
+  const prevTotal = sumRange(isoDaysAgo(from, spanDays), isoDaysAgo(from, 1));
+  return { points, gran, prevTotal };
+}
+
+function RevenueChart({ daily, latestDay }: { daily: { date: string; total: number }[]; latestDay: string | null }) {
   const today = todayCairo();
-  const a = ACCENT[accent];
+  const [period, setPeriod] = useState<Period>("12M");
+  const [hover, setHover] = useState<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const { points, gran, prevTotal } = useMemo(() => buildPoints(daily, period, today), [daily, period, today]);
+
+  const W = 760, H = 230, padL = 52, padR = 12, padTop = 16, padBot = 28;
+  const n = points.length;
+  const max = Math.max(1, ...points.map((p) => p.value));
+  const niceMax = niceCeil(max);
+  const x = (i: number) => (n <= 1 ? padL : padL + (i * (W - padL - padR)) / (n - 1));
+  const y = (v: number) => padTop + (1 - v / niceMax) * (H - padTop - padBot);
+  const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(n - 1).toFixed(1)},${(H - padBot).toFixed(1)} L${x(0).toFixed(1)},${(H - padBot).toFixed(1)} Z`;
+  const total = points.reduce((s, p) => s + p.value, 0);
+  const gridVals = [0, 0.25, 0.5, 0.75, 1].map((g) => niceMax * g);
+  const xStep = Math.max(1, Math.ceil(n / 7));
+
+  function onMove(e: React.MouseEvent) {
+    const r = ref.current?.getBoundingClientRect(); if (!r) return;
+    const f = (e.clientX - r.left) / r.width;
+    const plotStart = padL / W, plotEnd = (W - padR) / W;
+    const i = Math.round(((f - plotStart) / (plotEnd - plotStart)) * (n - 1));
+    setHover(Math.max(0, Math.min(n - 1, i)));
+  }
+  const hp = hover != null ? points[hover] : null;
+
   return (
-    <div className={`flex ${height} items-end gap-1`}>
-      {series.map((p) => {
-        const h = Math.max(3, (p.total / max) * 100);
-        const isToday = p.date === today;
-        return (
-          <div key={p.date} className="group relative flex flex-1 flex-col items-center justify-end" title={`${fmtDate(p.date)} · ${egp(p.total)}`}>
-            <div className={`w-full rounded-t-md transition-all ${isToday ? a.bar : p.total > 0 ? `${a.soft} group-hover:opacity-80` : "bg-line2"}`} style={{ height: `${h}%` }} />
+    <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Eyebrow accent="text-pink">Revenue · {period === "All" ? "all time" : `last ${period}`}</Eyebrow>
+          <div className="mt-1.5 flex items-end gap-2.5">
+            <div className="tnum font-display text-[32px] font-extrabold leading-none text-text">{egp(total)}</div>
+            <DeltaChip pct={delta(total, prevTotal)} />
           </div>
-        );
-      })}
+          <div className="mt-1 text-[12.5px] text-dim">
+            {gran === "month" ? "monthly" : gran === "week" ? "weekly" : "daily"} · {latestDay ? `latest sales ${fmtDate(latestDay, "d MMM yyyy")}` : "—"}
+          </div>
+        </div>
+        <Tabs value={period} options={PERIOD_OPTS} onChange={(p) => { setPeriod(p); setHover(null); }} />
+      </div>
+
+      <div ref={ref} className="relative mt-3" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 230 }}>
+          <defs>
+            <linearGradient id="rev-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgb(var(--pink))" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="rgb(var(--pink))" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {gridVals.map((v, i) => (
+            <g key={i}>
+              <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} style={{ stroke: "rgb(var(--line2))" }} strokeWidth={1} />
+              <text x={padL - 8} y={y(v) + 3.5} textAnchor="end" style={{ fontSize: 10.5, fontWeight: 600, fill: "rgb(var(--faint))" }}>{egpShort(v).replace("EGP ", "")}</text>
+            </g>
+          ))}
+          <path d={area} fill="url(#rev-fill)" />
+          <path d={line} fill="none" stroke="rgb(var(--pink))" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          {points.map((p, i) => (i % xStep === 0 || i === n - 1) ? (
+            <text key={i} x={x(i)} y={H - 8} textAnchor="middle" style={{ fontSize: 10.5, fontWeight: 600, fill: "rgb(var(--dim))" }}>{p.label}</text>
+          ) : null)}
+          {hp && (
+            <g>
+              <line x1={x(hover!)} x2={x(hover!)} y1={padTop} y2={H - padBot} style={{ stroke: "rgb(var(--pink))" }} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
+              <circle cx={x(hover!)} cy={y(hp.value)} r={4.5} fill="rgb(var(--pink))" stroke="rgb(var(--panel))" strokeWidth={2} />
+            </g>
+          )}
+        </svg>
+        {hp && (
+          <div className="pointer-events-none absolute -translate-x-1/2 rounded-xl border border-line bg-panel px-3 py-2 shadow-pop"
+            style={{ left: `${(x(hover!) / W) * 100}%`, top: 0 }}>
+            <div className="text-[11px] font-medium text-dim">{hp.full}</div>
+            <div className="tnum font-display text-sm font-extrabold text-text">{egp(hp.value)}</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function DeltaChip({ pct }: { pct: number | null }) {
-  if (pct == null) return null;
-  const up = pct >= 0;
-  return <span className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-semibold ${up ? "bg-good/15 text-good" : "bg-bad/15 text-bad"}`}>{up ? "▲" : "▼"} {Math.abs(Math.round(pct))}%</span>;
+/** Round a max up to a clean axis bound (1/2/2.5/5 × 10^k). */
+function niceCeil(v: number): number {
+  if (v <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  const f = v / mag;
+  const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
+  return nice * mag;
 }
 
-/** A colourful KPI tile: coloured top accent, value, delta vs previous period. */
-function ColorKpi({ label, value, accent, delta, sub, to, spark }: {
-  label: string; value: string; accent: AccentKey; delta?: number | null; sub?: string; to: string; spark?: { date: string; total: number }[];
-}) {
-  const a = ACCENT[accent];
-  return (
-    <Link to={to} className="lift group block overflow-hidden rounded-2xl border border-line border-t-2 bg-panel2 p-4 transition hover:border-line2" style={{ borderTopColor: a.hex }}>
-      <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-dim">{label}</span>
-        <DeltaChip pct={delta ?? null} />
-      </div>
-      <div className={`mt-2 font-display text-2xl font-semibold ${a.text}`}>{value}</div>
-      {spark ? <div className="mt-2 opacity-80"><Sparkbars series={spark} accent={accent} height="h-8" /></div> : sub ? <div className="mt-1 text-[11px] text-faint">{sub}</div> : null}
-    </Link>
-  );
-}
 const dot = (s: string) => s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : "bg-dim";
 const sevDot = (s: Severity) => s === "critical" ? "bg-bad" : s === "warning" ? "bg-warn" : "bg-dim";
 const confLabel: Record<Insight["confidence"], string> = { high: "", estimate: "estimate", "low-data": "needs data" };
+const kindGlyph: Record<ActivityEvent["kind"], string> = { sale: "🟢", purchase: "📦", expense: "🧾", cash: "💵", withdrawal: "🏷️", cheque: "🏦" };
 
-const kindGlyph: Record<ActivityEvent["kind"], string> = {
-  sale: "🟢", purchase: "📦", expense: "🧾", cash: "💵", withdrawal: "🏷️", cheque: "🏦",
-};
-
-/** Compact insight row — title, why, action, and an honest confidence chip. */
+/** Compact insight row — title, why, action, honest confidence chip. */
 export function InsightRow({ i }: { i: Insight }) {
   return (
-    <Link to={i.route} className="row-hover block rounded-xl border border-line2 p-3">
+    <Link to={i.route} className="row-hover block rounded-2xl border border-line p-3.5">
       <div className="flex items-start gap-2.5">
         <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${sevDot(i.severity)}`} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-display text-sm font-semibold text-text">{i.title}</span>
+            <span className="font-display text-sm font-bold text-text">{i.title}</span>
             {confLabel[i.confidence] && <Badge tone={i.confidence === "low-data" ? "neutral" : "warn"}>{confLabel[i.confidence]}</Badge>}
-            {i.metric && <span className="ml-auto font-mono text-[11px] text-dim">{i.metric}</span>}
+            {i.metric && <span className="ml-auto tnum text-[11px] text-dim">{i.metric}</span>}
           </div>
           <div className="mt-1 text-[12.5px] leading-relaxed text-muted">{i.detail}</div>
-          <div className="mt-1.5 text-[12px] text-pink">→ {i.action}</div>
+          <div className="mt-1.5 text-[12px] font-semibold text-pink">→ {i.action}</div>
         </div>
       </div>
     </Link>
   );
 }
-
-const delta = (cur: number, prev: number): number | null => (prev > 0 ? ((cur - prev) / prev) * 100 : null);
 
 /* ─ Today / Command Center ─────────────────────────────────────────────── */
 export function DashboardScreen() {
   const month = monthBoundsCairo();
   const last = lastMonthBoundsCairo();
   const today = todayCairo();
-  const chartFrom = isoDaysAgo(today, 13);
+  const histFrom = "2024-01-01"; // wide enough to cover all history for the chart's "All" view
   const cc = useQuery({ queryKey: ["cc"], queryFn: getCommandCenter, enabled: en });
   const miss = useQuery({ queryKey: ["missing"], queryFn: getMissingData, enabled: en });
   const insights = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
-  const feed = useQuery({ queryKey: ["activity"], queryFn: () => getActivityFeed(30, 8), enabled: en });
+  const feed = useQuery({ queryKey: ["activity"], queryFn: () => getActivityFeed(30, 6), enabled: en });
   const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
-  const daily = useQuery({ queryKey: ["dailyDash", last.from], queryFn: () => getDailyRevenue({ from: last.from, to: today }), enabled: en });
+  const daily = useQuery({ queryKey: ["dailyHist", histFrom], queryFn: () => getDailyRevenue({ from: histFrom, to: today }), enabled: en });
   const accStart = usePrefs((s) => s.accountingStart);
   const profitM = useQuery({ queryKey: ["profit", month, accStart], queryFn: () => getProfitReadout(month, accStart), enabled: en });
-  const profitL = useQuery({ queryKey: ["profit", last, accStart], queryFn: () => getProfitReadout(last, accStart), enabled: en });
   const c = cc.data;
   if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
 
-  const byDay = new Map((daily.data ?? []).map((p) => [p.date, p.total]));
-  const series = isoRange(chartFrom, today).map((d) => ({ date: d, total: byDay.get(d) ?? 0 }));
+  const rows = daily.data ?? [];
+  const byDay = new Map(rows.map((p) => [p.date, p.total]));
   const monthRev = isoRange(month.from, today).reduce((s, d) => s + (byDay.get(d) ?? 0), 0);
-  const lastRev = (daily.data ?? []).filter((p) => p.date >= last.from && p.date <= last.to).reduce((s, p) => s + p.total, 0);
-  const pM = profitM.data, pL = profitL.data;
-  const profitDelta = pM?.netProfit != null && pL?.netProfit != null ? delta(pM.netProfit, pL.netProfit) : null;
+  const lastRev = rows.filter((p) => p.date >= last.from && p.date <= last.to).reduce((s, p) => s + p.total, 0);
+  const latestDay = rows.filter((p) => p.total > 0).map((p) => p.date).sort().pop() ?? null;
+
+  // Monthly buckets for the trend chart (last 12 calendar months).
+  const monthly = new Map<string, number>();
+  for (const p of rows) { const k = p.date.slice(0, 7); monthly.set(k, (monthly.get(k) ?? 0) + p.total); }
+  const monthsAxis: string[] = [];
+  { const d = new Date(today + "T00:00:00"); for (let i = 11; i >= 0; i--) { const m = new Date(d.getFullYear(), d.getMonth() - i, 1); monthsAxis.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`); } }
+  const trendPoints = monthsAxis.map((k) => ({ label: fmtDate(k + "-01", "MMM"), value: monthly.get(k) ?? 0 }));
+  const trendTotal = trendPoints.reduce((s, p) => s + p.value, 0);
+  const sparkSeries = trendPoints.map((p) => p.value);
+
+  const pM = profitM.data;
   const attention = (miss.data?.length ?? 0) + (insights.data?.filter((i) => i.severity !== "info").length ?? 0);
+  const loading = !c && cc.isLoading;
 
   const widgets: Record<WidgetId, ReactNode> = {
     kpis: (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <ColorKpi label="Revenue · month" accent="pink" value={c ? egpShort(monthRev) : "—"} delta={delta(monthRev, lastRev)} spark={series} to="/sales" />
-        <ColorKpi label="Net profit · month" accent="mint" value={pM ? (pM.netProfit == null ? "unknown" : egpShort(pM.netProfit)) : "—"} delta={profitDelta} sub={pM?.netMargin != null ? `${Math.round(pM.netMargin)}% margin` : "after costs"} to="/reports" />
-        <ColorKpi label="Cash on hand" accent="blue" value={c ? (c.cashBalance == null ? "—" : egpShort(c.cashBalance)) : "—"} sub="current balance" to="/money" />
-        <ColorKpi label="Owed to you" accent="amber" value={c ? egpShort(c.owed) : "—"} sub="open settlements" to="/cheques" />
+        <StatCard label="Revenue · 12 months" accent="pink" icon={I.revenue} value={loading ? "—" : egpShort(trendTotal)} delta={delta(monthRev, lastRev)} sub={`this month ${egpShort(monthRev)}`}>
+          <Sparkline data={sparkSeries} accent="pink" height={36} />
+        </StatCard>
+        <StatCard label="Cash on hand" accent="blue" icon={I.cash} value={loading ? "—" : c?.cashBalance == null ? "—" : egpShort(c.cashBalance)} sub="current balance" />
+        <StatCard label="Net profit · month" accent="mint" icon={I.profit} value={pM ? (pM.netProfit == null ? "needs costs" : egpShort(pM.netProfit)) : "—"} sub={pM?.netMargin != null ? `${Math.round(pM.netMargin)}% margin` : "after costs"} />
+        <StatCard label="Owed to you" accent="amber" icon={I.owed} value={loading ? "—" : egpShort(c?.owed ?? 0)} sub="open settlements" />
       </div>
     ),
     trend: (
-      <Card glow accent="#F868C8">
-        <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
-          <div>
-            <div className="flex items-start justify-between">
-              <div>
-                <Eyebrow accent="text-pink">Today · {fmtDate(today, "EEE d MMM")}</Eyebrow>
-                <div className="mt-1 flex items-end gap-3">
-                  <div className="font-display text-4xl font-semibold leading-none text-white">{c ? egp(c.todayRevenue) : "—"}</div>
-                  <div className="pb-1 text-sm text-muted">sold today</div>
-                </div>
-              </div>
-              <Link to="/sales" className="rounded-lg bg-pink px-3 py-1.5 font-display text-xs font-semibold text-ink shadow-pink">+ Sale</Link>
-            </div>
-            <div className="mt-4">
-              {daily.isLoading ? <div className="h-24 animate-pulse rounded-lg bg-line2" /> : <Sparkbars series={series} accent="pink" />}
-              <div className="mt-1.5 flex justify-between text-[10px] text-dim"><span>{fmtDate(chartFrom, "d MMM")}</span><span>last 14 days</span><span>today</span></div>
-            </div>
+      <Card glow>
+        <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
+          <div className="min-w-0">
+            {daily.isLoading ? <div className="h-[300px] animate-pulse rounded-2xl bg-panel2" /> : <RevenueChart daily={rows} latestDay={latestDay} />}
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-            <MiniStat label="This month" value={c ? egp(monthRev) : "—"} accent="mint" delta={delta(monthRev, lastRev)} />
-            <MiniStat label="Stock value" value={c ? egp(c.stockValue) : "—"} accent="blue" />
+            <MiniStat label="This month" value={loading ? "—" : egp(monthRev)} accent="pink" delta={delta(monthRev, lastRev)} icon={I.revenue} />
+            <MiniStat label="Stock value" value={loading ? "—" : egp(c?.stockValue ?? 0)} accent="blue" icon={I.stock} />
+            <MiniStat label="Cash on hand" value={loading ? "—" : egp(c?.cashBalance ?? 0)} accent="mint" icon={I.cash} />
           </div>
         </div>
       </Card>
     ),
     attention: (
-      <Card accent="#F7A23B">
-        <div className="mb-2 flex items-center justify-between">
-          <Eyebrow accent="text-warn">Needs attention{attention > 0 ? ` · ${attention}` : ""}</Eyebrow>
-          <Link to="/missing" className="text-xs text-pink">Open Gaps →</Link>
-        </div>
+      <Card>
+        <CardHead title={`Needs attention${attention > 0 ? ` · ${attention}` : ""}`} accent="amber" icon={I.bolt}
+          action={<Link to="/missing" className="text-xs font-semibold text-pink">Open Gaps →</Link>} />
         {!en ? <Note>Sign in to load.</Note> : miss.isLoading ? <SkeletonRows rows={3} /> :
-          (miss.data?.length ?? 0) === 0 ? <div className="py-2 text-sm text-good">● All clear — nothing needs you right now.</div> : (
-          <div className="grid gap-1 sm:grid-cols-2">
+          (miss.data?.length ?? 0) === 0 ? <div className="flex items-center gap-2 py-1 text-sm font-medium text-good"><span className="h-2 w-2 rounded-full bg-good" /> All clear — nothing needs you right now.</div> : (
+          <div className="grid gap-1.5 sm:grid-cols-2">
             {miss.data!.slice(0, 6).map((i) => (
-              <Link key={i.key} to={i.route} className="row-hover flex items-center gap-2.5 rounded-lg p-2">
+              <Link key={i.key} to={i.route} className="row-hover flex items-center gap-2.5 rounded-2xl border border-line p-3">
                 <span className={`h-2 w-2 rounded-full ${dot(i.severity)}`} />
-                <span className="flex-1 text-sm text-text">{i.title}</span>
-                <span className="text-[11px] text-dim">{i.count}</span>
+                <span className="flex-1 text-sm font-medium text-text">{i.title}</span>
+                <span className="tnum text-[12px] font-semibold text-dim">{i.count}</span>
               </Link>
             ))}
           </div>
@@ -190,36 +280,32 @@ export function DashboardScreen() {
       </Card>
     ),
     risks: (
-      <Card accent="#FF5C6C">
-        <div className="mb-2 flex items-center justify-between">
-          <Eyebrow accent="text-bad">Risks &amp; signals</Eyebrow>
-          {(insights.data?.length ?? 0) > 3 && <Link to="/missing" className="text-xs text-pink">All {insights.data!.length} →</Link>}
-        </div>
+      <Card>
+        <CardHead title="Risks & signals" accent="red" icon={I.bolt}
+          action={(insights.data?.length ?? 0) > 3 ? <Link to="/missing" className="text-xs font-semibold text-pink">All {insights.data!.length} →</Link> : undefined} />
         {insights.isLoading ? <SkeletonRows rows={2} /> : (insights.data?.length ?? 0) === 0
-          ? <div className="py-2 text-sm text-good">● No risks flagged.</div>
+          ? <div className="flex items-center gap-2 py-1 text-sm font-medium text-good"><span className="h-2 w-2 rounded-full bg-good" /> No risks flagged.</div>
           : <div className="space-y-2">{insights.data!.slice(0, 3).map((i) => <InsightRow key={i.key} i={i} />)}</div>}
       </Card>
     ),
     activity: (
-      <Card className="!p-0" accent="#2BD4C4">
-        <div className="flex items-center justify-between px-4 pt-4">
-          <Eyebrow accent="text-good">Recent activity</Eyebrow>
-          <Link to="/activity" className="text-[11px] text-pink">All →</Link>
-        </div>
-        {!en ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Sign in to load.</div>
-          : feed.isLoading ? <div className="px-4 pb-4"><SkeletonRows rows={4} /></div>
-          : (feed.data?.length ?? 0) === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">No events recorded yet.</div>
+      <Card>
+        <CardHead title="Recent activity" accent="mint" icon={I.cash}
+          action={<Link to="/activity" className="text-xs font-semibold text-pink">All →</Link>} />
+        {!en ? <Note>Sign in to load.</Note>
+          : feed.isLoading ? <SkeletonRows rows={4} />
+          : (feed.data?.length ?? 0) === 0 ? <Note>No events recorded yet.</Note>
           : (
-          <div className="mt-2 divide-y divide-line2">
+          <div className="-my-1 divide-y divide-line">
             {feed.data!.map((e) => (
-              <Link key={`${e.kind}-${e.id}`} to={e.route} className="row-hover flex items-center gap-3 px-4 py-2.5">
-                <span className="text-base">{kindGlyph[e.kind]}</span>
+              <Link key={`${e.kind}-${e.id}`} to={e.route} className="row-hover -mx-2 flex items-center gap-3 rounded-2xl px-2 py-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-panel2 text-base">{kindGlyph[e.kind]}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-text">{e.label}</div>
-                  <div className="text-[11px] text-dim">{fmtDate(e.date)}</div>
+                  <div className="truncate text-sm font-medium text-text">{e.label}</div>
+                  <div className="text-[11.5px] text-dim">{fmtDate(e.date)}</div>
                 </div>
                 {e.amount !== 0 && (
-                  <div className={`font-display text-sm font-semibold ${e.amount > 0 ? "text-good" : "text-muted"}`}>
+                  <div className={`tnum font-display text-sm font-bold ${e.amount > 0 ? "text-good" : "text-muted"}`}>
                     {e.amount > 0 ? "+" : "−"}{egp(Math.abs(e.amount))}
                   </div>
                 )}
@@ -231,31 +317,29 @@ export function DashboardScreen() {
     ),
     health: (
       <Card glow accent="#9B6CFF" className="flex items-center gap-5">
-        <Ring value={health.data?.overall ?? null} size={96} stroke={11}>
-          <span className="font-display text-2xl font-semibold text-white">{health.data?.overall ?? "—"}</span>
-          <span className="text-[10px] text-dim">/ 100</span>
+        <Ring value={health.data?.overall ?? null} size={104} stroke={12}>
+          <span className="tnum font-display text-[26px] font-extrabold text-text">{health.data?.overall ?? "—"}</span>
+          <span className="text-[10px] font-semibold text-dim">/ 100</span>
         </Ring>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <Eyebrow accent="text-violet">Business health</Eyebrow>
-          <div className="font-display text-lg font-semibold text-good">{health.data?.status ?? "—"}</div>
-          <div className="mt-1 flex flex-wrap gap-1.5">
+          <div className="font-display text-xl font-extrabold text-text">{health.data?.status ?? "—"}</div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {health.data?.level != null && <Pill tone="warn">⚡ Level {health.data.level}</Pill>}
             {health.data && health.data.streakDays > 0 && <Pill tone="pink">🔥 {health.data.streakDays}-day streak</Pill>}
           </div>
         </div>
-        <Link to="/health" className="rounded-lg border border-line px-3 py-1.5 text-xs text-text hover:bg-line2">Open →</Link>
+        <Link to="/health" className="lift flex-shrink-0 rounded-2xl border border-line bg-panel px-3.5 py-2 text-xs font-semibold text-text hover:bg-panel2">Open →</Link>
       </Card>
     ),
     quick: (
-      <Card accent="#5C8DFF">
-        <Eyebrow accent="text-info">Quick actions</Eyebrow>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Link to="/sales" className="lift rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">+ Sale</Link>
-          <Link to="/stock" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">+ Product</Link>
-          <Link to="/purchases" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">+ Purchase</Link>
-          <Link to="/expenses" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">Add expense</Link>
-          <Link to="/money" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">Count cash</Link>
-          <Link to="/sales/import" className="lift rounded-xl border border-line bg-panel2 px-4 py-2.5 font-display text-sm font-semibold text-text">Import receipt</Link>
+      <Card>
+        <CardHead title="Quick actions" accent="blue" icon={I.bolt} />
+        <div className="flex flex-wrap gap-2">
+          <Link to="/sales" className="lift rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">+ Sale</Link>
+          {[["/stock", "+ Product"], ["/purchases", "+ Purchase"], ["/expenses", "Add expense"], ["/money", "Count cash"], ["/sales/import", "Import receipt"]].map(([to, label]) => (
+            <Link key={to} to={to} className="lift rounded-2xl border border-line bg-panel px-4 py-2.5 font-display text-sm font-bold text-text hover:bg-panel2">{label}</Link>
+          ))}
         </div>
       </Card>
     ),
@@ -264,18 +348,22 @@ export function DashboardScreen() {
   return <CustomizableDashboard widgets={widgets} />;
 }
 
-function MiniStat({ label, value, accent, delta }: { label: string; value: string; accent: AccentKey; delta?: number | null }) {
-  const a = ACCENT[accent];
+function MiniStat({ label, value, accent, delta, icon }: { label: string; value: string; accent: Accent; delta?: number | null; icon?: string }) {
   return (
-    <div className="rounded-xl border border-line bg-panel p-3">
-      <div className="flex items-center justify-between"><span className="text-[11px] text-dim">{label}</span><DeltaChip pct={delta ?? null} /></div>
-      <div className={`mt-1 font-display text-lg font-semibold ${a.text}`}>{value}</div>
+    <div className="rounded-2xl border border-line bg-panel2 p-3.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {icon && <IconChip d={icon} accent={accent} size="sm" />}
+          <span className="text-[12px] font-medium text-muted">{label}</span>
+        </div>
+        <DeltaChip pct={delta ?? undefined} />
+      </div>
+      <div className="mt-2 tnum font-display text-xl font-extrabold text-text">{value}</div>
     </div>
   );
 }
 
-/** Drag-to-reorder, click-to-hide dashboard. Smooth HTML5 drag-and-drop; layout
- *  saved per-browser. */
+/** Drag-to-reorder, click-to-hide dashboard. Layout saved per-browser. */
 function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNode> }) {
   const { layout, reorder, toggle, reset } = useLayoutStore();
   const [edit, setEdit] = useState(false);
@@ -286,9 +374,9 @@ function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNod
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="font-display text-sm font-semibold text-dim">{edit ? "Drag cards to reorder · tap Hide to remove" : "Your dashboard"}</div>
+        <div className="text-sm font-semibold text-dim">{edit ? "Drag cards to reorder · tap Hide to remove" : "Your dashboard"}</div>
         <button onClick={() => setEdit((e) => !e)}
-          className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${edit ? "border-pink bg-pink text-ink" : "border-line bg-panel2 text-muted hover:text-text"}`}>
+          className={`lift rounded-2xl border px-3.5 py-2 text-xs font-bold transition ${edit ? "border-pink bg-pink text-ink shadow-pink" : "border-line bg-panel text-muted hover:text-text"}`}>
           {edit ? "✓ Done" : "✎ Customize"}
         </button>
       </div>
@@ -300,13 +388,13 @@ function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNod
           onDragEnd={() => { setDrag(null); setOver(null); }}
           onDragOver={(e) => { if (edit && drag) { e.preventDefault(); setOver(item.id); } }}
           onDrop={(e) => { e.preventDefault(); if (drag && drag !== item.id) reorder(drag, item.id); setDrag(null); setOver(null); }}
-          className={cn(edit && "rounded-2xl border border-dashed p-2 transition", edit && (over === item.id ? "border-pink bg-pink/5" : "border-line2"), drag === item.id && "opacity-40")}
+          className={cn("animate-rise", edit && "rounded-3xl border border-dashed p-2 transition", edit && (over === item.id ? "border-pink bg-pink/5" : "border-line"), drag === item.id && "opacity-40")}
         >
           {edit && (
             <div className="mb-2 flex items-center gap-2 px-1">
               <span className="cursor-grab text-dim active:cursor-grabbing" title="Drag">⠿</span>
-              <span className="flex-1 font-mono text-[11px] uppercase tracking-wider text-faint">{WIDGET_TITLES[item.id]}</span>
-              <button onClick={() => toggle(item.id)} className="rounded-md bg-line2 px-2.5 py-1 text-[11px] text-muted hover:text-bad">Hide</button>
+              <span className="flex-1 text-[11px] font-bold uppercase tracking-wider text-faint">{WIDGET_TITLES[item.id]}</span>
+              <button onClick={() => toggle(item.id)} className="rounded-lg bg-panel2 px-2.5 py-1 text-[11px] font-semibold text-muted hover:text-bad">Hide</button>
             </div>
           )}
           <div className={edit ? "pointer-events-none" : ""}>{widgets[item.id]}</div>
@@ -317,12 +405,12 @@ function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNod
         <Card>
           <div className="flex items-center justify-between">
             <Eyebrow>Hidden widgets</Eyebrow>
-            <button onClick={reset} className="text-xs text-pink hover:underline">Reset to default</button>
+            <button onClick={reset} className="text-xs font-semibold text-pink hover:underline">Reset to default</button>
           </div>
           {hidden.length === 0 ? <p className="mt-2 text-sm text-dim">All widgets are visible. Drag the cards above to reorder.</p> : (
             <div className="mt-2 flex flex-wrap gap-2">
               {hidden.map((h) => (
-                <button key={h.id} onClick={() => toggle(h.id)} className="rounded-lg border border-line bg-panel2 px-3 py-1.5 text-[12px] text-muted hover:border-pink/40 hover:text-text">+ {WIDGET_TITLES[h.id]}</button>
+                <button key={h.id} onClick={() => toggle(h.id)} className="rounded-2xl border border-line bg-panel2 px-3.5 py-2 text-[12px] font-semibold text-muted hover:border-pink/40 hover:text-text">+ {WIDGET_TITLES[h.id]}</button>
               ))}
             </div>
           )}
@@ -331,7 +419,7 @@ function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNod
     </div>
   );
 }
-function Note({ children }: { children: React.ReactNode }) { return <div className="py-2 text-sm text-dim">{children}</div>; }
+function Note({ children }: { children: React.ReactNode }) { return <div className="py-1 text-sm text-dim">{children}</div>; }
 
 /* ─ Health Center (game-style, real signals) ───────────────────────────── */
 export function HealthScreen() {
@@ -345,13 +433,13 @@ export function HealthScreen() {
     <div className="space-y-4">
       <Card glow>
         <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr]">
-          <Ring value={h.overall} size={150} stroke={12}>
-            <span className="font-display text-4xl font-semibold leading-none text-white">{h.overall ?? "—"}</span>
-            <span className="text-[11px] text-dim">/ 100</span>
+          <Ring value={h.overall} size={150} stroke={13}>
+            <span className="tnum font-display text-4xl font-extrabold leading-none text-text">{h.overall ?? "—"}</span>
+            <span className="text-[11px] font-semibold text-dim">/ 100</span>
           </Ring>
           <div>
             <Eyebrow>Overall business health</Eyebrow>
-            <div className="mb-2 font-display text-2xl font-semibold text-good">{h.status}</div>
+            <div className="mb-2 font-display text-2xl font-extrabold text-text">{h.status}</div>
             <div className="mb-4 flex flex-wrap gap-2">
               {h.level != null && <Pill tone="warn">⚡ Level {h.level}</Pill>}
               {h.streakDays > 0 && <Pill tone="pink">🔥 {h.streakDays}-day streak</Pill>}
@@ -366,16 +454,16 @@ export function HealthScreen() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {h.categories.map((cat) => (
-          <Card key={cat.key} className="!p-4">
+          <Card key={cat.key}>
             <div className="flex items-center gap-3">
-              <Ring value={cat.score} size={52} stroke={6}><span className="font-display text-xs font-semibold text-text">{cat.score ?? "—"}</span></Ring>
+              <Ring value={cat.score} size={56} stroke={7}><span className="tnum font-display text-xs font-bold text-text">{cat.score ?? "—"}</span></Ring>
               <div className="min-w-0">
-                <div className="font-display text-sm font-semibold">{cat.label}</div>
-                {cat.trend != null && <span className={`font-mono text-[11px] ${cat.trend >= 0 ? "text-good" : "text-bad"}`}>{cat.trend >= 0 ? "▲ +" : "▼ −"}{Math.abs(cat.trend)}% this month</span>}
+                <div className="font-display text-sm font-bold">{cat.label}</div>
+                {cat.trend != null && <span className={`tnum text-[11px] font-semibold ${cat.trend >= 0 ? "text-good" : "text-bad"}`}>{cat.trend >= 0 ? "▲ +" : "▼ −"}{Math.abs(cat.trend)}% this month</span>}
               </div>
             </div>
             <div className="mt-3 text-[12.5px] leading-relaxed text-muted">{cat.reason}</div>
-            <div className="mt-3 border-t border-line2 pt-2.5 font-mono text-[10.5px] text-good">↑ {cat.lift}</div>
+            <div className="mt-3 border-t border-line pt-2.5 text-[11px] font-semibold text-good">↑ {cat.lift}</div>
           </Card>
         ))}
       </div>
@@ -385,9 +473,9 @@ export function HealthScreen() {
 function Col({ title, tone, rows, dotClass }: { title: string; tone: string; rows: { label: string; score: number }[]; dotClass: string }) {
   return (
     <div>
-      <div className={`eyebrow mb-2 font-mono text-[10.5px] uppercase tracking-[0.12em] ${tone}`}>{title}</div>
+      <div className={`mb-2 text-[10.5px] font-bold uppercase tracking-[0.12em] ${tone}`}>{title}</div>
       {rows.length ? rows.map((r) => (
-        <div key={r.label} className="text-[13px] text-muted"><span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${dotClass}`} /> {r.label} · {r.score}</div>
+        <div key={r.label} className="text-[13px] text-muted"><span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${dotClass}`} /> {r.label} · {r.score}</div>
       )) : <div className="text-[13px] text-dim">—</div>}
     </div>
   );
@@ -421,13 +509,13 @@ export function MissingScreen() {
                 <span className={`mt-1 h-2.5 w-2.5 rounded-full ${dot(i.severity)}`} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-display font-semibold">{i.title}</span>
+                    <span className="font-display font-bold">{i.title}</span>
                     <Pill tone={i.severity === "high" ? "bad" : i.severity === "medium" ? "warn" : "neutral"}>{i.count}</Pill>
                   </div>
                   <div className="mt-1 text-sm text-muted">{i.detail}</div>
-                  <div className="mt-1.5 text-[12px] text-pink">→ {i.action}</div>
+                  <div className="mt-1.5 text-[12px] font-semibold text-pink">→ {i.action}</div>
                 </div>
-                <Link to={i.route} className="flex-shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs text-text hover:bg-line2">Fix</Link>
+                <Link to={i.route} className="lift flex-shrink-0 rounded-2xl border border-line bg-panel px-3.5 py-2 text-xs font-semibold text-text hover:bg-panel2">Fix</Link>
               </div>
             </Card>
           ))}
@@ -437,34 +525,30 @@ export function MissingScreen() {
   );
 }
 
-/* ─ Activity — full business event feed (verify writes here) ─────────────── */
+/* ─ Activity — full business event feed ────────────────────────────────── */
 export function ActivityScreen() {
-  const range = useActiveRange();
-  const feed = useQuery({ queryKey: ["activity-full", range], queryFn: () => getActivityFeed(60, 200, range), enabled: en });
+  const feed = useQuery({ queryKey: ["activity-full"], queryFn: () => getActivityFeed(60, 200), enabled: en });
   if (!en) return <EmptyState title="Sign in to see activity" />;
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Eyebrow>Activity in range</Eyebrow>
-        <div className="flex items-center gap-2">
-          <DateRangePicker />
-          <Button variant="outline" disabled={feed.isFetching} onClick={() => feed.refetch()}>{feed.isFetching ? "Refreshing…" : "Refresh"}</Button>
-        </div>
+        <Eyebrow>Recent activity</Eyebrow>
+        <Button variant="outline" size="sm" disabled={feed.isFetching} onClick={() => feed.refetch()}>{feed.isFetching ? "Refreshing…" : "Refresh"}</Button>
       </div>
       {feed.isLoading ? <SkeletonRows rows={8} />
         : feed.isError ? <ErrorState message={String((feed.error as Error)?.message)} onRetry={() => feed.refetch()} />
         : (feed.data?.length ?? 0) === 0 ? <EmptyState title="No events yet" hint="Record a sale, purchase, expense, or cash movement and it appears here." />
         : (
-        <Card className="!p-0"><div className="divide-y divide-line2">
+        <Card><div className="-my-1 divide-y divide-line">
           {feed.data!.map((e) => (
-            <Link key={`${e.kind}-${e.id}`} to={e.route} className="row-hover flex items-center gap-3 px-4 py-2.5">
-              <span className="text-base">{kindGlyph[e.kind]}</span>
+            <Link key={`${e.kind}-${e.id}`} to={e.route} className="row-hover -mx-2 flex items-center gap-3 rounded-2xl px-2 py-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-panel2 text-base">{kindGlyph[e.kind]}</span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm text-text">{e.label}</div>
-                <div className="text-[11px] text-dim capitalize">{e.kind} · {fmtDate(e.date)}</div>
+                <div className="truncate text-sm font-medium text-text">{e.label}</div>
+                <div className="text-[11.5px] capitalize text-dim">{e.kind} · {fmtDate(e.date)}</div>
               </div>
               {e.amount !== 0 && (
-                <div className={`font-display text-sm font-semibold ${e.amount > 0 ? "text-good" : "text-muted"}`}>{e.amount > 0 ? "+" : "−"}{egp(Math.abs(e.amount))}</div>
+                <div className={`tnum font-display text-sm font-bold ${e.amount > 0 ? "text-good" : "text-muted"}`}>{e.amount > 0 ? "+" : "−"}{egp(Math.abs(e.amount))}</div>
               )}
             </Link>
           ))}
