@@ -3,6 +3,7 @@
 import { requireEngine } from "@/core/db/engine";
 import { getStockSummary } from "./stock";
 import { getSettlementPeriods } from "./settlements";
+import { getLifetimeProducts } from "./products";
 
 export type Severity = "high" | "medium" | "low";
 export interface MissingIssue {
@@ -13,12 +14,18 @@ export async function getMissingData(): Promise<MissingIssue[]> {
   const sb = requireEngine();
   const issues: MissingIssue[] = [];
 
-  const [stock, periods, unmapped, unrecon] = await Promise.all([
+  const [stock, periods, unmapped, unrecon, lifetime] = await Promise.all([
     getStockSummary(),
     getSettlementPeriods(),
     sb.from("sale_items").select("id", { count: "exact", head: true }).is("voided_at", null).is("product_id", null),
     sb.from("sales").select("id", { count: "exact", head: true }).is("voided_at", null).eq("reconciled", false),
+    getLifetimeProducts().catch(() => []),
   ]);
+
+  const noCost = lifetime.filter((p) => p.costSource === "unknown" && p.revenue > 0).length;
+  if (noCost) issues.push({ key: "product-cost-review", title: "Products with sales but no cost", severity: "low",
+    detail: "These sold-through products have no confident cost yet — their gross profit is withheld.", count: noCost, route: "/stock",
+    action: "Open each in Goods and set its unit cost (COGS) to unlock profit." });
 
   if (stock.missingCostCount) issues.push({ key: "missing-cogs", title: "Products missing cost", severity: "high",
     detail: "In stock but no recorded cost — profit is understated.", count: stock.missingCostCount, route: "/purchases",

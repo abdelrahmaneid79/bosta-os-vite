@@ -5,8 +5,18 @@
  *  cost, so we never publish a wrong per-product number. READ-ONLY. */
 import { requireEngine } from "@/core/db/engine";
 import type { SearchableProduct } from "@/core/products/match";
-import { composeLifetimeProfit, type CostSource } from "@/core/products/profit";
+import { composeLifetimeProfit, effectiveCost, type CostSource } from "@/core/products/profit";
 import type { DateRange } from "./common";
+
+/** Owner cost settings — the roasting-loss + packaging uplift applied to
+ *  estimate-source (raw nut/seed) costs. Default 15%. */
+export async function getCostUpliftPct(): Promise<number> {
+  const { data, error } = await requireEngine().from("app_settings").select("value").eq("key", "cost_settings").maybeSingle();
+  if (error) return 15;
+  const v = data?.value as { roastingUpliftPct?: number } | null;
+  const n = Number(v?.roastingUpliftPct);
+  return Number.isFinite(n) && n >= 0 ? n : 15;
+}
 
 /** Products + their aliases, for the searchable product picker / import matcher. */
 export async function getSearchableProducts(): Promise<(SearchableProduct & { active: boolean })[]> {
@@ -84,14 +94,19 @@ export interface LifetimeProduct {
 interface RawLifetime { name: string; barcode: string; units: number; revenue: number; unitCost?: number | null; costSource?: string }
 
 export async function getLifetimeProducts(): Promise<LifetimeProduct[]> {
-  const { data, error } = await requireEngine().from("app_settings").select("value").eq("key", "product_lifetime").maybeSingle();
-  if (error) throw error;
-  const v = data?.value as { items?: RawLifetime[] } | null;
+  const sb = requireEngine();
+  const [lifeRes, uplift] = await Promise.all([
+    sb.from("app_settings").select("value").eq("key", "product_lifetime").maybeSingle(),
+    getCostUpliftPct(),
+  ]);
+  if (lifeRes.error) throw lifeRes.error;
+  const v = lifeRes.data?.value as { items?: RawLifetime[] } | null;
   const items = Array.isArray(v?.items) ? v!.items! : [];
   return items.map((it) => {
     const src: CostSource = it.costSource === "verified" || it.costSource === "estimate" ? it.costSource : "unknown";
-    const p = composeLifetimeProfit(it.revenue, it.units, it.unitCost ?? null, src);
-    return { name: it.name, barcode: it.barcode, units: it.units, revenue: it.revenue, unitCost: it.unitCost ?? null, ...p };
+    const eff = effectiveCost(it.unitCost ?? null, src, uplift); // finished-good cost (uplift on estimates)
+    const p = composeLifetimeProfit(it.revenue, it.units, eff, src);
+    return { name: it.name, barcode: it.barcode, units: it.units, revenue: it.revenue, unitCost: eff, ...p };
   });
 }
 

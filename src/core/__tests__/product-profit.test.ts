@@ -1,5 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { composeLifetimeProfit, profitConfidence } from "@/core/products/profit";
+import { composeLifetimeProfit, profitConfidence, effectiveCost } from "@/core/products/profit";
+
+describe("effectiveCost (roasting + packaging uplift)", () => {
+  it("upweights estimate (raw nut) costs", () => {
+    expect(effectiveCost(100, "estimate", 15)).toBe(115);
+  });
+  it("leaves verified resale costs unchanged", () => {
+    expect(effectiveCost(100, "verified", 15)).toBe(100);
+  });
+  it("returns null for unknown / non-positive cost", () => {
+    expect(effectiveCost(null, "unknown", 15)).toBeNull();
+    expect(effectiveCost(0, "verified", 15)).toBeNull();
+  });
+  it("0% uplift is a no-op", () => {
+    expect(effectiveCost(200, "estimate", 0)).toBe(200);
+  });
+});
 
 describe("composeLifetimeProfit", () => {
   it("computes cogs / gross profit / margin from a known cost", () => {

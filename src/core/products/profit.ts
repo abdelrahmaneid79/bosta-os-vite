@@ -19,6 +19,15 @@ export interface LifetimeProfit {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Effective finished-good unit cost: estimate-source costs (raw nut/seed) get a
+ *  roasting-loss + packaging uplift; verified costs (resale goods) are used as-is;
+ *  unknown stays null. Owner sets the uplift % in Settings. */
+export function effectiveCost(rawCost: number | null, costSource: CostSource, roastingUpliftPct: number): number | null {
+  if (rawCost == null || costSource === "unknown" || !(rawCost > 0)) return null;
+  if (costSource === "estimate") return r2(rawCost * (1 + (roastingUpliftPct || 0) / 100));
+  return rawCost;
+}
+
 export function composeLifetimeProfit(
   revenue: number, units: number, unitCost: number | null, costSource: CostSource,
 ): LifetimeProfit {

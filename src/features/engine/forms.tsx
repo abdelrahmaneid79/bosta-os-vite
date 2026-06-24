@@ -40,6 +40,7 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
   const [saleUnit, setSaleUnit] = useState(product?.sale_unit ?? "kg");
   const [price, setPrice] = useState(product?.selling_price != null ? String(product.selling_price) : "");
   const [low, setLow] = useState(product?.low_stock_threshold != null ? String(product.low_stock_threshold) : "");
+  const [refCost, setRefCost] = useState(product?.reference_cost != null ? String(product.reference_cost) : "");
   const [active, setActive] = useState(product?.active ?? true);
 
   const [confirmDel, setConfirmDel] = useState(false);
@@ -47,7 +48,7 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
     mutationFn: () => {
       const input: ProductInput = {
         nameEn, nameAr: nameAr || null, unitType, baseUnit, saleUnit: saleUnit || null,
-        sellingPrice: num(price), lowStock: num(low), active,
+        sellingPrice: num(price), lowStock: num(low), active, referenceCost: num(refCost),
       };
       return product ? updateProduct(product.id, input).then(() => product.id) : createProduct(input);
     },
@@ -74,8 +75,9 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Low-stock alert (base units)"><Input type="number" step="any" value={low} onChange={(e) => setLow(e.target.value)} /></Field>
-        <label className="flex items-center gap-2 pt-7 text-sm text-muted"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
+        <Field label="Unit cost (EGP, COGS)"><Input type="number" step="any" value={refCost} onChange={(e) => setRefCost(e.target.value)} placeholder="cost / unit" /></Field>
       </div>
+      <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
       <Button type="submit" disabled={m.isPending} className="w-full">{m.isPending ? "Saving…" : product ? "Save changes" : "Add product"}</Button>
       {product && (
         confirmDel ? (

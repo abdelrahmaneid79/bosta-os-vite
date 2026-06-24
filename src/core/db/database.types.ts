@@ -1186,6 +1186,7 @@ export type Database = {
           name_ar: string | null
           name_en: string
           notes: string | null
+          reference_cost: number | null
           sale_unit: string | null
           selling_price: number | null
           unit_type: Database["public"]["Enums"]["product_unit_type"]
@@ -1194,6 +1195,7 @@ export type Database = {
         Insert: {
           active?: boolean
           avg_cost?: number
+          reference_cost?: number | null
           base_unit?: string
           base_units_per_sale_unit?: number
           category_id?: string | null
@@ -1212,6 +1214,7 @@ export type Database = {
         Update: {
           active?: boolean
           avg_cost?: number
+          reference_cost?: number | null
           base_unit?: string
           base_units_per_sale_unit?: number
           category_id?: string | null

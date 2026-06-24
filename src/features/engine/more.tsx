@@ -22,13 +22,13 @@ import { DateRangePicker } from "@/components/DateRangePicker";
 import { getStockSummary } from "@/core/read/stock";
 import { getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
-import { getProductProfit, getLifetimeProducts } from "@/core/read/products";
+import { getProductProfit, getLifetimeProducts, getCostUpliftPct } from "@/core/read/products";
 import { getTargets } from "@/core/read/budgets";
 import { getPurchaseTotal } from "@/core/read/purchases";
 import { getSettings, getExpenses, getExpenseCategoryTrends } from "@/core/read/expenses";
 import { getCheques } from "@/core/read/settlements";
 import { getLocations } from "@/core/read/common";
-import { setAppSetting, setLocationTerm } from "@/core/db/mutations";
+import { setAppSetting, setLocationTerm, setCostUplift } from "@/core/db/mutations";
 import { WRITE_BADGE } from "@/core/capabilities";
 import { useUI } from "@/store/ui";
 
@@ -410,6 +410,30 @@ function TargetsCard() {
   );
 }
 
+// ── Costing (roasting + packaging uplift on raw nut/seed costs) ──────────────
+function CostingCard() {
+  const { reportSuccess, reportError } = useUI();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["cost-uplift"], queryFn: getCostUpliftPct, enabled: en });
+  const [pct, setPct] = useState("");
+  useEffect(() => { if (q.data != null) setPct(String(q.data)); }, [q.data]);
+  const save = useMutation({
+    mutationFn: () => setCostUplift(Math.max(0, parseFloat(pct) || 0)),
+    onSuccess: () => { reportSuccess("Costing", "Uplift saved · estimate product costs recomputed"); qc.invalidateQueries(); },
+    onError: (e) => reportError("Costing", e),
+  });
+  return (
+    <Card>
+      <Eyebrow>Costing — roasting + packaging uplift</Eyebrow>
+      <p className="mt-1 text-[12px] text-dim">Raw nut/seed costs (from supplier bills) are uplifted to finished-good COGS to cover roasting weight-loss + packaging. Resale goods (jelly, pretzels…) are unaffected.</p>
+      <div className="mt-2 flex items-end gap-2">
+        <Field label="Uplift % on raw costs"><Input type="number" step="any" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="15" /></Field>
+        <Button variant="outline" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
+      </div>
+    </Card>
+  );
+}
+
 // ── Settings (editable: tracking start, low-stock default, rent, revenue share)
 export function SettingsScreen() {
   const { email } = useAuth();
@@ -465,6 +489,7 @@ export function SettingsScreen() {
       </Card>
 
       <TargetsCard />
+      <CostingCard />
 
       <Card>
         <Eyebrow>Tracking & stock</Eyebrow>

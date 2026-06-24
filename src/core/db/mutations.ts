@@ -30,6 +30,7 @@ export interface ProductInput {
   sellingPrice: number | null;
   lowStock: number | null;
   active: boolean;
+  referenceCost?: number | null;         // manual per-unit cost (COGS fallback when no purchases)
 }
 
 export async function createProduct(input: ProductInput): Promise<string> {
@@ -44,6 +45,7 @@ export async function createProduct(input: ProductInput): Promise<string> {
       selling_price: input.sellingPrice,
       low_stock_threshold: input.lowStock,
       active: input.active,
+      reference_cost: input.referenceCost ?? null,
     })
     .select("id")
     .single();
@@ -61,8 +63,32 @@ export async function updateProduct(id: string, input: Partial<ProductInput>): P
   if (input.sellingPrice !== undefined) patch.selling_price = input.sellingPrice;
   if (input.lowStock !== undefined) patch.low_stock_threshold = input.lowStock;
   if (input.active !== undefined) patch.active = input.active;
+  if (input.referenceCost !== undefined) patch.reference_cost = input.referenceCost;
   const { error } = await requireEngine().from("products").update(patch).eq("id", id);
   if (error) throw error;
+}
+
+/** Save the roasting+packaging uplift % and re-apply it to every estimate-source
+ *  product's reference/avg cost (raw cost × uplift). Keeps finished-good COGS
+ *  in sync when the owner tunes the factor. */
+export async function setCostUplift(pct: number): Promise<void> {
+  const sb = requireEngine();
+  await setAppSetting("cost_settings", { roastingUpliftPct: pct });
+  const [lifeRes, prodRes] = await Promise.all([
+    sb.from("app_settings").select("value").eq("key", "product_lifetime").maybeSingle(),
+    sb.from("products").select("id,name_ar"),
+  ]);
+  if (lifeRes.error) throw lifeRes.error;
+  if (prodRes.error) throw prodRes.error;
+  const items = ((lifeRes.data?.value as { items?: { name: string; unitCost?: number | null; costSource?: string }[] } | null)?.items) ?? [];
+  const byName = new Map((prodRes.data ?? []).map((p) => [p.name_ar, p.id]));
+  for (const it of items) {
+    if (it.costSource !== "estimate" || it.unitCost == null) continue;
+    const id = byName.get(it.name);
+    if (!id) continue;
+    const eff = Math.round(it.unitCost * (1 + pct / 100) * 100) / 100;
+    await sb.from("products").update({ reference_cost: eff, avg_cost: eff }).eq("id", id);
+  }
 }
 
 export async function setProductActive(id: string, active: boolean): Promise<void> {
