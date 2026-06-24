@@ -11,6 +11,7 @@ export const NAV_SECTIONS: NavSection[] = [
   ] },
   { id: "sales", label: "Sales", icon: "M3 3v18h18M7 14l3-3 3 3 5-6", accent: "#2BD4C4", tabs: [
     { to: "/sales", label: "Sales days" },
+    { to: "/sales/product-lines", label: "Product lines" },
     { to: "/sales/import", label: "Import & receipts" },
   ] },
   { id: "inventory", label: "Inventory", icon: "M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10", accent: "#5C8DFF", tabs: [

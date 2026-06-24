@@ -31,6 +31,7 @@ const money = () => import("@/features/engine/money");
 const more = () => import("@/features/engine/more");
 const product = () => import("@/features/engine/product");
 const receipts = () => import("@/features/engine/receipts");
+const productImport = () => import("@/features/engine/product-import");
 const analytics = () => import("@/features/engine/analytics");
 const qa = () => import("@/features/qa/QAScreen");
 const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
@@ -57,6 +58,7 @@ const QAScreen = L(qa, "QAScreen");
 const PreferencesScreen = L(more, "PreferencesScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
 const SettlementDetailScreen = L(money, "SettlementDetailScreen");
+const ProductLineImportScreen = L(productImport, "ProductLineImportScreen");
 
 const I = {
   today: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
@@ -83,7 +85,7 @@ interface Group { id: string; label: string; icon: string; accent: string; tabs:
 // Map each route to its screen; nav structure/labels/icons come from core/nav.
 const EL: Record<string, React.ReactNode> = {
   "/dashboard": <DashboardScreen />,
-  "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />,
+  "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <ProductLineImportScreen />,
   "/stock": <StockScreen />, "/purchases": <PurchasesScreen />,
   "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
