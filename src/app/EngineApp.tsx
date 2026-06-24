@@ -9,8 +9,6 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/core/utils/cn";
-import { fmtDate } from "@/core/utils/date";
-import { monthBoundsCairo } from "@/core/time";
 import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
@@ -309,14 +307,13 @@ function ThemeToggle() {
 function Header({ onAdd }: { onAdd: () => void }) {
   const { pathname } = useLocation();
   const setCommandOpen = useUI((s) => s.setCommandOpen);
-  const monthLabel = fmtDate(monthBoundsCairo().from, "MMMM yyyy");
   const group = groupForPath(pathname);
   const title = pathname.startsWith("/product/") ? "Product" : group?.label ?? "BostaOS";
   return (
     <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/80 px-4 py-3.5 backdrop-blur-xl sm:px-8">
       <div className="min-w-0">
         <div className="truncate font-display text-xl font-extrabold leading-tight tracking-tight sm:text-2xl">{title}</div>
-        <div className="text-[12.5px] font-medium text-dim">Bosta Bites · {monthLabel}</div>
+        <div className="text-[12.5px] font-medium text-dim">Bosta Bites</div>
       </div>
       <div className="flex-1" />
       <button onClick={() => setCommandOpen(true)} className="lift hidden items-center gap-2 rounded-2xl border border-line bg-panel px-3.5 py-2.5 text-sm text-faint shadow-card hover:text-muted lg:flex">

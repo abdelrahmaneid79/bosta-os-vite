@@ -170,7 +170,7 @@ export function ProductLineImportScreen() {
               {classified.slice(0, 200).map((l, i) => (
                 <div key={i} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
                   <span className={`h-2 w-2 flex-shrink-0 rounded-full ${l.status === "ready" ? "bg-good" : l.status === "unmapped" ? "bg-warn" : "bg-bad"}`} />
-                  <span className="w-20 flex-shrink-0 text-[12px] text-dim">{l.date ? fmtDate(l.date, "d MMM") : "—"}</span>
+                  <span className="w-24 flex-shrink-0 text-[12px] text-dim">{l.date ? fmtDate(l.date) : "—"}</span>
                   <span dir="auto" className="min-w-0 flex-1 truncate text-text">{l.rawName || "—"}{l.matchedName && l.matchedName !== l.rawName ? <span className="text-dim"> → {l.matchedName}</span> : ""}</span>
                   <span className="tnum w-24 flex-shrink-0 text-right text-dim">{l.qty ?? "—"} × {l.unitPrice != null ? egp(l.unitPrice) : "—"}</span>
                   <span className="tnum w-20 flex-shrink-0 text-right font-display font-bold text-text">{l.lineTotal != null ? egp(l.lineTotal) : "—"}</span>

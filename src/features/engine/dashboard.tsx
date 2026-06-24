@@ -61,12 +61,12 @@ function buildPoints(daily: { date: string; total: number }[], period: Period, t
 
   const points: ChartPoint[] = [];
   if (gran === "day") {
-    for (const d of isoRange(from, today)) points.push({ key: d, label: fmtDate(d, "d MMM"), full: fmtDate(d, "EEE d MMM"), value: byDay.get(d) ?? 0 });
+    for (const d of isoRange(from, today)) points.push({ key: d, label: fmtDate(d, "d MMM"), full: fmtDate(d, "EEE d MMM yyyy"), value: byDay.get(d) ?? 0 });
   } else if (gran === "week") {
     let ws = mondayOf(from);
     while (ws <= today) {
       const we = isoDaysAgo(ws, -6);
-      points.push({ key: ws, label: fmtDate(ws, "d MMM"), full: `Week of ${fmtDate(ws, "d MMM")}`, value: sumRange(ws, we > today ? today : we) });
+      points.push({ key: ws, label: fmtDate(ws, "d MMM"), full: `Week of ${fmtDate(ws, "d MMM yyyy")}`, value: sumRange(ws, we > today ? today : we) });
       ws = isoDaysAgo(ws, -7);
     }
   } else {

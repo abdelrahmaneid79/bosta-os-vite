@@ -7,7 +7,7 @@ export function todayISO(): ISODate {
   return format(new Date(), "yyyy-MM-dd");
 }
 
-export function fmtDate(iso: ISODate, pattern = "dd MMM"): string {
+export function fmtDate(iso: ISODate, pattern = "d MMM yyyy"): string {
   try {
     return format(parseISO(iso), pattern);
   } catch {

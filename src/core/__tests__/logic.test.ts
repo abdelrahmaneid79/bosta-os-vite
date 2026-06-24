@@ -437,8 +437,9 @@ describe("date-range engine (pinned today)", () => {
   const T = "2026-06-15";
   it("resolves rolling windows", () => {
     expect(resolveRange("today", undefined, T)).toEqual({ from: "2026-06-15", to: "2026-06-15" });
-    expect(resolveRange("7d", undefined, T)).toEqual({ from: "2026-06-09", to: "2026-06-15" });
-    expect(resolveRange("30d", undefined, T)).toEqual({ from: "2026-05-17", to: "2026-06-15" });
+    // T = Mon 15 Jun 2026 → Egyptian week starts Sat 13 Jun
+    expect(resolveRange("week", undefined, T)).toEqual({ from: "2026-06-13", to: "2026-06-15" });
+    expect(resolveRange("all", undefined, T)).toEqual({ from: "2024-01-01", to: "2026-06-15" });
   });
   it("resolves calendar windows incl. Feb + quarter + year", () => {
     expect(resolveRange("month", undefined, T)).toEqual({ from: "2026-06-01", to: "2026-06-30" });
@@ -453,7 +454,7 @@ describe("date-range engine (pinned today)", () => {
   });
   it("custom tolerates reversed inputs and labels itself", () => {
     expect(resolveRange("custom", { from: "2026-06-20", to: "2026-06-10" }, T)).toEqual({ from: "2026-06-10", to: "2026-06-20" });
-    expect(rangeLabelFn("custom", { from: "2026-06-10", to: "2026-06-20" })).toBe("2026-06-10 → 2026-06-20");
+    expect(rangeLabelFn("custom", { from: "2026-06-10", to: "2026-06-20" })).toBe("10 Jun 2026 → 20 Jun 2026");
     expect(rangeLabelFn("month", resolveRange("month", undefined, T))).toBe("This month");
   });
 });

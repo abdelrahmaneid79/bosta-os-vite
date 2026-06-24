@@ -13,6 +13,7 @@ import { getChannels } from "@/core/read/common";
 import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
 import type { Enums } from "@/core/db/tables";
 import { egp, egpShort, pct } from "@/core/utils/format";
+import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured, sb } from "@/core/db/engine";
 import { useAuth, SignOutButton } from "@/features/auth/auth";
 import { todayCairo, priorRange } from "@/core/time";
@@ -66,7 +67,7 @@ export function ReportsScreen() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Eyebrow>P&L · {rangeLabel(rk, r)} · vs prior {prior.from} → {prior.to}</Eyebrow>
+        <Eyebrow>P&L · {rangeLabel(rk, r)} · vs prior {fmtDate(prior.from)} → {fmtDate(prior.to)}</Eyebrow>
         <DateRangePicker />
       </div>
       {p?.partialBefore && <PartialNote since={p.partialBefore} />}
