@@ -10,14 +10,12 @@ import { DateRangePicker } from "@/components/DateRangePicker";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
-import { monthBoundsCairo } from "@/core/time";
 import { useActiveRange } from "@/store/filters";
 import { getMoneyMovements, getCashSummary, getMoneyAccounts } from "@/core/read/money";
-import { getCheques, getSettlementOverview, getSettlementDetail } from "@/core/read/settlements";
+import { getSettlementDetail, getChequeCycle } from "@/core/read/settlements";
 import type { SettlementStatus } from "@/core/settlement/logic";
 import { getExpenses, getExpenseCategories } from "@/core/read/expenses";
-import { getLocations } from "@/core/read/common";
-import { voidMovement, reconcileCheque, voidCheque, openSettlementPeriod, voidExpense } from "@/core/db/mutations";
+import { voidMovement, voidCheque, voidExpense } from "@/core/db/mutations";
 import { CashForm, ChequeForm, ExpenseForm } from "./forms";
 import { useUI } from "@/store/ui";
 
@@ -139,14 +137,14 @@ export function ExpensesScreen() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Operating expenses · withdrawals are on Cash</Eyebrow>
+        <Eyebrow>All spend by category · withdrawals are on Cash</Eyebrow>
         <div className="flex-1" />
         <DateRangePicker />
         <Link to="/expenses/import" className="lift rounded-2xl border border-line bg-panel px-4 py-2.5 font-display text-sm font-bold text-text hover:bg-panel2">Import</Link>
         <Button onClick={() => setAddOpen(true)}>+ Expense</Button>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label={cat ? "Spend (filtered)" : "Spend in range"} accent="red" icon={MI.out} value={egp(filteredTotal)} sub={cat || "all categories"} />
+        <StatCard label={cat ? "Expenses (filtered)" : "Expenses in range"} accent="red" icon={MI.out} value={egp(filteredTotal)} sub={cat || "all categories"} />
         <StatCard label="Records" accent="amber" icon={MI.bag} value={rows.length} sub="in range" />
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -260,78 +258,72 @@ function Row2({ label, value, tone, accent, strong }: { label: string; value: st
   );
 }
 
-// ── Cheques / Settlements ────────────────────────────────────────────────────
+// ── Cheques — close the running sales tab, cross-referenced to sales ─────────
 export function ChequesScreen() {
   const [addOpen, setAddOpen] = useState(false);
-  const [confirm, setConfirm] = useState<null | { kind: "reconcile" | "void"; id: string }>(null);
+  const [voidId, setVoidId] = useState<string | null>(null);
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
-  const periods = useQuery({ queryKey: ["settlement-overview"], queryFn: getSettlementOverview, enabled: en });
-  const cheques = useQuery({ queryKey: ["cheques"], queryFn: getCheques, enabled: en });
-  const outstanding = (periods.data ?? []).reduce((s, p) => s + Math.max(0, p.view.outstanding), 0);
-  const overdueCount = (periods.data ?? []).filter((p) => p.view.overdue).length;
-  const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
-  const openPeriod = useMutation({ mutationFn: () => openSettlementPeriod(locations.data![0].id, monthBoundsCairo().from), onSuccess: () => { reportSuccess("Open settlement", "Settlement period ready for this month (rent + share seeded)"); qc.invalidateQueries(); }, onError: (e) => reportError("Open settlement", e) });
-  const rec = useMutation({ mutationFn: (id: string) => reconcileCheque(id), onSuccess: () => { reportSuccess("Reconcile cheque", "Cheque reconciled · difference settled"); setConfirm(null); qc.invalidateQueries(); }, onError: (e) => reportError("Reconcile cheque", e) });
-  const del = useMutation({ mutationFn: (id: string) => voidCheque(id), onSuccess: () => { reportSuccess("Void cheque", "Cheque voided · removed from totals · kept for audit"); setConfirm(null); qc.invalidateQueries(); }, onError: (e) => reportError("Void cheque", e) });
-  if (!en) return <EmptyState title="Sign in to load settlements" />;
+  const cy = useQuery({ queryKey: ["cheque-cycle"], queryFn: getChequeCycle, enabled: en });
+  const del = useMutation({ mutationFn: (id: string) => voidCheque(id), onSuccess: () => { reportSuccess("Void cheque", "Cheque removed · kept for audit"); setVoidId(null); qc.invalidateQueries(); }, onError: (e) => reportError("Void cheque", e) });
+  if (!en) return <EmptyState title="Sign in to load cheques" />;
+  const c = cy.data;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Settlement = revenue − deductions</Eyebrow>
+        <Eyebrow>Cheques close the running sales tab — cross-referenced to your sales</Eyebrow>
         <div className="flex-1" />
-        <Button variant="outline" disabled={!locations.data?.length || openPeriod.isPending} onClick={() => openPeriod.mutate()}>Open this month</Button>
-        <Button disabled={!periods.data?.length} onClick={() => setAddOpen(true)}>+ Cheque</Button>
+        <Button onClick={() => setAddOpen(true)}>+ Cheque</Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Outstanding" accent={overdueCount ? "red" : "amber"} icon={MI.bank} value={periods.data ? egpShort(outstanding) : "—"} sub={`${(periods.data ?? []).length} periods`} />
-        <StatCard label="Overdue periods" accent={overdueCount ? "red" : "mint"} icon={MI.out} value={periods.data ? overdueCount : "—"} sub={`>${45} days unpaid`} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatCard label="Total cashed" accent="mint" icon={MI.in} value={c ? egpShort(c.totalReceived) : "—"} sub={`${c?.cheques.length ?? 0} cheques`} />
+        <StatCard label="Open tab" accent="amber" icon={MI.bank} value={c ? egpShort(c.openTab.revenue) : "—"} sub={c?.openTab.from ? `since ${fmtDate(c.openTab.from)}` : "awaiting sales"} />
+        <StatCard label="Avg mall deduction" accent="violet" icon={MI.out} value={c?.blendedDeductionPct != null ? `${c.blendedDeductionPct}%` : "—"} sub="of covered revenue" />
       </div>
 
-      <Eyebrow>Settlement periods · tap to reconcile</Eyebrow>
-      {periods.isLoading ? <SkeletonRows /> : (periods.data?.length ?? 0) === 0 ? <EmptyState title="No settlement periods" hint="Open this month to start." /> : (
-        <Card className="!p-0"><div className="divide-y divide-line">
-          {periods.data!.map((p) => (
-            <Link key={p.id} to={`/settlement/${p.id}`} className="row-hover flex items-center gap-3 px-5 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text">{fmtDate(p.start, "MMMM yyyy")}</div>
-                <div className="text-[12px] text-dim">expected {egp(p.view.expected)} · received {egp(p.view.received)}</div>
-              </div>
-              {p.view.overdue && <Badge tone="bad">overdue</Badge>}
-              <SettlementBadge status={p.view.status} />
-              <div className={`tnum font-display text-sm font-bold ${p.view.outstanding > 0 ? "text-warn" : p.view.outstanding < 0 ? "text-info" : "text-good"}`}>{p.view.outstanding > 0 ? egp(p.view.outstanding) : p.view.outstanding < 0 ? `+${egp(-p.view.outstanding)}` : "settled"}</div>
-            </Link>
-          ))}
-        </div></Card>
+      {c && c.openTab.revenue > 0 && (
+        <Card glow accent="#F7A23B">
+          <CardHead title="Open tab — awaiting next cheque" accent="amber" icon={MI.bank}
+            action={<Button size="sm" onClick={() => setAddOpen(true)}>Cash a cheque</Button>} />
+          <div className="text-sm text-muted">Sales since the last cheque ({c.openTab.from ? fmtDate(c.openTab.from) : "—"} → {fmtDate(c.openTab.to)}) total <b className="text-text">{egp(c.openTab.revenue)}</b> over {c.openTab.days} days. When the mall pays, record the cheque to close this tab.</div>
+        </Card>
       )}
 
-      <Eyebrow>Cheques</Eyebrow>
-      {(cheques.data?.length ?? 0) === 0 ? <EmptyState title="No cheques recorded" /> : (
-        <Card className="!p-0"><div className="divide-y divide-line">
-          {cheques.data!.map((c) => (
-            <div key={c.id} className="row-hover flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-text">{c.receivedDate ? fmtDate(c.receivedDate) : "pending"}</div>
-                <div className="text-[12px] text-dim">expected {egp(c.expected)}{c.received != null ? ` · received ${egp(c.received)}` : ""}</div>
+      {cy.isLoading ? <SkeletonRows /> : (c?.cheques.length ?? 0) === 0 ? <EmptyState title="No cheques recorded" hint="Record a cheque when the mall pays out — it closes the running sales tab and counts as cash in." /> : (
+        <Card className="!p-0">
+          <div className="px-5 pt-4"><Eyebrow>Cheque history · newest first</Eyebrow></div>
+          <div className="mt-2 divide-y divide-line">
+            {c!.cheques.map((ch) => (
+              <div key={ch.id} className="row-hover flex items-center gap-3 px-5 py-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-good/10 text-good"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={MI.bank} /></svg></span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-text">{fmtDate(ch.date)}</div>
+                  <div className="text-[12px] text-dim">
+                    {ch.coverFrom
+                      ? `covers ${fmtDate(ch.coverFrom)} → ${fmtDate(ch.coverTo)} · sales ${egp(ch.coverRevenue ?? 0)}${ch.deductionPct == null ? "" : ch.deductionPct >= 0 ? ` · ${ch.deductionPct}% mall cut` : " · paid in arrears (covers earlier sales)"}`
+                      : "opening cheque · prior period not on record"}
+                  </div>
+                </div>
+                <div className="tnum font-display text-sm font-bold text-good">+{egp(ch.amount)}</div>
+                <button onClick={() => setVoidId(ch.id)} className="text-dim hover:text-bad" title="Void">✕</button>
               </div>
-              {c.difference != null && <div className={`font-display text-sm font-semibold ${c.difference >= 0 ? "text-good" : "text-bad"}`}>{c.difference >= 0 ? "+" : "−"}{egp(Math.abs(c.difference))}</div>}
-              <Badge tone={c.status === "reconciled" ? "good" : "neutral"}>{c.status}</Badge>
-              {c.status !== "reconciled" && <button onClick={() => setConfirm({ kind: "reconcile", id: c.id })} className="text-[11px] text-pink hover:underline">reconcile</button>}
-              <button onClick={() => setConfirm({ kind: "void", id: c.id })} className="text-dim hover:text-bad" title="Void">✕</button>
-            </div>
-          ))}
-        </div></Card>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {c?.cashEra && (
+        <Card>
+          <div className="text-[13px] text-dim"><b className="text-text">Before cheque records:</b> {egp(c.cashEra.revenue)} of sales ({fmtDate(c.cashEra.from)} → {fmtDate(c.cashEra.to)}) were settled as cash before cheque tracking began — counted in revenue, never shown as owed.</div>
+        </Card>
       )}
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Record cheque"><ChequeForm onDone={() => setAddOpen(false)} /></Modal>
-      <Confirm open={confirm?.kind === "reconcile"} title="Reconcile this cheque?" busy={rec.isPending}
-        message="Marks the cheque reconciled (final stage of the lifecycle)." confirmLabel="Reconcile"
-        onConfirm={() => confirm && rec.mutate(confirm.id)} onClose={() => setConfirm(null)} />
-      <Confirm open={confirm?.kind === "void"} title="Void this cheque?" danger busy={del.isPending}
-        message="Kept for audit; removed from received/owed totals. Reversible only by re-recording." confirmLabel="Void"
-        onConfirm={() => confirm && del.mutate(confirm.id)} onClose={() => setConfirm(null)} />
+      <Confirm open={!!voidId} title="Void this cheque?" danger busy={del.isPending}
+        message="Removed from cheque totals and cash in; kept for audit." confirmLabel="Void"
+        onConfirm={() => voidId && del.mutate(voidId)} onClose={() => setVoidId(null)} />
     </div>
   );
 }

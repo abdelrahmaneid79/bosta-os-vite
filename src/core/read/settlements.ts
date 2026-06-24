@@ -3,7 +3,27 @@
 import { requireEngine } from "@/core/db/engine";
 import { todayCairo } from "@/core/time";
 import { composeSettlement, type SettlementView, type DeductionLite } from "@/core/settlement/logic";
+import { buildChequeCycle, type ChequeCycle } from "@/core/settlement/cheque-cycle";
 import type { Tables } from "@/core/db/tables";
+
+/** The real cheque flow: each cheque cross-referenced to the sales it settled
+ *  (coverage window), the open tab since the last cheque, and the pre-record
+ *  cash era. READ-ONLY. */
+export async function getChequeCycle(): Promise<ChequeCycle> {
+  const sb = requireEngine();
+  const today = todayCairo();
+  const [chq, sales] = await Promise.all([
+    sb.from("cheques").select("id,received_date,amount_received").is("voided_at", null),
+    sb.from("sales").select("sale_date,total_amount").is("voided_at", null),
+  ]);
+  if (chq.error) throw chq.error;
+  if (sales.error) throw sales.error;
+  const cheques = (chq.data ?? [])
+    .filter((c) => c.received_date && c.amount_received != null)
+    .map((c) => ({ id: c.id, date: c.received_date as string, amount: Number(c.amount_received) }));
+  const daily = (sales.data ?? []).map((s) => ({ date: s.sale_date, total: Number(s.total_amount) }));
+  return buildChequeCycle(cheques, daily, today);
+}
 
 export interface SettlementPeriod {
   id: string; start: string; end: string | null;

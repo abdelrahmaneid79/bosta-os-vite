@@ -244,7 +244,7 @@ export function DashboardScreen() {
         </StatCard>
         <StatCard label="Cash on hand" accent="blue" icon={I.cash} value={loading ? "—" : c?.cashBalance == null ? "—" : egpShort(c.cashBalance)} sub="current balance" />
         <StatCard label="Net profit · month" accent="mint" icon={I.profit} value={pM ? (pM.netProfit == null ? "needs costs" : egpShort(pM.netProfit)) : "—"} sub={pM?.netMargin != null ? `${Math.round(pM.netMargin)}% margin` : "after costs"} />
-        <StatCard label="Owed to you" accent="amber" icon={I.owed} value={loading ? "—" : egpShort(c?.owed ?? 0)} sub="open settlements" />
+        <StatCard label="Awaiting cheque" accent="amber" icon={I.owed} value={loading ? "—" : egpShort(c?.owed ?? 0)} sub="sales since last cheque" />
       </div>
     ),
     trend: (

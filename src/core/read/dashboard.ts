@@ -5,14 +5,14 @@ import { todayCairo, monthBoundsCairo } from "@/core/time";
 import { getRevenueTotal } from "./sales";
 import { getStockSummary } from "./stock";
 import { getMoneyAccounts } from "./money";
-import { getSettlementPeriods } from "./settlements";
+import { getChequeCycle } from "./settlements";
 
 export interface CommandCenter {
   todayRevenue: number;
   monthRevenue: number;
   stockValue: number;
   cashBalance: number | null;
-  owed: number;            // Σ net_expected of open periods
+  owed: number;            // open tab: sales accumulated since the last cheque
   warnings: { missingCogs: number; unreconciledSales: number; negativeStock: number };
 }
 
@@ -21,12 +21,12 @@ export async function getCommandCenter(): Promise<CommandCenter> {
   const today = todayCairo();
   const month = monthBoundsCairo();
 
-  const [todayRevenue, monthRevenue, stock, accts, periods, todayRows, unrecRows] = await Promise.all([
+  const [todayRevenue, monthRevenue, stock, accts, cycle, todayRows, unrecRows] = await Promise.all([
     getRevenueTotal({ from: today, to: today }),
     getRevenueTotal(month),
     getStockSummary(),
     getMoneyAccounts(),
-    getSettlementPeriods(),
+    getChequeCycle(),
     sb.from("sales").select("id").is("voided_at", null).eq("sale_date", today),
     sb.from("sales").select("id").is("voided_at", null).eq("reconciled", false)
       .gte("sale_date", month.from).lte("sale_date", month.to),
@@ -39,7 +39,7 @@ export async function getCommandCenter(): Promise<CommandCenter> {
     monthRevenue,
     stockValue: stock.totalValue,
     cashBalance: accts[0]?.balance ?? null,
-    owed: periods.filter((p) => p.status === "open").reduce((s, p) => s + p.netExpected, 0),
+    owed: cycle.openTab.revenue,
     warnings: {
       missingCogs: stock.missingCostCount,
       unreconciledSales: unrecRows.data.length,

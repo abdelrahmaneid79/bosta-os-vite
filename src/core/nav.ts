@@ -20,9 +20,8 @@ export const NAV_SECTIONS: NavSection[] = [
   ] },
   { id: "money", label: "Money", icon: "M3 7h18v11H3zM3 11h18M7 15h3", accent: "#F7A23B", tabs: [
     { to: "/money", label: "Cash" },
-    { to: "/expenses", label: "Spend" },
+    { to: "/expenses", label: "Expenses" },
     { to: "/cheques", label: "Cheques" },
-    { to: "/expenses/import", label: "Import expenses" },
   ] },
   { id: "reports", label: "Reports", icon: "M6 2h9l5 5v15H4V2zM9 13h6M9 17h6", accent: "#9B6CFF", tabs: [
     { to: "/reports", label: "Overview" },

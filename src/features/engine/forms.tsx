@@ -7,14 +7,14 @@ import { egp } from "@/core/utils/format";
 import { getProducts, getLocations, getChannels } from "@/core/read/common";
 import { getExpenseCategories } from "@/core/read/expenses";
 import { getMoneyAccounts } from "@/core/read/money";
-import { getSettlementPeriods } from "@/core/read/settlements";
+import { requireEngine } from "@/core/db/engine";
 import { ProductPicker } from "@/components/ProductPicker";
 import type { Tables, Enums } from "@/core/db/tables";
 import type { SaleLine } from "@/core/read/sales";
 import {
   createProduct, updateProduct, deleteProduct, addPurchase, createSale, addSaleItem, editSaleItem,
   addExpense, ensureExpenseCategory, createMovement, recordWithdrawal, recordCashCount, recordCheque,
-  type ProductInput,
+  openSettlementPeriod, type ProductInput,
 } from "@/core/db/mutations";
 
 /** Write helper bound to a context label, so successes/errors are logged to the
@@ -294,47 +294,38 @@ export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void
   );
 }
 
-/* ─ Cheque: record a received/expected cheque against a settlement period ── */
-const CHQ_STATUS: Enums<"cheque_status">[] = ["expected", "received", "deposited", "cleared", "reconciled"];
+/* ─ Cheque: record a received cheque — closes the running sales tab, counts as
+ *  cash in. No "period" to pick: it's auto-matched to its month + cross-
+ *  referenced to your sales for coverage. ── */
 export function ChequeForm({ onDone }: { onDone?: () => void }) {
   const w = useWrite("Record cheque", onDone);
-  const periods = useQuery({ queryKey: ["periods"], queryFn: getSettlementPeriods });
-  const [periodId, setPeriodId] = useState("");
-  const [status, setStatus] = useState<Enums<"cheque_status">>("received");
-  const [expected, setExpected] = useState("");
-  const [received, setReceived] = useState("");
+  const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations });
   const [date, setDate] = useState(todayCairo());
+  const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
-  // default expected to the period's net_expected when picked
-  const onPeriod = (id: string) => { setPeriodId(id); const p = periods.data?.find((x) => x.id === id); if (p && !expected) setExpected(String(Math.round(p.netExpected))); };
-  const needsReceived = (["received", "deposited", "cleared", "reconciled"] as string[]).includes(status);
   const m = useMutation({
-    mutationFn: () => recordCheque({
-      periodId, expected: num(expected) ?? 0, received: needsReceived ? (num(received) ?? 0) : null,
-      receivedDate: needsReceived ? date : null, status, notes: notes || null,
-    }),
-    onSuccess: () => w.ok(`Cheque recorded · expected ${egp(num(expected) ?? 0)}${needsReceived ? ` · received ${egp(num(received) ?? 0)}` : ""}`), onError: w.fail,
+    mutationFn: async () => {
+      const loc = locations.data?.[0];
+      if (!loc) throw new Error("No active location.");
+      const monthStart = date.slice(0, 8) + "01";
+      await openSettlementPeriod(loc.id, monthStart);          // idempotent: ensure a container period exists
+      const sb = requireEngine();
+      const { data, error } = await sb.from("settlement_periods").select("id")
+        .eq("location_id", loc.id).eq("start_date", monthStart).is("voided_at", null).limit(1).maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("Couldn't resolve the period for that date.");
+      const amt = num(amount) ?? 0;
+      return recordCheque({ periodId: data.id, expected: amt, received: amt, receivedDate: date, status: "reconciled", notes: notes || null });
+    },
+    onSuccess: () => w.ok(`Cheque recorded · ${egp(num(amount) ?? 0)} cashed · sales tab closed`), onError: w.fail,
   });
-  const ready = !!periodId && (num(expected) ?? -1) >= 0 && (!needsReceived || ((num(received) ?? -1) >= 0 && !!date));
+  const ready = (num(amount) ?? 0) > 0 && !!date && !!locations.data?.length;
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
-      <Field label="Settlement period">
-        <Select value={periodId} onChange={(e) => onPeriod(e.target.value)} required>
-          <option value="">Select period…</option>
-          {(periods.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.start}{p.end ? `→${p.end}` : ""} · expects {Math.round(p.netExpected)}</option>)}
-        </Select>
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Status"><Select value={status} onChange={(e) => setStatus(e.target.value as Enums<"cheque_status">)}>{CHQ_STATUS.map((s) => <option key={s} value={s}>{s}</option>)}</Select></Field>
-        <Field label="Expected (EGP)"><Input type="number" step="any" value={expected} onChange={(e) => setExpected(e.target.value)} /></Field>
-      </div>
-      {needsReceived && (
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Received (EGP)"><Input type="number" step="any" value={received} onChange={(e) => setReceived(e.target.value)} /></Field>
-          <Field label="Received date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-        </div>
-      )}
+      <Field label="Date received"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      <Field label="Amount cashed (EGP)"><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 65000" /></Field>
       <Field label="Note"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" /></Field>
+      <p className="text-[11px] text-dim">Closes the open sales tab up to this date and counts as cash in. Coverage is matched to your sales automatically.</p>
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Record cheque"}</Button>
     </form>
   );
