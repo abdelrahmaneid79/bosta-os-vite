@@ -292,6 +292,26 @@ export async function voidCheque(id: string): Promise<void> {
 // ════════════════════════════════════════════════════════════════════════════
 // PHASE 7 — SETTINGS (app_settings + location_terms; additive, no migrations)
 // ════════════════════════════════════════════════════════════════════════════
+// ── Alert dismissals (cross-device; additive table alert_dismissals) ─────────
+export async function dismissAlert(key: string): Promise<void> {
+  const { error } = await requireEngine().from("alert_dismissals").upsert({ key }, { onConflict: "key" });
+  if (error) throw error;
+}
+export async function restoreAlert(key: string): Promise<void> {
+  const { error } = await requireEngine().from("alert_dismissals").delete().eq("key", key);
+  if (error) throw error;
+}
+export async function restoreAllAlerts(): Promise<void> {
+  const { error } = await requireEngine().from("alert_dismissals").delete().neq("key", "");
+  if (error) throw error;
+}
+/** Drop dismissals whose alert no longer fires (auto-resolved). Best-effort. */
+export async function pruneAlertDismissals(staleKeys: string[]): Promise<void> {
+  if (!staleKeys.length) return;
+  const { error } = await requireEngine().from("alert_dismissals").delete().in("key", staleKeys);
+  if (error) throw error;
+}
+
 export async function setAppSetting(key: string, value: unknown): Promise<void> {
   const { error } = await requireEngine().from("app_settings")
     .upsert({ key, value: value as never, updated_at: new Date().toISOString() }, { onConflict: "key" });

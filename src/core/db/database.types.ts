@@ -44,6 +44,21 @@ export type Database = {
         }
         Relationships: []
       }
+      alert_dismissals: {
+        Row: {
+          key: string
+          dismissed_at: string
+        }
+        Insert: {
+          key: string
+          dismissed_at?: string
+        }
+        Update: {
+          key?: string
+          dismissed_at?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           key: string

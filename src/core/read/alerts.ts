@@ -49,6 +49,16 @@ async function settlementAlerts(): Promise<Alert[]> {
   }));
 }
 
+/** Dismissed alert keys (cross-device). Resilient: returns [] if the table
+ *  isn't present (older deploy) so the bell never breaks. */
+export async function getDismissedAlertKeys(): Promise<string[]> {
+  try {
+    const { data, error } = await requireEngine().from("alert_dismissals").select("key");
+    if (error) return [];
+    return (data ?? []).map((r) => r.key);
+  } catch { return []; }
+}
+
 export async function getAlerts(): Promise<Alert[]> {
   const [insights, missing, stale, budget, settle] = await Promise.all([
     getRiskInsights(), getMissingData(), staleSalesAlerts(), budgetAlerts(), settlementAlerts(),

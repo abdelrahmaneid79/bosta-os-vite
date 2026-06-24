@@ -6,7 +6,7 @@
  * Insights = health + gaps + activity, Settings = general + system + QA).
  */
 import { lazy, Suspense, useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/core/utils/cn";
 import { fmtDate } from "@/core/utils/date";
@@ -20,8 +20,8 @@ import { NAV_SECTIONS, SETTINGS_SECTION } from "@/core/nav";
 import { usePrefs, useApplyTheme, type ThemeMode } from "@/store/prefs";
 import { useFilters } from "@/store/filters";
 import { isEngineConfigured } from "@/core/db/engine";
-import { getAlerts } from "@/core/read/alerts";
-import { useAlertDismissals } from "@/store/alerts";
+import { getAlerts, getDismissedAlertKeys } from "@/core/read/alerts";
+import { dismissAlert, restoreAllAlerts, pruneAlertDismissals } from "@/core/db/mutations";
 import { partitionAlerts, bellCount, type Alert, type AlertSeverity } from "@/core/alerts/engine";
 
 // Lazy route chunks — split out of the initial bundle.
@@ -219,14 +219,16 @@ const SEV_DOT: Record<AlertSeverity, string> = { critical: "bg-bad", warning: "b
 function AlertBell() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const dismissed = useAlertDismissals((s) => s.dismissed);
-  const dismiss = useAlertDismissals((s) => s.dismiss);
-  const restoreAll = useAlertDismissals((s) => s.restoreAll);
-  const prune = useAlertDismissals((s) => s.prune);
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ["alerts"], queryFn: getAlerts, enabled: isEngineConfigured, staleTime: 60_000, refetchInterval: 300_000 });
+  const dq = useQuery({ queryKey: ["alert-dismissals"], queryFn: getDismissedAlertKeys, enabled: isEngineConfigured, staleTime: 60_000 });
+  const dismissed = dq.data ?? [];
   const all = q.data ?? [];
   const { open: openAlerts, staleKeys } = partitionAlerts(all, dismissed);
-  useEffect(() => { if (staleKeys.length) prune(staleKeys); }, [staleKeys, prune]);
+  const refresh = () => qc.invalidateQueries({ queryKey: ["alert-dismissals"] });
+  const dismiss = (key: string) => { void dismissAlert(key).then(refresh).catch(() => {}); };
+  const restoreAll = () => { void restoreAllAlerts().then(refresh).catch(() => {}); };
+  useEffect(() => { if (staleKeys.length) void pruneAlertDismissals(staleKeys).then(refresh).catch(() => {}); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [staleKeys.join(",")]);
   const count = bellCount(openAlerts);
 
   const go = (a: Alert) => { setOpen(false); navigate(a.route); };
