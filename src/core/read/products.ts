@@ -5,6 +5,7 @@
  *  cost, so we never publish a wrong per-product number. READ-ONLY. */
 import { requireEngine } from "@/core/db/engine";
 import type { SearchableProduct } from "@/core/products/match";
+import { composeLifetimeProfit, type CostSource } from "@/core/products/profit";
 import type { DateRange } from "./common";
 
 /** Products + their aliases, for the searchable product picker / import matcher. */
@@ -72,14 +73,26 @@ export function aggregateProductProfit(
 }
 
 /** Lifetime per-product sales captured from the historical POS export (stored in
- *  app_settings.product_lifetime). Used as a real fallback for the product
- *  leaderboards when per-line sale_items don't exist for the selected range. */
-export interface LifetimeProduct { name: string; barcode: string; units: number; revenue: number }
+ *  app_settings.product_lifetime), enriched with per-unit cost backfilled from
+ *  supplier bills → real gross profit + margin (cost source flagged, never
+ *  faked). Used as the product profitability source until daily sale_items exist. */
+export interface LifetimeProduct {
+  name: string; barcode: string; units: number; revenue: number;
+  unitCost: number | null; costSource: CostSource;
+  cogs: number | null; grossProfit: number | null; margin: number | null;
+}
+interface RawLifetime { name: string; barcode: string; units: number; revenue: number; unitCost?: number | null; costSource?: string }
+
 export async function getLifetimeProducts(): Promise<LifetimeProduct[]> {
   const { data, error } = await requireEngine().from("app_settings").select("value").eq("key", "product_lifetime").maybeSingle();
   if (error) throw error;
-  const v = data?.value as { items?: LifetimeProduct[] } | null;
-  return Array.isArray(v?.items) ? v!.items! : [];
+  const v = data?.value as { items?: RawLifetime[] } | null;
+  const items = Array.isArray(v?.items) ? v!.items! : [];
+  return items.map((it) => {
+    const src: CostSource = it.costSource === "verified" || it.costSource === "estimate" ? it.costSource : "unknown";
+    const p = composeLifetimeProfit(it.revenue, it.units, it.unitCost ?? null, src);
+    return { name: it.name, barcode: it.barcode, units: it.units, revenue: it.revenue, unitCost: it.unitCost ?? null, ...p };
+  });
 }
 
 export async function getProductProfit(range: DateRange): Promise<ProductProfit[]> {

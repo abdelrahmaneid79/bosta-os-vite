@@ -106,7 +106,7 @@ export function ReportsScreen() {
             <Eyebrow>Top products · revenue (lifetime)</Eyebrow>
             <Badge tone="neutral">since launch</Badge>
           </div>
-          <p className="px-4 pt-1 text-[11px] text-dim">From the POS product report — per-range profit needs daily product lines (not in the historical export).</p>
+          <p className="px-4 pt-1 text-[11px] text-dim">Lifetime sales × supplier-bill cost. <span className="text-faint">* margin is an estimate (raw nut/seed cost, excludes roasting + packaging). Products with no confident cost show “cost n/a”.</span></p>
           <div className="mt-2 divide-y divide-line">
             {lifeProds.slice(0, 12).map((x, i) => {
               const top = lifeProds[0]?.revenue ?? 0;
@@ -115,8 +115,11 @@ export function ReportsScreen() {
                 <div key={x.barcode || x.name} className="px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <span className="w-5 text-center font-display text-xs font-bold text-dim">{i + 1}</span>
-                    <div className="min-w-0 flex-1"><div dir="auto" className="truncate text-sm text-text">{x.name}</div><div className="text-[11px] text-dim">{Math.round(x.units)} units sold</div></div>
-                    <div className="tnum font-display text-sm font-bold text-good">{egp(x.revenue)}</div>
+                    <div className="min-w-0 flex-1"><div dir="auto" className="truncate text-sm text-text">{x.name}</div><div className="text-[11px] text-dim">{Math.round(x.units)} units · {x.margin == null ? "cost n/a" : `${pct(x.margin)} margin${x.costSource === "estimate" ? "*" : ""}`}</div></div>
+                    <div className="text-right">
+                      <div className="tnum font-display text-sm font-bold text-good">{egp(x.revenue)}</div>
+                      {x.grossProfit != null && <div className="tnum text-[11px] text-dim">+{egp(x.grossProfit)} profit</div>}
+                    </div>
                   </div>
                   <div className="ml-7 mt-1.5 h-1.5 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-pink" style={{ width: `${w}%` }} /></div>
                 </div>

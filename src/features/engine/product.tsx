@@ -107,13 +107,23 @@ export function ProductDetailScreen() {
         </div>
       </div>
 
-      {/* Lifetime performance (from the POS product report) */}
+      {/* Lifetime profitability (POS sales × supplier-bill cost) */}
       {life && (
-        <div className="grid grid-cols-3 gap-3">
-          <Stat label="Lifetime revenue" value={egpShort(life.revenue)} accent="text-good" />
-          <Stat label="Lifetime units" value={num(life.units)} />
-          <Stat label="Lifetime rank" value={`#${lifeIdx + 1} of ${lifeRanked.length}`} accent={lifeIdx < 10 ? "text-pink" : "text-text"} />
-        </div>
+        <>
+          <div className="flex items-center justify-between">
+            <Eyebrow>Lifetime · since launch</Eyebrow>
+            {life.costSource === "estimate" ? <Badge tone="warn">cost estimate</Badge> : life.costSource === "verified" ? <Badge tone="good">verified cost</Badge> : <Badge tone="neutral">no cost yet</Badge>}
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Lifetime revenue" value={egpShort(life.revenue)} accent="text-good" sub={`${num(life.units)} units · #${lifeIdx + 1}`} />
+            <Stat label="Lifetime COGS" value={life.cogs == null ? "—" : egpShort(life.cogs)} accent="text-bad" />
+            <Stat label="Gross profit" value={life.grossProfit == null ? "unknown" : egpShort(life.grossProfit)} accent="text-good" />
+            <Stat label="Margin" value={life.margin == null ? "—" : pct(life.margin)} accent={life.margin != null && life.margin < 20 ? "text-warn" : "text-text"} />
+          </div>
+          {life.costSource !== "unknown" && life.unitCost != null && (
+            <p className="text-[11px] text-dim">Cost {egp(life.unitCost)}/unit from supplier bills{life.costSource === "estimate" ? " · estimate — raw material cost, excludes roasting loss + packaging" : " · verified resale cost"}.</p>
+          )}
+        </>
       )}
 
       {/* Period KPIs */}
