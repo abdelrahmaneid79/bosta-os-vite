@@ -70,8 +70,6 @@ export function MoneyScreen() {
       </div>
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => setSheet("count")}>Count cash</Button>
-        <Button variant="outline" onClick={() => setSheet("in")}>+ Cash in</Button>
-        <Button variant="outline" onClick={() => setSheet("out")}>− Cash out</Button>
         <Button variant="outline" onClick={() => setSheet("withdraw")}>Withdraw</Button>
       </div>
 
