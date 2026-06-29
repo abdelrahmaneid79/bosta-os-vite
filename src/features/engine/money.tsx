@@ -11,7 +11,7 @@ import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
-import { getMoneyMovements, getCashSummary, getMoneyAccounts } from "@/core/read/money";
+import { getCashLedger, getCashSummary, getMoneyAccounts } from "@/core/read/money";
 import { getSettlementDetail, getChequeCycle } from "@/core/read/settlements";
 import type { SettlementStatus } from "@/core/settlement/logic";
 import { getExpenses, getExpenseCategories } from "@/core/read/expenses";
@@ -28,6 +28,10 @@ const MI = {
   bank: "M3 21h18M5 21V10M19 21V10M3 10l9-6 9 6M9 21v-6h6v6",
 } as const;
 const monthKey = (d: string) => d.slice(0, 7);
+const KIND_LABEL: Record<string, string> = {
+  cheque: "cheque in", withdrawal: "withdrawal · not an expense", expense: "expense",
+  purchase: "stock purchase", cash_in: "cash in", cash_out: "cash out",
+};
 
 // ── Money / Cash ───────────────────────────────────────────────────────────
 export function MoneyScreen() {
@@ -38,13 +42,13 @@ export function MoneyScreen() {
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const sum = useQuery({ queryKey: ["cash", r], queryFn: () => getCashSummary(r), enabled: en });
-  const mv = useQuery({ queryKey: ["mv", r], queryFn: () => getMoneyMovements(r), enabled: en });
+  const mv = useQuery({ queryKey: ["cash-ledger", r], queryFn: () => getCashLedger(r), enabled: en });
   const accounts = useQuery({ queryKey: ["money-accounts"], queryFn: getMoneyAccounts, enabled: en });
   const accId = accounts.data?.[0]?.id;
   const c = sum.data;
   const all = mv.data ?? [];
   const movements = all.filter((m) =>
-    filter === "all" ? true : filter === "withdrawals" ? m.isWithdrawal : filter === "in" ? m.amount >= 0 : m.amount < 0 && !m.isWithdrawal);
+    filter === "all" ? true : filter === "withdrawals" ? m.kind === "withdrawal" : filter === "in" ? m.amount >= 0 : m.amount < 0 && m.kind !== "withdrawal");
   const months = [...new Set(all.map((m) => monthKey(m.date)))].sort();
   const inflowSeries = months.map((ym) => ({ label: fmtDate(ym + "-01", "MMM"), value: all.filter((m) => monthKey(m.date) === ym && m.amount > 0).reduce((s, m) => s + m.amount, 0) }));
   const outflowSeries = months.map((ym) => ({ label: fmtDate(ym + "-01", "MMM"), value: all.filter((m) => monthKey(m.date) === ym && m.amount < 0).reduce((s, m) => s + Math.abs(m.amount), 0) }));
@@ -55,7 +59,7 @@ export function MoneyScreen() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Cash ledger · drawer only — separate from profit &amp; expenses</Eyebrow>
+        <Eyebrow>Cash on hand · cheques in − expenses, stock &amp; withdrawals out</Eyebrow>
         <div className="flex-1" />
         <DateRangePicker />
       </div>
@@ -84,31 +88,34 @@ export function MoneyScreen() {
 
       <Card className="!p-0">
         <div className="flex flex-wrap items-center gap-2 p-5 pb-3">
-          <Eyebrow>Movements</Eyebrow>
+          <Eyebrow>Cash flow · every in &amp; out</Eyebrow>
           <div className="flex-1" />
           <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="max-w-[170px]">
-            <option value="all">All movements</option>
+            <option value="all">All flow</option>
             <option value="in">Cash in</option>
             <option value="out">Cash out</option>
             <option value="withdrawals">Withdrawals</option>
           </Select>
         </div>
         {mv.isLoading ? <div className="p-4"><SkeletonRows /></div> : mv.isError ? <div className="p-4"><ErrorState message={String((mv.error as Error)?.message)} /></div> :
-          movements.length === 0 ? <div className="p-4"><EmptyState title="No movements in range" /></div> : (
+          movements.length === 0 ? <div className="p-4"><EmptyState title="No cash flow in range" /></div> : (
           <div className="divide-y divide-line">
-            {movements.map((m) => (
+            {movements.map((m) => {
+              const voidable = m.id.startsWith("mv-");
+              return (
               <div key={m.id} className="row-hover flex items-center gap-3 px-5 py-3">
                 <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${m.amount >= 0 ? "bg-good/10 text-good" : "bg-bad/10 text-bad"}`}>
                   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={m.amount >= 0 ? MI.in : MI.out} /></svg>
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium capitalize text-text">{m.type.replace(/_/g, " ")}{m.notes ? ` · ${m.notes}` : ""}</div>
-                  <div className="text-[12px] text-dim">{fmtDate(m.date)}{m.isWithdrawal ? " · not an expense" : ""}</div>
+                  <div className="truncate text-sm font-medium capitalize text-text">{m.label}</div>
+                  <div className="text-[12px] text-dim">{fmtDate(m.date)} · {KIND_LABEL[m.kind] ?? m.kind}</div>
                 </div>
                 <div className={`tnum font-display text-sm font-bold ${m.amount >= 0 ? "text-good" : "text-bad"}`}>{m.amount >= 0 ? "+" : "−"}{egp(Math.abs(m.amount))}</div>
-                <button onClick={() => setVoidMv(m.id)} className="text-dim hover:text-bad" title="Void">✕</button>
+                {voidable ? <button onClick={() => setVoidMv(m.id.slice(3))} className="text-dim hover:text-bad" title="Void">✕</button> : <span className="w-[14px] flex-shrink-0" />}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>

@@ -1,21 +1,21 @@
 /** Dashboard layout — which Today widgets show and in what order. Pure helpers
  *  so the customization logic is unit-tested; the store persists it per-browser.
  *  normalizeLayout keeps saved layouts forward-compatible as widgets change. */
-export type WidgetId = "kpis" | "trend" | "attention" | "risks" | "activity" | "health" | "quick";
+export type WidgetId = "kpis" | "trend" | "spend" | "attention" | "risks" | "activity" | "health";
 
 export interface LayoutItem { id: WidgetId; on: boolean }
 
 export const WIDGET_TITLES: Record<WidgetId, string> = {
   kpis: "Key numbers",
   trend: "Today + sales trend",
+  spend: "Where money goes",
   attention: "Needs attention",
   risks: "Risks & signals",
   activity: "Recent activity",
   health: "Business health",
-  quick: "Quick actions",
 };
 
-export const ALL_WIDGETS: WidgetId[] = ["kpis", "trend", "attention", "activity", "health", "risks", "quick"];
+export const ALL_WIDGETS: WidgetId[] = ["kpis", "trend", "spend", "attention", "activity", "health", "risks"];
 
 export const DEFAULT_LAYOUT: LayoutItem[] = ALL_WIDGETS.map((id) => ({ id, on: true }));
 

@@ -2,6 +2,8 @@ import { useState, useRef, useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHead, Eyebrow, Pill, Ring, Badge, Button, StatCard, IconChip, DeltaChip, Sparkline, Tabs, type Accent } from "@/components/ui";
+import { DonutChart } from "@/components/charts";
+import { getExpenses } from "@/core/read/expenses";
 import { cn } from "@/core/utils/cn";
 import { useLayoutStore } from "@/store/layout";
 import { WIDGET_TITLES, type WidgetId } from "@/core/dashboardLayout";
@@ -214,6 +216,7 @@ export function DashboardScreen() {
   const daily = useQuery({ queryKey: ["dailyHist", histFrom], queryFn: () => getDailyRevenue({ from: histFrom, to: today }), enabled: en });
   const accStart = usePrefs((s) => s.accountingStart);
   const profitM = useQuery({ queryKey: ["profit", month, accStart], queryFn: () => getProfitReadout(month, accStart), enabled: en });
+  const spend = useQuery({ queryKey: ["dash-spend", histFrom], queryFn: () => getExpenses({ from: histFrom, to: today }), enabled: en });
   const c = cc.data;
   if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
 
@@ -332,17 +335,31 @@ export function DashboardScreen() {
         <Link to="/health" className="lift flex-shrink-0 rounded-2xl border border-line bg-panel px-3.5 py-2 text-xs font-semibold text-text hover:bg-panel2">Open →</Link>
       </Card>
     ),
-    quick: (
-      <Card>
-        <CardHead title="Quick actions" accent="blue" icon={I.bolt} />
-        <div className="flex flex-wrap gap-2">
-          <Link to="/sales" className="lift rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">+ Sale</Link>
-          {[["/stock", "+ Product"], ["/purchases", "+ Purchase"], ["/expenses", "Add expense"], ["/money", "Count cash"], ["/sales/import", "Import receipt"]].map(([to, label]) => (
-            <Link key={to} to={to} className="lift rounded-2xl border border-line bg-panel px-4 py-2.5 font-display text-sm font-bold text-text hover:bg-panel2">{label}</Link>
-          ))}
-        </div>
-      </Card>
-    ),
+    spend: (() => {
+      const rowsE = spend.data ?? [];
+      const opTotal = rowsE.filter((e) => e.isOperating).reduce((s, e) => s + e.amount, 0);
+      const invTotal = rowsE.filter((e) => !e.isOperating).reduce((s, e) => s + e.amount, 0);
+      const byCat = new Map<string, number>();
+      for (const e of rowsE) byCat.set(e.category, (byCat.get(e.category) ?? 0) + e.amount);
+      const donut = [...byCat.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+      return (
+        <Card>
+          <CardHead title="Where money goes" sub="all spend by category · since launch" accent="violet" icon="M6 2h9l5 5v15H4V2zM9 13h6M9 17h6"
+            action={<Link to="/expenses" className="text-xs font-semibold text-pink">Open Expenses →</Link>} />
+          {spend.isLoading ? <SkeletonRows rows={3} /> : donut.length === 0 ? <Note>No expenses recorded yet.</Note> : (
+            <div className="grid items-center gap-6 lg:grid-cols-[1.15fr_1fr]">
+              <DonutChart data={donut} size={208} />
+              <div className="grid grid-cols-2 gap-3">
+                <MiniStat label="Operating costs" value={egp(opTotal)} accent="amber" icon={I.owed} />
+                <MiniStat label="Inventory" value={egp(invTotal)} accent="violet" icon={I.stock} />
+                <MiniStat label="Total spend" value={egp(opTotal + invTotal)} accent="pink" icon={I.revenue} />
+                <MiniStat label="Cash on hand" value={loading ? "—" : egpShort(c?.cashBalance ?? 0)} accent="mint" icon={I.cash} />
+              </div>
+            </div>
+          )}
+        </Card>
+      );
+    })(),
   };
 
   return <CustomizableDashboard widgets={widgets} />;

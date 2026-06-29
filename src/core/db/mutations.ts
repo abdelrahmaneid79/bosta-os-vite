@@ -14,6 +14,7 @@ import {
 import type { Enums } from "@/core/db/tables";
 import type { Database } from "@/core/db/database.types";
 import { signMoney, type MoneyType } from "@/core/money/sign";
+import { getCashPosition } from "@/core/read/money";
 
 type ChequeStatus = Enums<"cheque_status">;
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -261,9 +262,9 @@ export async function voidMovement(id: string, accountId: string): Promise<void>
 /** Physical cash count: snapshot expected, store reconciliation, land balance via a voidable adjustment. */
 export async function recordCashCount(accountId: string, counted: number, date: string, notes: string | null): Promise<number> {
   const sb = requireEngine();
-  const acc = await sb.from("money_accounts").select("current_balance").eq("id", accountId).single();
-  if (acc.error) throw acc.error;
-  const expected = Number(acc.data.current_balance);
+  // expected = the true cash position (movements − expenses − purchases), not the
+  // raw movements balance — so a physical count anchors cash on hand to reality.
+  const { onHand: expected } = await getCashPosition();
   const difference = r2(counted - expected);
   const recon = await sb.from("cash_reconciliations")
     .insert({ account_id: accountId, count_date: date, counted_amount: counted, expected_balance: expected, notes })

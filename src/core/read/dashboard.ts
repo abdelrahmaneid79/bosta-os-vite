@@ -4,7 +4,7 @@ import { requireEngine } from "@/core/db/engine";
 import { todayCairo, monthBoundsCairo } from "@/core/time";
 import { getRevenueTotal } from "./sales";
 import { getStockSummary } from "./stock";
-import { getMoneyAccounts } from "./money";
+import { getCashPosition } from "./money";
 import { getChequeCycle } from "./settlements";
 
 export interface CommandCenter {
@@ -21,11 +21,11 @@ export async function getCommandCenter(): Promise<CommandCenter> {
   const today = todayCairo();
   const month = monthBoundsCairo();
 
-  const [todayRevenue, monthRevenue, stock, accts, cycle, todayRows, unrecRows] = await Promise.all([
+  const [todayRevenue, monthRevenue, stock, cash, cycle, todayRows, unrecRows] = await Promise.all([
     getRevenueTotal({ from: today, to: today }),
     getRevenueTotal(month),
     getStockSummary(),
-    getMoneyAccounts(),
+    getCashPosition(),
     getChequeCycle(),
     sb.from("sales").select("id").is("voided_at", null).eq("sale_date", today),
     sb.from("sales").select("id").is("voided_at", null).eq("reconciled", false)
@@ -38,7 +38,7 @@ export async function getCommandCenter(): Promise<CommandCenter> {
     todayRevenue,
     monthRevenue,
     stockValue: stock.totalValue,
-    cashBalance: accts[0]?.balance ?? null,
+    cashBalance: cash.onHand,
     owed: cycle.openTab.revenue,
     warnings: {
       missingCogs: stock.missingCostCount,
