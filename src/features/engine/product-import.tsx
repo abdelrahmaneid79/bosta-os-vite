@@ -24,6 +24,8 @@ import {
 } from "@/core/import/product-lines";
 import { parseOcrProductLines } from "@/core/import/ocr-lines";
 import { readDayReportPhoto } from "@/core/import/day-report-ai";
+import { detectCostMap, parseCosts, classifyCosts, summarizeCosts, type CostMap } from "@/core/import/product-costs";
+import { applyProductCosts } from "@/core/db/mutations";
 import type { Row } from "@/core/import/csv";
 import { useUI } from "@/store/ui";
 
@@ -266,6 +268,130 @@ export function ProductLineImportScreen() {
                     <div className="w-full sm:w-64">
                       <ProductPicker value={assign[i] ?? ""} onChange={(id) => setAssign((a) => ({ ...a, [i]: id }))} />
                     </div>
+                  )}
+                  {l.status === "invalid" && <span className="text-[11px] text-bad">{l.issues.join(", ")}</span>}
+                </div>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Read a normal table (headers on row 0) from Excel into header-keyed rows. */
+async function readSheetObjects(file: File): Promise<Row[]> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  return XLSX.utils.sheet_to_json<Row>(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: false });
+}
+
+const COST_FIELDS: { key: keyof CostMap; label: string }[] = [
+  { key: "barcode", label: "Barcode" }, { key: "name", label: "Product name" },
+  { key: "cost", label: "Cost price" }, { key: "price", label: "Selling price" },
+];
+
+/** Product-cost import — upload a portfolio file (cost + selling price per
+ *  product), auto-detect columns, match by barcode/name, preview, then apply:
+ *  sets reference_cost + selling_price and refreshes lifetime margins. */
+export function ProductCostImportScreen() {
+  const { reportSuccess, reportError } = useUI();
+  const qc = useQueryClient();
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [map, setMap] = useState<CostMap | null>(null);
+  const [assign, setAssign] = useState<Record<number, string>>({});
+  const [result, setResult] = useState<{ products: number; lifetime: number } | null>(null);
+
+  const prods = useQuery({ queryKey: ["searchable-products"], queryFn: getSearchableProducts, enabled: en });
+  const index = useMemo(() => buildIndex(prods.data ?? []), [prods.data]);
+  const nameById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.nameEn])), [prods.data]);
+
+  const classified = useMemo(() => {
+    if (!rows || !map) return [];
+    return classifyCosts(parseCosts(rows, map), (name, barcode) => {
+      const m = (barcode && autoMatch(barcode, index)) || (name && autoMatch(name, index)) || null;
+      return m ? { id: m.id, name: m.nameEn } : null;
+    }).map((l, i) => assign[i] ? { ...l, productId: assign[i], matchedName: nameById.get(assign[i]) ?? "", status: "ready" as const } : l);
+  }, [rows, map, index, assign, nameById]);
+  const sum = summarizeCosts(classified);
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return;
+    setFileName(f.name); setResult(null); setAssign({});
+    const done = (rs: Row[]) => {
+      if (!rs.length) { reportError("Import costs", new Error("No rows found in that file.")); return; }
+      const hs = Object.keys(rs[0]); setRows(rs); setHeaders(hs); setMap(detectCostMap(hs));
+    };
+    if (/\.(xlsx|xls)$/i.test(f.name)) readSheetObjects(f).then(done).catch(() => reportError("Import costs", new Error("Couldn't read the Excel file")));
+    else Papa.parse<Row>(f, { header: true, skipEmptyLines: true, complete: (r) => done(r.data), error: () => reportError("Import costs", new Error("Couldn't parse the CSV")) });
+  }
+
+  const approve = useMutation({
+    mutationFn: () => {
+      const ready = classified.filter((l) => l.status === "ready" && l.productId);
+      if (!ready.length) throw new Error("Nothing ready to apply.");
+      return applyProductCosts(ready.map((l) => ({ productId: l.productId!, barcode: l.barcode, cost: l.cost, price: l.price })));
+    },
+    onSuccess: (res) => { setResult(res); reportSuccess("Apply product costs", `Updated ${res.products} product(s) · refreshed ${res.lifetime} lifetime margin(s)`); qc.invalidateQueries(); },
+    onError: (e) => reportError("Apply product costs", e),
+  });
+
+  if (!en) return <EmptyState title="Sign in to import" />;
+
+  return (
+    <div className="space-y-4">
+      <Eyebrow>Product costs · set cost + selling price for the whole catalogue → real margins</Eyebrow>
+      {!rows ? (
+        <Card>
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <CardHead title="Upload your product portfolio" sub="CSV/Excel with cost price + selling price per product. Columns (barcode, name, cost, price) are auto-detected; matched by barcode first." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            <label className="lift cursor-pointer rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">
+              Choose file<input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onFile} />
+            </label>
+            <p className="max-w-md text-[12px] text-dim">The cost you give is taken as the real finished-good unit cost. Applying sets each product's cost (drives profit/COGS) + selling price, and refreshes margins everywhere. Nothing saves until you approve.</p>
+          </div>
+        </Card>
+      ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
+        <>
+          <Card>
+            <CardHead title="Map columns" sub={fileName} accent="blue" icon="M4 6h16M4 12h16M4 18h10" />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {COST_FIELDS.map((f) => (
+                <label key={f.key} className="block">
+                  <span className="mb-1.5 block text-[12px] font-medium text-muted">{f.label}</span>
+                  <Select value={map?.[f.key] ?? ""} onChange={(e) => setMap((m) => ({ ...(m as CostMap), [f.key]: e.target.value }))}>
+                    <option value="">— none —</option>
+                    {headers.map((h) => <option key={h} value={h}>{h}</option>)}
+                  </Select>
+                </label>
+              ))}
+            </div>
+          </Card>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone="good">{sum.ready} ready</Badge>
+            {sum.unmapped > 0 && <Badge tone="warn">{sum.unmapped} unmapped</Badge>}
+            {sum.invalid > 0 && <Badge tone="bad">{sum.invalid} invalid</Badge>}
+            <Badge tone="pink">{sum.withCost} costs · {sum.withPrice} prices</Badge>
+            <div className="flex-1" />
+            <Button variant="ghost" onClick={() => { setRows(null); setMap(null); setResult(null); setFileName(""); }}>Cancel</Button>
+            <Button disabled={approve.isPending || sum.ready === 0} onClick={() => approve.mutate()}>{approve.isPending ? "Applying…" : `Apply ${sum.ready}`}</Button>
+          </div>
+
+          {result && <Card><div className="text-sm text-text">Updated <b className="text-good">{result.products}</b> product(s) · refreshed <b className="text-good">{result.lifetime}</b> lifetime margin(s).</div></Card>}
+
+          <Card className="!p-0">
+            <div className="max-h-[60vh] divide-y divide-line overflow-y-auto">
+              {classified.slice(0, 400).map((l, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
+                  <span className={`h-2 w-2 flex-shrink-0 rounded-full ${l.status === "ready" ? "bg-good" : l.status === "unmapped" ? "bg-warn" : "bg-bad"}`} />
+                  <span dir="auto" className="min-w-0 flex-1 truncate text-text">{l.name || l.barcode || "—"}{l.matchedName && l.matchedName !== l.name ? <span className="text-dim"> → {l.matchedName}</span> : ""}</span>
+                  <span className="tnum w-44 flex-shrink-0 text-right text-dim">cost {l.cost != null ? egp(l.cost) : "—"} · sell {l.price != null ? egp(l.price) : "—"}</span>
+                  {l.status === "unmapped" && (
+                    <div className="w-full sm:w-64"><ProductPicker value={assign[i] ?? ""} onChange={(id) => setAssign((a) => ({ ...a, [i]: id }))} /></div>
                   )}
                   {l.status === "invalid" && <span className="text-[11px] text-bad">{l.issues.join(", ")}</span>}
                 </div>

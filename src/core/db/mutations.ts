@@ -92,6 +92,40 @@ export async function setCostUplift(pct: number): Promise<void> {
   }
 }
 
+/** Bulk-apply a product-portfolio import: set each product's reference_cost
+ *  (drives per-sale COGS) + selling_price, and refresh the lifetime-margin source
+ *  (app_settings.product_lifetime) by barcode so leaderboards/margins go accurate
+ *  immediately. Provided cost is treated as the real finished-good cost
+ *  ("verified" — no roasting uplift applied on top). */
+export interface ProductCostUpdate { productId: string; barcode: string; cost: number | null; price: number | null }
+export async function applyProductCosts(updates: ProductCostUpdate[]): Promise<{ products: number; lifetime: number }> {
+  const sb = requireEngine();
+  let products = 0;
+  for (const u of updates) {
+    const patch: ProductUpdate = {};
+    if (u.cost != null) patch.reference_cost = u.cost;
+    if (u.price != null) patch.selling_price = u.price;
+    if (Object.keys(patch).length === 0) continue;
+    const { error } = await sb.from("products").update(patch).eq("id", u.productId);
+    if (error) throw error;
+    products += 1;
+  }
+  // refresh lifetime margins (matched by barcode) so reports reflect the real cost now
+  const lifeRes = await sb.from("app_settings").select("value").eq("key", "product_lifetime").maybeSingle();
+  if (lifeRes.error) throw lifeRes.error;
+  const val = (lifeRes.data?.value ?? null) as { items?: { barcode?: string; unitCost?: number | null; costSource?: string }[] } | null;
+  let lifetime = 0;
+  if (val?.items?.length) {
+    const costByBarcode = new Map(updates.filter((u) => u.cost != null && u.barcode).map((u) => [u.barcode, u.cost as number]));
+    for (const it of val.items) {
+      const c = it.barcode ? costByBarcode.get(it.barcode) : undefined;
+      if (c != null) { it.unitCost = c; it.costSource = "verified"; lifetime += 1; }
+    }
+    await setAppSetting("product_lifetime", val);
+  }
+  return { products, lifetime };
+}
+
 export async function setProductActive(id: string, active: boolean): Promise<void> {
   const { error } = await requireEngine().from("products").update({ active }).eq("id", id);
   if (error) throw error;

@@ -56,6 +56,7 @@ const QAScreen = L(qa, "QAScreen");
 const PreferencesScreen = L(more, "PreferencesScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
 const ProductLineImportScreen = L(productImport, "ProductLineImportScreen");
+const ProductCostImportScreen = L(productImport, "ProductCostImportScreen");
 
 const I = {
   today: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
@@ -83,7 +84,7 @@ interface Group { id: string; label: string; icon: string; accent: string; tabs:
 const EL: Record<string, React.ReactNode> = {
   "/dashboard": <DashboardScreen />,
   "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <ProductLineImportScreen />,
-  "/stock": <StockScreen />, "/purchases": <PurchasesScreen />,
+  "/stock": <StockScreen />, "/purchases": <PurchasesScreen />, "/costs": <ProductCostImportScreen />,
   "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
   "/health": <HealthScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
