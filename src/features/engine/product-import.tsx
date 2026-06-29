@@ -19,7 +19,7 @@ import { getLocations, getChannels } from "@/core/read/common";
 import { createSale, addSaleItem } from "@/core/db/mutations";
 import { buildIndex, autoMatch } from "@/core/products/match";
 import {
-  detectLineMap, parseProductLines, dedupeLines, classifyLines, summarize,
+  detectLineMap, parseSheet, parseProductLines, dedupeLines, classifyLines, summarize,
   type ProductLineMap, type ClassifiedLine,
 } from "@/core/import/product-lines";
 import type { Row } from "@/core/import/csv";
@@ -27,16 +27,18 @@ import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
 const FIELDS: { key: keyof ProductLineMap; label: string }[] = [
-  { key: "date", label: "Date" }, { key: "product", label: "Product" }, { key: "qty", label: "Quantity" },
-  { key: "unitPrice", label: "Unit price" }, { key: "lineTotal", label: "Line total" },
+  { key: "barcode", label: "Barcode" }, { key: "product", label: "Product name" }, { key: "qty", label: "Quantity sold" },
+  { key: "unitPrice", label: "Unit price" }, { key: "lineTotal", label: "Line total (net value)" }, { key: "date", label: "Date column (optional)" },
 ];
 
-async function readExcel(file: File): Promise<Row[]> {
+/** Read any sheet to a raw 2-D array (rows × cells), so the parser can locate the
+ *  real header row beneath the POS metadata. */
+async function readExcel(file: File): Promise<unknown[][]> {
   const XLSX = await import("xlsx");
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json<Row>(sheet, { defval: "", raw: false });
+  return XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", raw: false, blankrows: false });
 }
 
 export function ProductLineImportScreen() {
@@ -46,6 +48,7 @@ export function ProductLineImportScreen() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
   const [map, setMap] = useState<ProductLineMap | null>(null);
+  const [dayDate, setDayDate] = useState("");                       // the single day this file covers
   const [assign, setAssign] = useState<Record<number, string>>({}); // row index → productId override
   const [result, setResult] = useState<{ created: number; skipped: number; failed: number; days: number } | null>(null);
 
@@ -55,22 +58,25 @@ export function ProductLineImportScreen() {
 
   const classified = useMemo(() => {
     if (!rows || !map) return [];
-    const parsed = dedupeLines(parseProductLines(rows, map)).kept;
-    const base = classifyLines(parsed, (raw) => { const m = autoMatch(raw, index); return m ? { id: m.id, name: m.nameEn } : null; });
-    // apply manual assignments (by row position)
-    return base.map((l, i) => assign[i] ? { ...l, productId: assign[i], matchedName: nameById.get(assign[i]) ?? "", status: "ready" as const } : l);
-  }, [rows, map, index, assign, nameById]);
+    const parsed = dedupeLines(parseProductLines(rows, map, dayDate || undefined)).kept;
+    // resolve by barcode first (exact, reliable), then by Arabic/English name
+    return classifyLines(parsed, (raw, barcode) => {
+      const m = (barcode && autoMatch(barcode, index)) || (raw && autoMatch(raw, index)) || null;
+      return m ? { id: m.id, name: m.nameEn } : null;
+    }).map((l, i) => assign[i] ? { ...l, productId: assign[i], matchedName: nameById.get(assign[i]) ?? "", status: "ready" as const } : l);
+  }, [rows, map, dayDate, index, assign, nameById]);
   const sum = summarize(classified);
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     setFileName(f.name); setResult(null); setAssign({});
-    const done = (data: Row[]) => {
-      const h = data.length ? Object.keys(data[0]) : [];
-      setRows(data); setHeaders(h); setMap(detectLineMap(h));
+    const done = (grid: unknown[][]) => {
+      const sheet = parseSheet(grid);
+      setRows(sheet.rows); setHeaders(sheet.headers); setMap(detectLineMap(sheet.headers));
+      setDayDate(sheet.date ?? "");
     };
     if (/\.(xlsx|xls)$/i.test(f.name)) readExcel(f).then(done).catch(() => reportError("Import", new Error("Couldn't read the Excel file")));
-    else Papa.parse<Row>(f, { header: true, skipEmptyLines: true, complete: (r) => done(r.data), error: () => reportError("Import", new Error("Couldn't parse the CSV")) });
+    else Papa.parse<string[]>(f, { skipEmptyLines: true, complete: (r) => done(r.data as unknown[][]), error: () => reportError("Import", new Error("Couldn't parse the CSV")) });
   }
 
   const approve = useMutation({
@@ -124,15 +130,23 @@ export function ProductLineImportScreen() {
       {!rows ? (
         <Card>
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <CardHead title="Upload a product-sales sheet" sub="CSV or Excel — columns like date, product, quantity, unit price, line total" accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            <CardHead title="Upload a daily product-sales report" sub="Your POS export (CSV/Excel) — Arabic columns and barcodes are read automatically." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             <label className="lift cursor-pointer rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">
               Choose file<input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onFile} />
             </label>
-            <p className="max-w-md text-[12px] text-dim">Each row becomes a sale line on its day. Products are matched by name (Arabic too) or barcode; unmatched rows are queued for you to assign. Stock is deducted and COGS captured automatically.</p>
+            <p className="max-w-md text-[12px] text-dim">One report = one day. It finds the table under the report header, reads each product line (barcode → product, net qty, price, net value), and confirms the day's total. Unmatched rows are queued for you to map. Nothing saves until you approve.</p>
           </div>
         </Card>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
         <>
+          {/* Sale date for the whole file (POS report = one day) */}
+          <Card>
+            <CardHead title="Sale day" sub="This report covers one day — auto-detected from the file, confirm or change it." accent="pink" icon="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" />
+            <input type="date" value={dayDate} onChange={(e) => setDayDate(e.target.value)}
+              className="w-full max-w-xs rounded-2xl border border-line bg-panel2 px-3.5 py-2.5 text-sm text-text outline-none focus:border-pink/60" />
+            {!dayDate && <p className="mt-2 text-[12px] text-warn">Couldn’t read the date from the file — pick the day these sales belong to.</p>}
+          </Card>
+
           {/* Column mapping */}
           <Card>
             <CardHead title="Map columns" sub={fileName} accent="blue" icon="M4 6h16M4 12h16M4 18h10" />
@@ -154,9 +168,9 @@ export function ProductLineImportScreen() {
             <Badge tone="good">{sum.ready} ready</Badge>
             {sum.unmapped > 0 && <Badge tone="warn">{sum.unmapped} unmapped</Badge>}
             {sum.invalid > 0 && <Badge tone="bad">{sum.invalid} invalid</Badge>}
-            <Badge tone="neutral">{sum.days} day(s)</Badge>
+            <Badge tone="pink">day total {egp(sum.total)}</Badge>
             <div className="flex-1" />
-            <Button variant="ghost" onClick={() => { setRows(null); setMap(null); setResult(null); }}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setRows(null); setMap(null); setDayDate(""); setResult(null); }}>Cancel</Button>
             <Button disabled={approve.isPending || sum.ready === 0} onClick={() => approve.mutate()}>{approve.isPending ? "Importing…" : `Approve ${sum.ready}`}</Button>
           </div>
 
