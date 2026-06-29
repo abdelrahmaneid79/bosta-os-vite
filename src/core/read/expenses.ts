@@ -6,6 +6,7 @@ import type { DateRange } from "./common";
 
 export interface ExpenseRow {
   id: string; date: string; category: string; amount: number;
+  isOperating: boolean; // false = cost-of-goods (inventory purchases), not a running expense
   paymentMethod: Tables<"expenses">["payment_method"]; notes: string | null;
 }
 export async function getExpenses(range: DateRange): Promise<ExpenseRow[]> {
@@ -14,17 +15,29 @@ export async function getExpenses(range: DateRange): Promise<ExpenseRow[]> {
     sb.from("expenses").select("id,expense_date,category_id,amount,payment_method,notes")
       .is("voided_at", null).gte("expense_date", range.from).lte("expense_date", range.to)
       .order("expense_date", { ascending: false }),
-    sb.from("expense_categories").select("id,name"),
+    sb.from("expense_categories").select("id,name,is_operating"),
   ]);
   if (error) throw error;
-  const names = new Map((cats.data ?? []).map((c) => [c.id, c.name]));
+  const byId = new Map((cats.data ?? []).map((c) => [c.id, c]));
   return data.map((e) => ({
-    id: e.id, date: e.expense_date, category: names.get(e.category_id) ?? "—",
+    id: e.id, date: e.expense_date, category: byId.get(e.category_id)?.name ?? "—",
+    isOperating: byId.get(e.category_id)?.is_operating ?? true,
     amount: Number(e.amount), paymentMethod: e.payment_method, notes: e.notes,
   }));
 }
+/** Every recorded spend (operating + inventory/cost-of-goods). */
 export async function getExpenseTotal(range: DateRange): Promise<number> {
   return (await getExpenses(range)).reduce((s, e) => s + e.amount, 0);
+}
+/** Running/operating expenses only (rent, salary, packaging…). Excludes inventory
+ *  purchases, which are cost-of-goods and reach profit via per-sale COGS — counting
+ *  them here too would double-charge the business. This is what the P&L uses. */
+export async function getOperatingExpenseTotal(range: DateRange): Promise<number> {
+  return (await getExpenses(range)).filter((e) => e.isOperating).reduce((s, e) => s + e.amount, 0);
+}
+/** Inventory / cost-of-goods spend (is_operating = false). */
+export async function getInventorySpendTotal(range: DateRange): Promise<number> {
+  return (await getExpenses(range)).filter((e) => !e.isOperating).reduce((s, e) => s + e.amount, 0);
 }
 
 export interface ExpenseCatStat {

@@ -5,7 +5,7 @@
  *  personal withdrawals are NOT expenses and never appear here). READ-ONLY. */
 import { requireEngine } from "@/core/db/engine";
 import { getRevenueTotal } from "./sales";
-import { getExpenseTotal } from "./expenses";
+import { getOperatingExpenseTotal } from "./expenses";
 import type { DateRange } from "./common";
 
 export interface ProfitReadout {
@@ -80,7 +80,7 @@ export async function getProfitReadout(range: DateRange, since?: string): Promis
 
   const [revenue, operatingExpenses] = await Promise.all([
     getRevenueTotal(eff),
-    getExpenseTotal(eff),
+    getOperatingExpenseTotal(eff),
   ]);
   return composeProfit({ revenue, cogs, operatingExpenses, soldLines: lines, missingCostLines: missing, partialBefore });
 }

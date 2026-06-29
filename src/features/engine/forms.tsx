@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Field, Input, Select } from "@/components/ui";
 import { useUI } from "@/store/ui";
@@ -143,28 +143,87 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
   );
 }
 
-/* ─ Sale: create the day's header ──────────────────────────────────────── */
+/* ─ Sale: product-first day entry — pick items, price & totals auto-fill ── */
+interface SaleLineDraft { key: number; productId: string; qty: string; price: string }
 export function SaleForm({ onDone }: { onDone?: () => void }) {
   const w = useWrite("New sale day", onDone);
   const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations });
   const channels = useQuery({ queryKey: ["channels"], queryFn: getChannels });
+  const products = useQuery({ queryKey: ["products-list"], queryFn: getProducts });
+  const priceOf = (id: string) => products.data?.find((p) => p.id === id)?.selling_price ?? null;
+
   const [date, setDate] = useState(todayCairo());
-  const [total, setTotal] = useState("");
+  const [lines, setLines] = useState<SaleLineDraft[]>([{ key: 1, productId: "", qty: "", price: "" }]);
+  const [other, setOther] = useState(""); // sales not tied to a catalog product
+  const nextKey = useRef(2);
+
   const loc = locations.data?.[0];
   const ch = channels.data?.[0];
+
+  const setLine = (key: number, patch: Partial<SaleLineDraft>) => setLines((ls) => ls.map((l) => l.key === key ? { ...l, ...patch } : l));
+  // picking a product seeds its sale price (only if the owner hasn't typed one)
+  const pickProduct = (key: number, id: string) => {
+    const p = priceOf(id);
+    setLines((ls) => ls.map((l) => l.key === key ? { ...l, productId: id, price: l.price || (p != null ? String(p) : "") } : l));
+  };
+  const addLine = () => setLines((ls) => [...ls, { key: nextKey.current++, productId: "", qty: "", price: "" }]);
+  const removeLine = (key: number) => setLines((ls) => ls.length > 1 ? ls.filter((l) => l.key !== key) : ls);
+
+  const lineTotal = (l: SaleLineDraft) => (num(l.qty) ?? 0) * (num(l.price) ?? 0);
+  const validLines = lines.filter((l) => l.productId && (num(l.qty) ?? 0) > 0);
+  const otherNum = num(other) ?? 0;
+  const dayTotal = Math.round((validLines.reduce((s, l) => s + lineTotal(l), 0) + otherNum) * 100) / 100;
+
   const m = useMutation({
-    mutationFn: () => createSale({ date, total: num(total) ?? 0, locationId: loc!.id, channelId: ch!.id }),
-    onSuccess: () => w.ok(`Sale day created · ${egp(num(total) ?? 0)} revenue — add lines for stock & profit`),
+    mutationFn: async () => {
+      if (!loc || !ch) throw new Error("No active location/channel.");
+      const saleId = await createSale({ date, total: dayTotal, locationId: loc.id, channelId: ch.id });
+      let added = 0, failed = 0;
+      for (const l of validLines) {
+        try {
+          await addSaleItem({ saleId, productId: l.productId, qty: num(l.qty) ?? 0, unitPrice: num(l.price) ?? 0, lineTotal: Math.round(lineTotal(l) * 100) / 100, notes: null });
+          added++;
+        } catch { failed++; }
+      }
+      return { added, failed };
+    },
+    onSuccess: (res) => w.ok(`Sale day saved · ${egp(dayTotal)} · ${res.added} product line${res.added === 1 ? "" : "s"}${res.failed ? ` · ${res.failed} failed` : ""}`),
     onError: w.fail,
   });
-  const ready = !!loc && !!ch && !!date && (num(total) ?? -1) >= 0;
+
+  const ready = !!loc && !!ch && !!date && (validLines.length > 0 || otherNum > 0);
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
       {(!loc || !ch) && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No active location/channel found — set one up in Supabase first.</div>}
       <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-      <Field label="Day's total sales (EGP, from POS)"><Input type="number" step="any" value={total} onChange={(e) => setTotal(e.target.value)} placeholder="e.g. 4200" /></Field>
-      <p className="text-[11px] text-dim">This is the day's grand total (revenue). After saving, open the day to add product lines — those deduct stock and snapshot COGS.</p>
-      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Create sale day"}</Button>
+
+      <div className="space-y-2">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-dim">Products sold</div>
+        {lines.map((l) => (
+          <div key={l.key} className="space-y-2 rounded-xl border border-line p-2.5">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1"><ProductPicker value={l.productId} onChange={(id) => pickProduct(l.key, id)} /></div>
+              {lines.length > 1 && <button type="button" onClick={() => removeLine(l.key)} className="px-1 text-dim hover:text-bad" title="Remove">✕</button>}
+            </div>
+            <div className="flex items-center gap-2">
+              <Input inputMode="decimal" placeholder="qty" value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} className="!w-20" />
+              <span className="text-dim">×</span>
+              <Input inputMode="decimal" placeholder="price" value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} className="!w-24" />
+              <div className="tnum flex-1 text-right text-sm font-semibold text-text">{egp(lineTotal(l))}</div>
+            </div>
+          </div>
+        ))}
+        <Button type="button" variant="ghost" onClick={addLine}>+ Add product</Button>
+      </div>
+
+      <Field label="Other / untracked sales (optional)"><Input inputMode="decimal" value={other} onChange={(e) => setOther(e.target.value)} placeholder="items not in your catalog" /></Field>
+
+      <div className="flex items-center justify-between rounded-xl bg-panel p-3">
+        <span className="text-[12px] text-dim">Day total (auto)</span>
+        <span className="tnum font-display text-lg font-bold text-text">{egp(dayTotal)}</span>
+      </div>
+      <p className="text-[11px] text-dim">Pick each product and quantity — the price fills from the product and the totals add up automatically. Each line deducts stock and captures cost (COGS).</p>
+      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Save sale day"}</Button>
     </form>
   );
 }
@@ -172,10 +231,16 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
 /* ─ Sale line: add or edit a product line (deducts stock + COGS) ────────── */
 export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: SaleLine; onDone?: () => void }) {
   const w = useWrite(item ? "Edit sale line" : "Add sale line", onDone);
+  const products = useQuery({ queryKey: ["products-list"], queryFn: getProducts });
   const [productId, setProductId] = useState(item?.productId ?? "");
   const [qty, setQty] = useState(item ? String(item.qty) : "");
   const [price, setPrice] = useState(item?.unitPrice != null ? String(item.unitPrice) : "");
   const [lineTotal, setLineTotal] = useState(item ? String(item.lineTotal) : "");
+  // seed sale price from the product when none was typed yet
+  const onPickProduct = (id: string) => {
+    setProductId(id);
+    if (!price) { const p = products.data?.find((x) => x.id === id)?.selling_price; if (p != null) setPrice(String(p)); }
+  };
 
   const computed = (num(qty) ?? 0) * (num(price) ?? 0);
   const m = useMutation({
@@ -192,7 +257,7 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
       <Field label="Product">
-        <ProductPicker value={productId} onChange={setProductId} />
+        <ProductPicker value={productId} onChange={onPickProduct} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Quantity (base units)"><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
@@ -215,13 +280,14 @@ export function ExpenseForm({ onDone }: { onDone?: () => void }) {
   const [date, setDate] = useState(todayCairo());
   const [categoryId, setCategoryId] = useState("");
   const [newCat, setNewCat] = useState("");
+  const [newCatOperating, setNewCatOperating] = useState(true); // false = inventory / cost-of-goods
   const [amount, setAmount] = useState("");
   const [pay, setPay] = useState<Enums<"payment_method">>("cash");
   const [notes, setNotes] = useState("");
   const loc = locations.data?.[0];
   const m = useMutation({
     mutationFn: async () => {
-      const catId = categoryId || (newCat.trim() ? await ensureExpenseCategory(newCat, true) : "");
+      const catId = categoryId || (newCat.trim() ? await ensureExpenseCategory(newCat, newCatOperating) : "");
       if (!catId) throw new Error("Pick or name a category.");
       return addExpense({ date, categoryId: catId, amount: num(amount) ?? 0, paymentMethod: pay, notes: notes || null, locationId: loc!.id });
     },
@@ -238,7 +304,12 @@ export function ExpenseForm({ onDone }: { onDone?: () => void }) {
           {(cats.data ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
       </Field>
-      {!categoryId && <Field label="…or new category (rent, supplies, salary, transport…)"><Input value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="Rent" /></Field>}
+      {!categoryId && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="…or new category"><Input value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="Rent" /></Field>
+          <Field label="Type"><Select value={newCatOperating ? "op" : "inv"} onChange={(e) => setNewCatOperating(e.target.value === "op")}><option value="op">Operating cost</option><option value="inv">Inventory (cost of goods)</option></Select></Field>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Amount (EGP)"><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
         <Field label="Payment"><Select value={pay} onChange={(e) => setPay(e.target.value as Enums<"payment_method">)}>{PAYMENTS.map((p) => <option key={p} value={p}>{p}</option>)}</Select></Field>

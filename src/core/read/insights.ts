@@ -7,7 +7,7 @@ import { getStockSummary } from "./stock";
 import { getCashSummary } from "./money";
 import { getSettlementPeriods, getCheques } from "./settlements";
 import { getRevenueTotal, reconTolerance } from "./sales";
-import { getExpenseTotal } from "./expenses";
+import { getOperatingExpenseTotal } from "./expenses";
 import {
   buildStockInsights, buildCashInsights, buildSettlementInsights, buildTrendInsights,
   sortInsights, type Insight, type Velocity,
@@ -56,8 +56,8 @@ export async function getRiskInsights(): Promise<Insight[]> {
       getCheques(),
       getRevenueTotal(month),
       getRevenueTotal(last),
-      getExpenseTotal(month),
-      getExpenseTotal(last),
+      getOperatingExpenseTotal(month),
+      getOperatingExpenseTotal(last),
     ]);
 
   const chequePeriodIds = new Set(cheques.map((c) => c.periodId));

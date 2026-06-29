@@ -121,6 +121,9 @@ export function MoneyScreen() {
 }
 
 // ── Expenses ─────────────────────────────────────────────────────────────────
+/** Spend split into two honest buckets: running OPERATING costs (rent, salary,
+ *  packaging…) that hit profit, and INVENTORY purchases (cost-of-goods) that
+ *  reach profit through per-sale COGS — shown apart so they never blur together. */
 export function ExpensesScreen() {
   const r = useActiveRange();
   const [addOpen, setAddOpen] = useState(false);
@@ -130,53 +133,121 @@ export function ExpensesScreen() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
   const cats = useQuery({ queryKey: ["expense-cats"], queryFn: getExpenseCategories, enabled: en });
-  const rows = (q.data ?? []).filter((e) => !cat || e.category === cat);
-  const filteredTotal = rows.reduce((s, e) => s + e.amount, 0);
   const del = useMutation({ mutationFn: (id: string) => voidExpense(id), onSuccess: () => { reportSuccess("Void expense", "Expense voided · profit restored · kept for audit"); setVoidId(null); qc.invalidateQueries(); }, onError: (e) => reportError("Void expense", e) });
   if (!en) return <EmptyState title="Sign in to load expenses" />;
+
+  const all = q.data ?? [];
+  const opTotal = all.filter((e) => e.isOperating).reduce((s, e) => s + e.amount, 0);
+  const invTotal = all.filter((e) => !e.isOperating).reduce((s, e) => s + e.amount, 0);
+
+  // category breakdown (each group's share is of its own group's subtotal)
+  const byCat = new Map<string, { amount: number; isOperating: boolean }>();
+  for (const e of all) {
+    const cur = byCat.get(e.category) ?? { amount: 0, isOperating: e.isOperating };
+    cur.amount += e.amount; byCat.set(e.category, cur);
+  }
+  const groups = [...byCat.entries()].map(([category, v]) => ({ category, ...v })).sort((a, b) => b.amount - a.amount);
+  const opCats = groups.filter((g) => g.isOperating);
+  const invCats = groups.filter((g) => !g.isOperating);
+
+  const rows = all.filter((e) => !cat || e.category === cat);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>All spend by category · withdrawals are on Cash</Eyebrow>
+        <Eyebrow>Running costs vs inventory · withdrawals are on Cash</Eyebrow>
         <div className="flex-1" />
         <DateRangePicker />
         <Link to="/expenses/import" className="lift rounded-2xl border border-line bg-panel px-4 py-2.5 font-display text-sm font-bold text-text hover:bg-panel2">Import</Link>
         <Button onClick={() => setAddOpen(true)}>+ Expense</Button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label={cat ? "Expenses (filtered)" : "Expenses in range"} accent="red" icon={MI.out} value={egp(filteredTotal)} sub={cat || "all categories"} />
-        <StatCard label="Records" accent="amber" icon={MI.bag} value={rows.length} sub="in range" />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatCard label="Operating expenses" accent="red" icon={MI.out} value={egp(opTotal)} sub="rent, salary, packaging — hits profit" />
+        <StatCard label="Inventory purchases" accent="violet" icon={MI.bag} value={egp(invTotal)} sub="cost of goods — profit via COGS" />
+        <StatCard label="Total spend" accent="amber" icon={MI.cash} value={egp(opTotal + invTotal)} sub="in range · all categories" />
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Select value={cat} onChange={(e) => setCat(e.target.value)} className="max-w-xs">
-          <option value="">All categories</option>
-          {(cats.data ?? []).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-        </Select>
-        {cat && <Button variant="ghost" onClick={() => setCat("")}>Clear</Button>}
-      </div>
-      {q.isLoading ? <SkeletonRows /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> :
-        rows.length === 0 ? <EmptyState title="No expenses in range" hint="Add rent, supplies, salary, transport…" /> : (
-        <Card className="!p-0"><div className="divide-y divide-line">
-          {rows.map((e) => (
-            <div key={e.id} className="row-hover flex items-center gap-3 px-5 py-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-warn/10 text-warn">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h9l5 5v15H4V2zM9 13h6M9 17h6" /></svg>
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium capitalize text-text">{e.category}{e.notes ? ` · ${e.notes}` : ""}</div>
-                <div className="text-[12px] text-dim">{fmtDate(e.date)} · {e.paymentMethod}</div>
+
+      {q.isLoading ? <SkeletonRows /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : all.length === 0 ? (
+        <EmptyState title="No expenses in range" hint="Add rent, supplies, salary, transport…" />
+      ) : (
+        <>
+          {/* By-category breakdown, grouped */}
+          <div className="grid gap-3 lg:grid-cols-2">
+            <CatGroup title="Operating costs" sub="recurring running expenses" total={opTotal} cats={opCats} accent="rgb(var(--bad))"
+              active={cat} onPick={(c) => setCat((p) => p === c ? "" : c)} />
+            <CatGroup title="Inventory (cost of goods)" sub="stock you buy to resell" total={invTotal} cats={invCats} accent="rgb(var(--violet))"
+              active={cat} onPick={(c) => setCat((p) => p === c ? "" : c)} hint="For future buying, use Inventory → Purchases so it feeds real product cost." />
+          </div>
+
+          {/* Records */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Eyebrow>{cat ? `${cat} · ${rows.length} record${rows.length === 1 ? "" : "s"}` : `All records · ${rows.length}`}</Eyebrow>
+            <div className="flex-1" />
+            <Select value={cat} onChange={(e) => setCat(e.target.value)} className="max-w-[200px]">
+              <option value="">All categories</option>
+              {(cats.data ?? []).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </Select>
+            {cat && <Button variant="ghost" onClick={() => setCat("")}>Clear</Button>}
+          </div>
+          <Card className="!p-0"><div className="divide-y divide-line">
+            {rows.map((e) => (
+              <div key={e.id} className="row-hover flex items-center gap-3 px-5 py-3">
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${e.isOperating ? "bg-warn/10 text-warn" : "bg-violet/10 text-violet"}`}>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={e.isOperating ? "M6 2h9l5 5v15H4V2zM9 13h6M9 17h6" : MI.bag} /></svg>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium capitalize text-text">{e.category}{e.notes ? ` · ${e.notes}` : ""}</div>
+                  <div className="text-[12px] text-dim">{fmtDate(e.date)} · {e.paymentMethod}{e.isOperating ? "" : " · cost of goods"}</div>
+                </div>
+                <div className="tnum font-display text-sm font-bold text-bad">−{egp(e.amount)}</div>
+                <button onClick={() => setVoidId(e.id)} className="text-dim hover:text-bad" title="Void">✕</button>
               </div>
-              <div className="tnum font-display text-sm font-bold text-bad">−{egp(e.amount)}</div>
-              <button onClick={() => setVoidId(e.id)} className="text-dim hover:text-bad" title="Void">✕</button>
-            </div>
-          ))}
-        </div></Card>
+            ))}
+          </div></Card>
+        </>
       )}
+
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add expense"><ExpenseForm onDone={() => setAddOpen(false)} /></Modal>
       <Confirm open={!!voidId} title="Void this expense?" danger busy={del.isPending}
         message="The row is kept for audit but no longer counts. Reversible only by re-entering it." confirmLabel="Void"
         onConfirm={() => voidId && del.mutate(voidId)} onClose={() => setVoidId(null)} />
     </div>
+  );
+}
+
+/** One spend bucket: subtotal + per-category share bars; tap a row to filter. */
+function CatGroup({ title, sub, total, cats, accent, active, onPick, hint }: {
+  title: string; sub: string; total: number; accent: string; active: string;
+  cats: { category: string; amount: number }[]; onPick: (c: string) => void; hint?: string;
+}) {
+  return (
+    <Card className="!p-0">
+      <div className="flex items-center justify-between px-5 pt-4">
+        <div><div className="font-display text-sm font-bold text-text">{title}</div><div className="text-[11px] text-dim">{sub}</div></div>
+        <div className="tnum font-display text-base font-bold text-text">{egp(total)}</div>
+      </div>
+      {cats.length === 0 ? (
+        <div className="px-5 py-4 text-[12px] text-dim">Nothing in range.</div>
+      ) : (
+        <div className="mt-2 space-y-1 px-3 pb-3">
+          {cats.map((c) => {
+            const share = total > 0 ? (c.amount / total) * 100 : 0;
+            return (
+              <button key={c.category} onClick={() => onPick(c.category)}
+                className={`block w-full rounded-xl px-2 py-2 text-left transition hover:bg-panel2 ${active === c.category ? "bg-panel2" : ""}`}>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="truncate capitalize text-text">{c.category}</span>
+                  <span className="tnum ml-2 flex-shrink-0 font-display font-semibold text-text">{egp(c.amount)}<span className="ml-1 text-[11px] font-normal text-dim">{Math.round(share)}%</span></span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full" style={{ width: `${Math.max(2, share)}%`, background: accent }} /></div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {hint && <div className="border-t border-line px-5 py-2.5 text-[11px] text-dim">{hint}</div>}
+    </Card>
   );
 }
 
