@@ -23,6 +23,7 @@ import {
   type ProductLineMap, type ClassifiedLine,
 } from "@/core/import/product-lines";
 import { parseOcrProductLines } from "@/core/import/ocr-lines";
+import { readDayReportPhoto } from "@/core/import/day-report-ai";
 import type { Row } from "@/core/import/csv";
 import { useUI } from "@/store/ui";
 
@@ -81,13 +82,35 @@ export function ProductLineImportScreen() {
       setRows(sheet.rows); setHeaders(sheet.headers); setMap(detectLineMap(sheet.headers));
       setDayDate(sheet.date ?? "");
     };
-    // Photo of the POS daily report → OCR (Arabic + English) → editable rows.
+    // Photo of the POS daily report → AI vision reader (accurate) → editable rows;
+    // falls back to on-device OCR if the vision function isn't available.
     if (/\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(f.name) || f.type.startsWith("image/")) {
       setImgUrl(URL.createObjectURL(f));
+      // load each row into the editable preview; returns how many lines it built
+      const apply = (lines: { name: string; barcode: string; qty: number | null; price: number | null; total: number | null }[], date: string | null, dayTotal: number | null) => {
+        const built: Row[] = lines.map((l) => ({
+          product: l.name, barcode: l.barcode,
+          qty: l.qty != null ? String(l.qty) : "", price: l.price != null ? String(l.price) : "", total: l.total != null ? String(l.total) : "",
+        }));
+        setRows(built);
+        setHeaders(["product", "barcode", "qty", "price", "total"]);
+        setMap({ date: "", barcode: "barcode", product: "product", qty: "qty", unitPrice: "price", lineTotal: "total" });
+        setDayDate(date ?? "");
+        setPhotoTotal(dayTotal);
+        return built.length;
+      };
+      // 1) AI vision reader (server-side key)
       try {
-        setOcrStatus("Loading reader…");
+        setOcrStatus("Reading photo with AI…");
+        const ai = await readDayReportPhoto(f);
+        setOcrStatus("");
+        setOcrText(`AI reader · ${ai.lines.length} line(s) detected`);
+        if (apply(ai.lines, ai.date, ai.dayTotal) > 0) return;
+      } catch { /* vision unavailable — fall through to on-device OCR */ }
+      // 2) Fallback: on-device OCR (Arabic + English)
+      try {
+        setOcrStatus("Reading photo (on-device)…");
         const Tesseract = (await import("tesseract.js")).default;
-        setOcrStatus("Reading photo…");
         const { data } = await Tesseract.recognize(f, "ara+eng", {
           logger: (m: { status?: string; progress?: number }) => {
             if (m.status === "recognizing text" && typeof m.progress === "number") setOcrStatus(`Reading photo… ${Math.round(m.progress * 100)}%`);
@@ -96,16 +119,8 @@ export function ProductLineImportScreen() {
         setOcrStatus("");
         setOcrText(data.text || "");
         const parsed = parseOcrProductLines(data.text || "");
-        const built: Row[] = parsed.lines.map((l) => ({
-          product: l.rawName, barcode: l.barcode,
-          qty: l.qty != null ? String(l.qty) : "", price: l.unitPrice != null ? String(l.unitPrice) : "", total: l.lineTotal != null ? String(l.lineTotal) : "",
-        }));
-        setRows(built);
-        setHeaders(["product", "barcode", "qty", "price", "total"]);
-        setMap({ date: "", barcode: "barcode", product: "product", qty: "qty", unitPrice: "price", lineTotal: "total" });
-        setDayDate(parsed.date ?? "");
-        setPhotoTotal(parsed.dayTotal);
-        if (!built.length) reportError("Read photo", new Error("Couldn't find product rows — try a sharper, straight-on photo, or upload the Excel export."));
+        const n = apply(parsed.lines.map((l) => ({ name: l.rawName, barcode: l.barcode, qty: l.qty, price: l.unitPrice, total: l.lineTotal })), parsed.date, parsed.dayTotal);
+        if (!n) reportError("Read photo", new Error("Couldn't read product rows — try a sharper, straight-on photo, or upload the Excel export."));
       } catch (err) { setOcrStatus(""); reportError("Read photo", err); }
       return;
     }
