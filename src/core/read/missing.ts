@@ -2,7 +2,6 @@
  *  fixed. READ-ONLY. */
 import { requireEngine } from "@/core/db/engine";
 import { getStockSummary } from "./stock";
-import { getSettlementPeriods } from "./settlements";
 import { getLifetimeProducts } from "./products";
 
 export type Severity = "high" | "medium" | "low";
@@ -14,9 +13,8 @@ export async function getMissingData(): Promise<MissingIssue[]> {
   const sb = requireEngine();
   const issues: MissingIssue[] = [];
 
-  const [stock, periods, unmapped, unrecon, lifetime] = await Promise.all([
+  const [stock, unmapped, unrecon, lifetime] = await Promise.all([
     getStockSummary(),
-    getSettlementPeriods(),
     sb.from("sale_items").select("id", { count: "exact", head: true }).is("voided_at", null).is("product_id", null),
     sb.from("sales").select("id", { count: "exact", head: true }).is("voided_at", null).eq("reconciled", false),
     getLifetimeProducts().catch(() => []),
@@ -43,11 +41,6 @@ export async function getMissingData(): Promise<MissingIssue[]> {
   if (unreconCount) issues.push({ key: "unreconciled-sales", title: "Sales days not matching lines", severity: "medium",
     detail: "Day total differs from the sum of product lines beyond tolerance.", count: unreconCount, route: "/sales",
     action: "Open each day and adjust lines or the day total until they agree." });
-
-  const openOwed = periods.filter((p) => p.status !== "reconciled" && p.netExpected > 0).length;
-  if (openOwed) issues.push({ key: "settlements", title: "Unreconciled settlements", severity: "low",
-    detail: "Settlement periods with money expected but not reconciled.", count: openOwed, route: "/cheques",
-    action: "Record and reconcile the cheque for each period." });
 
   const order = { high: 0, medium: 1, low: 2 };
   return issues.sort((a, b) => order[a.severity] - order[b.severity]);

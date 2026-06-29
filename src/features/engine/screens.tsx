@@ -22,7 +22,7 @@ import { useFilters } from "@/store/filters";
 import { getStockSummary } from "@/core/read/stock";
 import { getProducts } from "@/core/read/common";
 import { getRecentSales, getSalesStats, getSaleItems, type SaleRow as SaleRowVM, type SaleLine } from "@/core/read/sales";
-import { getPurchases } from "@/core/read/purchases";
+import { getPurchases, getInventoryPurchases } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
 import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
 import { voidSaleItem, voidSale } from "@/core/db/mutations";
@@ -231,12 +231,16 @@ export function PurchasesScreen() {
   const [productId, setProductId] = useState("");
   const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
   const q = useQuery({ queryKey: ["purchases", range], queryFn: () => getPurchases(range), enabled: isEngineConfigured });
+  const inv = useQuery({ queryKey: ["inv-purchases", range], queryFn: () => getInventoryPurchases(range), enabled: isEngineConfigured });
   const rows = (q.data ?? []).filter((r) => !productId || r.productId === productId);
-  const filteredTotal = rows.reduce((s, r) => s + r.totalCost, 0);
+  // lump historical stock buys (no per-product detail) only show in the unfiltered view
+  const lump = productId ? [] : (inv.data ?? []);
+  const filteredTotal = rows.reduce((s, r) => s + r.totalCost, 0) + lump.reduce((s, r) => s + r.totalCost, 0);
+  const entries = rows.length + lump.length;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Purchases feed COGS → WAC</Eyebrow>
+        <Eyebrow>Stock buying = cost of goods · per-product batches feed WAC</Eyebrow>
         <div className="flex-1" />
         <DateRangePicker />
         <Button onClick={() => setAddOpen(true)}>+ Purchase</Button>
@@ -249,10 +253,10 @@ export function PurchasesScreen() {
         {productId && <Button variant="ghost" onClick={() => setProductId("")}>Clear</Button>}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label={productId ? "Spend (filtered)" : "Spend in range"} accent="amber" icon={SI.spend} value={egp(filteredTotal)} />
-        <StatCard label="Batches" accent="blue" icon={SI.batch} value={rows.length} />
+        <StatCard label={productId ? "Spend (filtered)" : "Stock spend in range"} accent="amber" icon={SI.spend} value={egp(filteredTotal)} />
+        <StatCard label="Entries" accent="blue" icon={SI.batch} value={entries} sub={lump.length ? `${lump.length} historical` : undefined} />
       </div>
-      <Guarded q={q} empty={rows.length === 0}>
+      <Guarded q={q} empty={entries === 0}>
         <Card className="!p-0">
           <div className="divide-y divide-line">
             {rows.map((r) => (
@@ -263,6 +267,15 @@ export function PurchasesScreen() {
                 </div>
                 <div className="font-display text-sm font-semibold">{egp(r.totalCost)}</div>
               </Link>
+            ))}
+            {lump.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm text-text">{r.note}</div>
+                  <div className="text-[12px] text-dim">{fmtDate(r.date)} · stock purchase · no product breakdown</div>
+                </div>
+                <div className="font-display text-sm font-semibold">{egp(r.totalCost)}</div>
+              </div>
             ))}
           </div>
         </Card>

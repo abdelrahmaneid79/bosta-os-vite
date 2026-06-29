@@ -7,8 +7,8 @@ import { getExpenses, getExpenseTotal } from "./expenses";
 import { getPurchases } from "./purchases";
 import { getProductProfit } from "./products";
 import { getProfitReadout } from "./profit";
-import { getSettlementPeriods } from "./settlements";
-import { todayCairo, monthBoundsCairo, priorRange, isoRange } from "@/core/time";
+import { getChequeCycle } from "./settlements";
+import { todayCairo, monthBoundsCairo, priorRange } from "@/core/time";
 import type { DateRange } from "./common";
 
 export interface DailyPoint { date: string; total: number }
@@ -80,22 +80,23 @@ export async function getAnalytics(range: DateRange, accountingStart?: string): 
   const month = monthBoundsCairo();
   const prior = priorRange(range);
 
-  const [allPoints, expensesRange, totalExpensesAll, purchasesRange, products, monthProfit, periods] = await Promise.all([
+  const [allPoints, expensesRange, totalExpensesAll, purchasesRange, products, monthProfit, cycle] = await Promise.all([
     getDailyRevenue({ from: EPOCH, to: today }),
     getExpenses(range),
     getExpenseTotal({ from: EPOCH, to: today }),
     getPurchases(range),
     getProductProfit(range),
     getProfitReadout(month, accountingStart),
-    getSettlementPeriods(),
+    getChequeCycle(),
   ]);
 
   const rangePoints = inRange(allPoints, range);
   const priorRevenue = sumTotals(inRange(allPoints, prior));
   const periodRevenue = sumTotals(rangePoints);
-  const firstDate = allPoints.length ? allPoints.map((p) => p.date).sort()[0] : today;
-  const daysSinceLaunch = Math.max(1, isoRange(firstDate, today).length);
-  const owed = periods.filter((p) => p.status === "open").reduce((s, p) => s + p.netExpected, 0);
+  const sortedDates = allPoints.map((p) => p.date).sort();
+  const firstDate = sortedDates[0] ?? today;
+  const lastDate = sortedDates[sortedDates.length - 1] ?? today;
+  const owed = cycle.openTab.revenue; // real "awaiting cheque" = sales since the last cheque
 
   // expense distribution by category
   const catMap = new Map<string, number>();
@@ -111,15 +112,13 @@ export async function getAnalytics(range: DateRange, accountingStart?: string): 
 
   const kpis: Kpi[] = [
     { key: "periodRevenue", label: "Period revenue", value: periodRevenue, sub: `${rangePoints.length} sales days` },
-    { key: "dailyAvg", label: "Daily average", value: rangePoints.length ? periodRevenue / rangePoints.length : 0, sub: "this period" },
-    { key: "avg30", label: "30-day average", value: lastNDaysAvg(allPoints, today, 30), sub: "rolling benchmark" },
+    { key: "dailyAvg", label: "Daily average", value: rangePoints.length ? periodRevenue / rangePoints.length : 0, sub: "in range" },
+    { key: "allTime", label: "All-time revenue", value: sumTotals(allPoints), sub: `${firstDate} → ${lastDate}` },
     { key: "monthProfit", label: "Est. monthly profit", value: monthProfit.netProfit, sub: monthProfit.netProfit == null ? "needs product costs" : "this month, net", tone: "good" },
-    { key: "owed", label: "Expected payout", value: owed, sub: "open settlements", tone: "warn" },
-    { key: "allTime", label: "All-time revenue", value: sumTotals(allPoints), sub: `${firstDate} → today` },
-    { key: "totalDays", label: "Days traded", value: allPoints.length, sub: "since launch" },
-    { key: "totalExp", label: "Total expenses", value: totalExpensesAll, sub: "all recorded" },
+    { key: "totalExp", label: "Total spend", value: totalExpensesAll, sub: "operating + inventory" },
+    { key: "owed", label: "Awaiting cheque", value: owed, sub: "sales since last cheque", tone: "warn" },
+    { key: "totalDays", label: "Days traded", value: allPoints.length, sub: `since ${firstDate}` },
     { key: "growth", label: "Growth vs prev", value: growth, sub: growth == null ? "no prior data" : "vs previous period", tone: growth != null && growth < 0 ? "warn" : "good" },
-    { key: "sinceLaunch", label: "Days since launch", value: daysSinceLaunch, sub: firstDate },
   ];
 
   return {

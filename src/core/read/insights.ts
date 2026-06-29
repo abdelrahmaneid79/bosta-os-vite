@@ -5,11 +5,10 @@ import { requireEngine } from "@/core/db/engine";
 import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo } from "@/core/time";
 import { getStockSummary } from "./stock";
 import { getCashSummary } from "./money";
-import { getSettlementPeriods, getCheques } from "./settlements";
-import { getRevenueTotal, reconTolerance } from "./sales";
+import { getRevenueTotal } from "./sales";
 import { getOperatingExpenseTotal } from "./expenses";
 import {
-  buildStockInsights, buildCashInsights, buildSettlementInsights, buildTrendInsights,
+  buildStockInsights, buildCashInsights, buildTrendInsights,
   sortInsights, type Insight, type Velocity,
 } from "@/core/insights/risk";
 
@@ -46,25 +45,17 @@ export async function getRiskInsights(): Promise<Insight[]> {
   const month = monthBoundsCairo();
   const last = lastMonthBoundsCairo();
 
-  const [stock, velocity, cash, counted, periods, cheques, thisRev, lastRev, thisExp, lastExp] =
+  const [stock, velocity, cash, counted, thisRev, lastRev, thisExp, lastExp] =
     await Promise.all([
       getStockSummary(),
       getStockVelocity(30),
       getCashSummary(month),
       sb.from("cash_reconciliations").select("id", { count: "exact", head: true }),
-      getSettlementPeriods(),
-      getCheques(),
       getRevenueTotal(month),
       getRevenueTotal(last),
       getOperatingExpenseTotal(month),
       getOperatingExpenseTotal(last),
     ]);
-
-  const chequePeriodIds = new Set(cheques.map((c) => c.periodId));
-  const periodsLite = periods.map((p) => ({
-    id: p.id, start: p.start, netExpected: p.netExpected, status: p.status,
-    hasCheque: chequePeriodIds.has(p.id),
-  }));
 
   return sortInsights([
     ...buildStockInsights(
@@ -78,9 +69,6 @@ export async function getRiskInsights(): Promise<Insight[]> {
       balance: cash.balance, inflow: cash.inflow, outflow: cash.outflow,
       withdrawals: cash.withdrawals, hasEverCounted: (counted.count ?? 0) > 0,
     }),
-    ...buildSettlementInsights(periodsLite, cheques.map((c) => ({
-      id: c.id, expected: c.expected, received: c.received, difference: c.difference, status: c.status,
-    })), reconTolerance),
     ...buildTrendInsights({ thisRevenue: thisRev, lastRevenue: lastRev, thisExpenses: thisExp, lastExpenses: lastExp }),
   ]);
 }

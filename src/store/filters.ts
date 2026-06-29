@@ -16,8 +16,10 @@ interface FilterState {
 }
 
 export const useFilters = create<FilterState>((set) => ({
-  rangeKey: "month",
-  customFrom: resolveRange("month").from,
+  // Default to All time: the latest sales may predate the current month, so a
+  // "this month" default would show empty screens even though data exists.
+  rangeKey: "all",
+  customFrom: resolveRange("all").from,
   customTo: todayCairo(),
   setRangeKey: (rangeKey) => set({ rangeKey }),
   setCustom: (customFrom, customTo) => set({ customFrom, customTo, rangeKey: "custom" }),

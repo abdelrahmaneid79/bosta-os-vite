@@ -42,3 +42,16 @@ export async function getPurchaseTotal(range: DateRange): Promise<number> {
   const rows = await getPurchases(range);
   return rows.reduce((s, r) => s + r.totalCost, 0);
 }
+
+/** Historical/lump inventory buying lives in the expenses ledger (cost-of-goods
+ *  category, is_operating = false) because it has no per-product detail. Surface
+ *  it here so stock spend shows in the Inventory area, not buried in Expenses. */
+export interface InventoryPurchase { id: string; date: string; note: string; totalCost: number }
+export async function getInventoryPurchases(range: DateRange): Promise<InventoryPurchase[]> {
+  const { getExpenses } = await import("./expenses");
+  const exps = await getExpenses(range);
+  return exps
+    .filter((e) => !e.isOperating)
+    .map((e) => ({ id: e.id, date: e.date, note: e.notes || e.category, totalCost: e.amount }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}

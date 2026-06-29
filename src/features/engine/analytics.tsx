@@ -147,7 +147,7 @@ export function AnalyticsScreen() {
       {forecast.data && forecast.data.tradingDays > 0 && <ForecastCard f={forecast.data} />}
 
       {/* KPI grid */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {a.kpis.map((k) => (
           <Card key={k.key} className="!p-4">
             <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-dim">{k.label}</div>
