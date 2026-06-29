@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardHead, Eyebrow, StatCard, Badge, Button, Select } from "@/components/ui";
+import { Card, CardHead, Eyebrow, StatCard, Button, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
 import { BarChart } from "@/components/charts";
@@ -12,8 +12,7 @@ import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getCashLedger, getCashSummary, getMoneyAccounts } from "@/core/read/money";
-import { getSettlementDetail, getChequeCycle } from "@/core/read/settlements";
-import type { SettlementStatus } from "@/core/settlement/logic";
+import { getChequeCycle } from "@/core/read/settlements";
 import { getExpenses, getExpenseCategories } from "@/core/read/expenses";
 import { voidMovement, voidCheque, voidExpense } from "@/core/db/mutations";
 import { CashForm, ChequeForm, ExpenseForm } from "./forms";
@@ -258,83 +257,6 @@ function CatGroup({ title, sub, total, cats, accent, active, onPick, hint }: {
   );
 }
 
-const SETTLE_TONE: Record<SettlementStatus, { tone: "good" | "warn" | "neutral" | "info"; label: string }> = {
-  settled: { tone: "good", label: "settled" }, partial: { tone: "warn", label: "partial" },
-  awaiting: { tone: "neutral", label: "awaiting" }, over: { tone: "info", label: "overpaid" },
-};
-function SettlementBadge({ status }: { status: SettlementStatus }) {
-  const m = SETTLE_TONE[status];
-  return <Badge tone={m.tone}>{m.label}</Badge>;
-}
-const DEDUCTION_LABEL: Record<string, string> = { rent: "Rent / stand fee", revenue_charge: "Revenue share", other: "Other deduction" };
-
-// ── Settlement detail (one period: revenue − deductions vs cheques) ──────────
-export function SettlementDetailScreen() {
-  const { id = "" } = useParams();
-  const d = useQuery({ queryKey: ["settlement", id], queryFn: () => getSettlementDetail(id), enabled: en && !!id });
-  if (!en) return <EmptyState title="Sign in to view settlement" />;
-  if (d.isLoading) return <SkeletonRows rows={6} />;
-  if (d.isError) return <ErrorState message={String((d.error as Error)?.message)} onRetry={() => d.refetch()} />;
-  const s = d.data;
-  if (!s) return <EmptyState title="Settlement not found" />;
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to="/cheques" className="text-sm font-semibold text-pink">← Cheques</Link>
-        <div className="flex-1" />
-        {s.overdue && <Badge tone="bad">overdue {s.daysOutstanding}d</Badge>}
-        <SettlementBadge status={s.status} />
-      </div>
-
-      <Card glow>
-        <Eyebrow accent="text-pink">Settlement · {fmtDate(s.start, "MMMM yyyy")}</Eyebrow>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <StatCard label="Expected (net)" accent="pink" icon={MI.bank} value={egp(s.expected)} sub="revenue − deductions" />
-          <StatCard label="Received" accent="mint" icon={MI.in} value={egp(s.received)} sub={`${s.cheques.length} cheque${s.cheques.length === 1 ? "" : "s"}`} />
-          <StatCard label={s.outstanding < 0 ? "Overpaid" : "Outstanding"} accent={s.outstanding > 0 ? (s.overdue ? "red" : "amber") : "mint"} icon={MI.out} value={egp(Math.abs(s.outstanding))} sub={s.daysOutstanding != null ? `${s.daysOutstanding} days outstanding` : "fully settled"} />
-        </div>
-      </Card>
-
-      <Card>
-        <CardHead title="Breakdown" sub="How the expected cheque is calculated" accent="violet" icon={MI.bank} />
-        <div className="divide-y divide-line text-sm">
-          <Row2 label="Revenue (period)" value={egp(s.revenue)} strong />
-          {s.deductions.map((x, i) => (
-            <Row2 key={i} label={`− ${DEDUCTION_LABEL[x.type] ?? x.type}${x.rate != null ? ` (${Math.round(x.rate * 100)}%)` : ""}`} value={`−${egp(x.amount)}`} tone="text-bad" />
-          ))}
-          <Row2 label="= Expected net" value={egp(s.expected)} strong accent="text-pink" />
-          <Row2 label="Cheques received" value={egp(s.received)} tone="text-good" />
-          <Row2 label={s.outstanding < 0 ? "Overpaid" : "Still outstanding"} value={egp(Math.abs(s.outstanding))} strong accent={s.outstanding > 0 ? "text-warn" : "text-good"} />
-        </div>
-      </Card>
-
-      <Eyebrow>Cheques in this period</Eyebrow>
-      {s.cheques.length === 0 ? <EmptyState title="No cheque recorded yet" hint="Record the cheque on the Cheques screen when it arrives." /> : (
-        <Card className="!p-0"><div className="divide-y divide-line">
-          {s.cheques.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 px-5 py-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-good/10 text-good"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={MI.bank} /></svg></span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text">{c.receivedDate ? fmtDate(c.receivedDate, "d MMM yyyy") : "pending"}</div>
-                <div className="text-[12px] text-dim">expected {egp(c.expected)}{c.received != null ? ` · received ${egp(c.received)}` : ""}</div>
-              </div>
-              <Badge tone={c.status === "reconciled" ? "good" : "neutral"}>{c.status}</Badge>
-              <div className="tnum font-display text-sm font-bold text-good">{c.received != null ? egp(c.received) : "—"}</div>
-            </div>
-          ))}
-        </div></Card>
-      )}
-    </div>
-  );
-}
-function Row2({ label, value, tone, accent, strong }: { label: string; value: string; tone?: string; accent?: string; strong?: boolean }) {
-  return (
-    <div className="flex items-center justify-between py-2.5">
-      <span className={`text-[13px] ${strong ? "font-display font-bold text-text" : "text-muted"}`}>{label}</span>
-      <span className={`tnum font-display text-sm font-bold ${accent ?? tone ?? "text-text"}`}>{value}</span>
-    </div>
-  );
-}
 
 // ── Cheques — close the running sales tab, cross-referenced to sales ─────────
 export function ChequesScreen() {

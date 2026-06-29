@@ -55,7 +55,6 @@ const AnalyticsScreen = L(analytics, "AnalyticsScreen");
 const QAScreen = L(qa, "QAScreen");
 const PreferencesScreen = L(more, "PreferencesScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
-const SettlementDetailScreen = L(money, "SettlementDetailScreen");
 const ProductLineImportScreen = L(productImport, "ProductLineImportScreen");
 
 const I = {
@@ -394,7 +393,6 @@ function Shell() {
               )))}
               <Route path="/imports" element={<Navigate to="/sales/import" replace />} />
               <Route path="/product/:id" element={<ProductDetailScreen />} />
-              <Route path="/settlement/:id" element={<SettlementDetailScreen />} />
               <Route path="*" element={<Navigate to={landing} replace />} />
             </Routes>
           </Suspense>
