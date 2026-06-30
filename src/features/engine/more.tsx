@@ -6,6 +6,7 @@ import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge, Select } from "
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, PartialNote } from "@/components/feedback";
 import { usePrefs } from "@/store/prefs";
+import { useBooksStartDate } from "@/store/books";
 import { LANDING_OPTIONS, HIDEABLE_SECTIONS } from "@/core/nav";
 import { RANGE_PRESETS } from "@/core/range";
 import { parseSalesRows, parseExpenseRows, type Row } from "@/core/import/csv";
@@ -48,7 +49,7 @@ function downloadCSV(name: string, rows: Record<string, unknown>[]) {
 export function ReportsScreen() {
   const r = useActiveRange();
   const rk = useFilters((s) => s.rangeKey);
-  const accStart = usePrefs((s) => s.accountingStart);
+  const accStart = useBooksStartDate();
   const prior = priorRange(r);
   const stock = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: en });
   const sales = useQuery({ queryKey: ["salesStats", r], queryFn: () => getSalesStats(r), enabled: en });

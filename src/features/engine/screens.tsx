@@ -12,7 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
-import { usePrefs } from "@/store/prefs";
+import { useBooksStartDate } from "@/store/books";
 import { egp, egpShort, num, pct } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
@@ -291,7 +291,7 @@ export function PurchasesScreen() {
 export function ReconcileScreen() {
   const range = useActiveRange();
   const key = useFilters((s) => s.rangeKey);
-  const accStart = usePrefs((s) => s.accountingStart);
+  const accStart = useBooksStartDate();
   const q = useQuery({ queryKey: ["profit", range, accStart], queryFn: () => getProfitReadout(range, accStart), enabled: isEngineConfigured });
   const p = q.data;
   return (

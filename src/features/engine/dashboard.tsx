@@ -19,7 +19,7 @@ import { getHealthReport } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
 import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
-import { usePrefs } from "@/store/prefs";
+import { useBooksStartDate } from "@/store/books";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
@@ -214,7 +214,7 @@ export function DashboardScreen() {
   const feed = useQuery({ queryKey: ["activity"], queryFn: () => getActivityFeed(30, 6), enabled: en });
   const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
   const daily = useQuery({ queryKey: ["dailyHist", histFrom], queryFn: () => getDailyRevenue({ from: histFrom, to: today }), enabled: en });
-  const accStart = usePrefs((s) => s.accountingStart);
+  const accStart = useBooksStartDate();
   const profitM = useQuery({ queryKey: ["profit", month, accStart], queryFn: () => getProfitReadout(month, accStart), enabled: en });
   const spend = useQuery({ queryKey: ["dash-spend", histFrom], queryFn: () => getExpenses({ from: histFrom, to: today }), enabled: en });
   const c = cc.data;

@@ -8,7 +8,7 @@ import { Card, Eyebrow, Badge } from "@/components/ui";
 import { cn } from "@/core/utils/cn";
 import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
-import { usePrefs } from "@/store/prefs";
+import { useBooksStartDate } from "@/store/books";
 import { BarChart, LineChart, DonutChart, HBars } from "@/components/charts";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -114,7 +114,7 @@ type ChartMode = "bar" | "line" | "monthly";
 
 export function AnalyticsScreen() {
   const range = useActiveRange();
-  const accStart = usePrefs((s) => s.accountingStart);
+  const accStart = useBooksStartDate();
   const [mode, setMode] = useState<ChartMode>("bar");
   const q = useQuery({ queryKey: ["analytics", range, accStart], queryFn: () => getAnalytics(range, accStart), enabled: isEngineConfigured });
   const lifetime = useQuery({ queryKey: ["lifetime-products"], queryFn: getLifetimeProducts, enabled: isEngineConfigured });
