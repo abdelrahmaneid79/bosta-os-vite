@@ -30,6 +30,7 @@ const more = () => import("@/features/engine/more");
 const product = () => import("@/features/engine/product");
 const receipts = () => import("@/features/engine/receipts");
 const productImport = () => import("@/features/engine/product-import");
+const opening = () => import("@/features/engine/opening");
 const analytics = () => import("@/features/engine/analytics");
 const qa = () => import("@/features/qa/QAScreen");
 const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
@@ -57,6 +58,7 @@ const PreferencesScreen = L(more, "PreferencesScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
 const ProductLineImportScreen = L(productImport, "ProductLineImportScreen");
 const ProductCostImportScreen = L(productImport, "ProductCostImportScreen");
+const OpeningBalancesScreen = L(opening, "OpeningBalancesScreen");
 
 const I = {
   today: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
@@ -88,7 +90,7 @@ const EL: Record<string, React.ReactNode> = {
   "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
   "/health": <HealthScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
-  "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/settings/history": <HistoryImportScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
+  "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/settings/opening": <OpeningBalancesScreen />, "/settings/history": <HistoryImportScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
 };
 const build = (s: { id: string; label: string; icon: string; accent: string; tabs: { to: string; label: string }[] }): Group =>
   ({ id: s.id, label: s.label, icon: s.icon, accent: s.accent, tabs: s.tabs.map((t) => ({ ...t, el: EL[t.to] })) });
@@ -393,6 +395,7 @@ function Shell() {
                 <Route key={t.to} path={t.to} element={<Page group={g}>{t.el}</Page>} />
               )))}
               <Route path="/imports" element={<Navigate to="/sales/import" replace />} />
+              <Route path="/expenses/import" element={<Page group={ALL_GROUPS.find((g) => g.id === "money")!}>{EL["/expenses/import"]}</Page>} />
               <Route path="/product/:id" element={<ProductDetailScreen />} />
               <Route path="*" element={<Navigate to={landing} replace />} />
             </Routes>
