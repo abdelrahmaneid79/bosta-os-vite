@@ -14,7 +14,7 @@ export interface Prefs {
   theme: ThemeMode;           // light (default) / dark / follow system
 }
 
-export const DEFAULT_PREFS: Prefs = { landing: "/dashboard", defaultRange: "month", hiddenSections: [], accountingStart: "2026-03-01", theme: "dark" };
+export const DEFAULT_PREFS: Prefs = { landing: "/dashboard", defaultRange: "all", hiddenSections: [], accountingStart: "2026-07-01", theme: "dark" };
 
 const KEY = "bostaos.prefs.v1";
 function load(): Prefs {

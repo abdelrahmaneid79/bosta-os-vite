@@ -39,33 +39,54 @@ export async function getMoneyMovements(range: DateRange, limit = 80): Promise<M
   }));
 }
 
-/** True cash position (all-time): money in (cheques, injections, cash-in) minus
- *  money out (withdrawals, manual cash-out, expenses, stock purchases). This is
- *  the honest "cash on hand" — the stored money_accounts balance only tracks the
- *  movements ledger and ignores expenses, so it overstates reality. */
-export interface CashPosition { onHand: number; inflowsAll: number; outflowsAll: number }
+/** Clean-books anchor: from `date`, the live cash position is `openingCash` plus
+ *  only the flows on/after that date — the earlier (partial/mixed) era is carried
+ *  forward as a single opening balance, not reconstructed. Stored in app_settings
+ *  `books_start` = { date, openingCash }. Until openingCash is set, cash falls back
+ *  to the all-time net so nothing breaks. */
+export interface BooksStart { date: string | null; openingCash: number | null }
+export async function getBooksStart(): Promise<BooksStart> {
+  const { data } = await requireEngine().from("app_settings").select("value").eq("key", "books_start").maybeSingle();
+  const v = (data?.value ?? null) as { date?: string; openingCash?: number | null } | null;
+  return {
+    date: typeof v?.date === "string" ? v.date : null,
+    openingCash: typeof v?.openingCash === "number" ? v.openingCash : null,
+  };
+}
+
+/** Honest "cash on hand". With a clean-books opening balance set, this is
+ *  openingCash + (inflows − outflows) since the books-start date; otherwise it's
+ *  the all-time net (cheques in − expenses, purchases, withdrawals, cash-out). */
+export interface CashPosition { onHand: number; inflowsAll: number; outflowsAll: number; opening: number; since: string | null }
 export async function getCashPosition(): Promise<CashPosition> {
   const sb = requireEngine();
   const today = todayCairo();
-  const [mvRes, expAll, purAll] = await Promise.all([
-    sb.from("money_movements").select("amount").is("voided_at", null),
-    getExpenseTotal({ from: EPOCH, to: today }),
-    getPurchaseTotal({ from: EPOCH, to: today }),
+  const books = await getBooksStart();
+  const anchored = !!(books.date && books.openingCash != null);
+  const from = anchored ? books.date! : EPOCH;
+  const opening = anchored ? books.openingCash! : 0;
+  const [mvRes, expFwd, purFwd] = await Promise.all([
+    sb.from("money_movements").select("amount").is("voided_at", null).gte("movement_date", from),
+    getExpenseTotal({ from, to: today }),
+    getPurchaseTotal({ from, to: today }),
   ]);
   if (mvRes.error) throw mvRes.error;
   let mvIn = 0, mvOut = 0;
   for (const m of mvRes.data) { if (m.amount >= 0) mvIn += m.amount; else mvOut += Math.abs(m.amount); }
-  const inflowsAll = r2(mvIn);
-  const outflowsAll = r2(mvOut + expAll + purAll);
-  return { onHand: r2(inflowsAll - outflowsAll), inflowsAll, outflowsAll };
+  const inflowsAll = r2(opening + mvIn);
+  const outflowsAll = r2(mvOut + expFwd + purFwd);
+  return { onHand: r2(inflowsAll - outflowsAll), inflowsAll, outflowsAll, opening, since: anchored ? books.date : null };
 }
 
 /** One row in the unified cash flow: signed amount (+ in / − out) with its source. */
 export type CashKind = "cheque" | "withdrawal" | "expense" | "purchase" | "cash_in" | "cash_out";
 export interface CashEntry { id: string; date: string; label: string; amount: number; kind: CashKind }
-/** Every cash flow in range — movements + expenses + purchases — newest first. */
+/** Every cash flow in range — movements + expenses + purchases — newest first.
+ *  When a clean-books opening balance is set, flows before the books-start date
+ *  are excluded (that era is carried forward as the opening balance instead). */
 export async function getCashLedger(range: DateRange): Promise<CashEntry[]> {
-  const [mv, exps, purs] = await Promise.all([getMoneyMovements(range, 1000), getExpenses(range), getPurchases(range)]);
+  const [mv, exps, purs, books] = await Promise.all([getMoneyMovements(range, 1000), getExpenses(range), getPurchases(range), getBooksStart()]);
+  const floor = books.date && books.openingCash != null ? books.date : null;
   const entries: CashEntry[] = [];
   for (const m of mv) {
     const label = m.notes ? `${m.type.replace(/_/g, " ")} · ${m.notes}` : m.type.replace(/_/g, " ");
@@ -74,13 +95,16 @@ export async function getCashLedger(range: DateRange): Promise<CashEntry[]> {
   }
   for (const e of exps) entries.push({ id: `ex-${e.id}`, date: e.date, label: e.category + (e.notes ? ` · ${e.notes}` : ""), amount: -e.amount, kind: "expense" });
   for (const p of purs) entries.push({ id: `pu-${p.id}`, date: p.date, label: `Stock · ${p.productName}`, amount: -p.totalCost, kind: "purchase" });
-  return entries.sort((a, b) => b.date.localeCompare(a.date));
+  const kept = floor ? entries.filter((e) => e.date >= floor) : entries;
+  return kept.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export interface CashSummary {
   balance: number | null; inflow: number; outflow: number; withdrawals: number;
+  opening: number; since: string | null;
 }
-/** Range summary over the unified ledger: balance is the all-time net position;
+/** Range summary over the unified ledger: balance is the live net position
+ *  (opening balance + flows since books-start, or all-time if no books-start);
  *  inflow/outflow span cheques, cash moves, expenses and purchases in range. */
 export async function getCashSummary(range: DateRange): Promise<CashSummary> {
   const [pos, ledger] = await Promise.all([getCashPosition(), getCashLedger(range)]);
@@ -89,5 +113,5 @@ export async function getCashSummary(range: DateRange): Promise<CashSummary> {
     if (e.amount >= 0) inflow += e.amount; else outflow += e.amount;
     if (e.kind === "withdrawal") withdrawals += Math.abs(e.amount);
   }
-  return { balance: pos.onHand, inflow: r2(inflow), outflow: r2(outflow), withdrawals: r2(withdrawals) };
+  return { balance: pos.onHand, inflow: r2(inflow), outflow: r2(outflow), withdrawals: r2(withdrawals), opening: pos.opening, since: pos.since };
 }
