@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardHead, Eyebrow, Pill, Ring, Badge, Button, StatCard, IconChip, DeltaChip, Sparkline, Tabs, type Accent } from "@/components/ui";
+import { Card, CardHead, Eyebrow, Pill, Ring, Badge, Button, StatCard, IconChip, DeltaChip, Tabs, type Accent } from "@/components/ui";
 import { DonutChart } from "@/components/charts";
 import { getExpenses } from "@/core/read/expenses";
 import { cn } from "@/core/utils/cn";
@@ -35,6 +35,40 @@ const I = {
 } as const;
 
 const delta = (cur: number, prev: number): number | null => (prev > 0 ? ((cur - prev) / prev) * 100 : null);
+
+/* ─ Gradient hero balance card (reference-grade) — big number, delta pill, and
+   an inline bar-viz of the trailing months, all on a brand-pink gradient. ── */
+function HeroCard({ label, value, deltaPct, sub, bars }: { label: string; value: string; deltaPct: number | null; sub: string; bars: number[] }) {
+  const max = Math.max(1, ...bars);
+  return (
+    <div className="lift relative flex flex-col overflow-hidden rounded-3xl p-6 text-ink shadow-pink"
+      style={{ background: "linear-gradient(140deg, rgb(var(--pink)) 0%, rgb(var(--berry)) 100%)" }}>
+      <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/12 blur-2xl" />
+      <div className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-black/10 blur-2xl" />
+      <div className="relative flex items-center justify-between">
+        <div className="text-[12.5px] font-semibold uppercase tracking-[0.12em] opacity-90">{label}</div>
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 transition group-hover:bg-white/25">
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
+        </span>
+      </div>
+      <div className="relative mt-3.5 flex flex-wrap items-end gap-2.5">
+        <div className="tnum font-display text-[44px] font-extrabold leading-[0.95]">{value}</div>
+        {deltaPct != null && Number.isFinite(deltaPct) && (
+          <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-bold backdrop-blur">
+            <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">{deltaPct >= 0 ? <path d="M3 8l3-3 3 3" /> : <path d="M3 4l3 3 3-3" />}</svg>
+            {Math.abs(Math.round(deltaPct))}%
+          </span>
+        )}
+      </div>
+      <div className="relative mt-1.5 text-[12.5px] font-medium opacity-80">{sub}</div>
+      <div className="relative mt-auto flex h-20 items-end gap-[5px] pt-5">
+        {bars.map((b, i) => (
+          <div key={i} className="flex-1 rounded-t-[5px] bg-white/30" style={{ height: `${Math.max(5, (b / max) * 100)}%`, transition: "height .6s cubic-bezier(.22,1,.36,1)" }} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /* ─ Interactive revenue chart ──────────────────────────────────────────────
    Selectable period (3M/6M/12M/All) with automatic granularity, a labeled
@@ -241,13 +275,17 @@ export function DashboardScreen() {
 
   const widgets: Record<WidgetId, ReactNode> = {
     kpis: (
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Revenue · 12 months" accent="pink" icon={I.revenue} value={loading ? "—" : egpShort(trendTotal)} delta={delta(monthRev, lastRev)} sub={`this month ${egpShort(monthRev)}`}>
-          <Sparkline data={sparkSeries} accent="pink" height={36} />
-        </StatCard>
-        <StatCard label="Cash on hand" accent="blue" icon={I.cash} value={loading ? "—" : c?.cashBalance == null ? "—" : egpShort(c.cashBalance)} sub="current balance" />
-        <StatCard label="Net profit · month" accent="mint" icon={I.profit} value={pM ? (pM.netProfit == null ? "needs costs" : egpShort(pM.netProfit)) : "—"} sub={pM?.netMargin != null ? `${Math.round(pM.netMargin)}% margin` : "after costs"} />
-        <StatCard label="Awaiting cheque" accent="amber" icon={I.owed} value={loading ? "—" : egpShort(c?.owed ?? 0)} sub="sales since last cheque" />
+      <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
+        <HeroCard label="Revenue · last 12 months" value={loading ? "—" : egp(trendTotal)}
+          deltaPct={delta(monthRev, lastRev)}
+          sub={`this month ${egpShort(monthRev)}${latestDay ? ` · latest ${fmtDate(latestDay, "d MMM")}` : ""}`}
+          bars={sparkSeries} />
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard label="Cash on hand" accent="blue" icon={I.cash} value={loading ? "—" : c?.cashBalance == null ? "—" : egpShort(c.cashBalance)} sub="current" />
+          <StatCard label="Net profit · mo" accent="mint" icon={I.profit} value={pM ? (pM.netProfit == null ? "needs costs" : egpShort(pM.netProfit)) : "—"} sub={pM?.netMargin != null ? `${Math.round(pM.netMargin)}% margin` : "after costs"} />
+          <StatCard label="Awaiting cheque" accent="amber" icon={I.owed} value={loading ? "—" : egpShort(c?.owed ?? 0)} sub="open tab" />
+          <StatCard label="Stock value" accent="violet" icon={I.stock} value={loading ? "—" : egpShort(c?.stockValue ?? 0)} sub="on hand" />
+        </div>
       </div>
     ),
     trend: (
