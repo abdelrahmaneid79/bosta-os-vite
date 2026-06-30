@@ -20,11 +20,11 @@ export function Card({
 }: { className?: string; children: ReactNode; glow?: boolean; accent?: string; as?: "div" | "section" }) {
   const Tag = as ?? "div";
   return (
-    <Tag className={cn("relative overflow-hidden rounded-3xl border border-line bg-panel p-5 shadow-card sm:p-6", className)}>
+    <Tag className={cn("relative overflow-hidden rounded-2xl border border-line bg-panel p-5 shadow-card sm:p-6", className)}>
       {glow && (
         <div
-          className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl"
-          style={{ background: accent ? `${accent}22` : "rgb(var(--pink) / 0.14)" }}
+          className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full blur-3xl"
+          style={{ background: accent ? `${accent}14` : "rgb(var(--pink) / 0.07)" }}
         />
       )}
       {children}
@@ -40,7 +40,7 @@ export function CardHead({
     <div className="mb-4 flex items-start gap-3">
       {icon && <IconChip d={icon} accent={accent} />}
       <div className="min-w-0 flex-1">
-        <h3 className="font-display text-[15px] font-bold leading-tight text-text">{title}</h3>
+        <h3 className="font-serif text-[17px] font-semibold leading-tight tracking-[-0.01em] text-text">{title}</h3>
         {sub && <p className="mt-0.5 text-[12.5px] text-dim">{sub}</p>}
       </div>
       {action && <div className="flex-shrink-0">{action}</div>}
@@ -55,7 +55,7 @@ export function Eyebrow({ children, className, accent }: { children: ReactNode; 
 export function SectionTitle({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
   return (
     <div>
-      <h2 className="font-display text-lg font-bold text-text">{children}</h2>
+      <h2 className="font-serif text-xl font-semibold tracking-[-0.01em] text-text">{children}</h2>
       {sub && <p className="text-xs text-dim">{sub}</p>}
     </div>
   );
@@ -67,7 +67,7 @@ export function IconChip({ d, accent = "pink", size = "md" }: { d: string; accen
   const dim = size === "lg" ? "h-12 w-12" : size === "sm" ? "h-8 w-8" : "h-10 w-10";
   const ic = size === "lg" ? "h-6 w-6" : size === "sm" ? "h-4 w-4" : "h-5 w-5";
   return (
-    <span className={cn("flex flex-shrink-0 items-center justify-center rounded-2xl", a.soft, dim)}>
+    <span className={cn("flex flex-shrink-0 items-center justify-center rounded-xl", a.soft, dim)}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={cn(ic, a.text)}>
         <path d={d} />
       </svg>
@@ -98,7 +98,7 @@ export function StatCard({
 }) {
   return (
     <div onClick={onClick}
-      className={cn("group rounded-3xl border border-line bg-panel p-5 shadow-card", onClick && "lift cursor-pointer hover:shadow-pop")}>
+      className={cn("group rounded-2xl border border-line bg-panel p-5 shadow-card", onClick && "lift cursor-pointer hover:shadow-pop")}>
       <div className="flex items-center justify-between">
         {icon ? <IconChip d={icon} accent={accent} /> : <span className="text-[12px] font-medium text-muted">{label}</span>}
         <DeltaChip pct={delta ?? undefined} />
@@ -153,10 +153,10 @@ export function Ring({ value, size = 128, stroke = 12, color, children }: {
   const c = 2 * Math.PI * r;
   const v = Math.max(0, Math.min(100, value ?? 0));
   const tier: [string, string, string] = color ? [color, color, color]
-    : v >= 80 ? ["#34D399", "#10B981", "#10B981"]
-    : v >= 55 ? ["#FBBF24", "#F59E0B", "#F59E0B"]
-    : v >= 1 ? ["#FB7185", "#F43F5E", "#F43F5E"]
-    : ["#CBD5E1", "#CBD5E1", "#CBD5E1"];
+    : v >= 80 ? ["#3CA87B", "#1F7A55", "#1F7A55"]
+    : v >= 55 ? ["#D6A93C", "#B07A1E", "#B07A1E"]
+    : v >= 1 ? ["#CC6A5E", "#B4453C", "#B4453C"]
+    : ["#CFC9BC", "#CFC9BC", "#CFC9BC"];
   const gid = `ring-${tier[0].slice(1)}-${size}`;
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
@@ -189,7 +189,7 @@ export function Button({ variant = "primary", size = "md", className, children, 
   };
   const S = size === "sm" ? "px-3 py-2 text-[13px]" : "px-4 py-2.5 text-sm";
   return (
-    <button className={cn("lift inline-flex items-center justify-center gap-2 rounded-2xl font-display font-bold transition disabled:cursor-not-allowed disabled:opacity-45", S, V[variant], className)} {...props}>
+    <button className={cn("lift inline-flex items-center justify-center gap-2 rounded-xl font-display font-bold transition disabled:cursor-not-allowed disabled:opacity-45", S, V[variant], className)} {...props}>
       {children}
     </button>
   );
@@ -210,7 +210,7 @@ export function Field({ label, error, children }: { label: string; error?: strin
     </label>
   );
 }
-const FIELD = "w-full rounded-2xl border border-line bg-panel2 px-3.5 py-2.5 text-sm text-text outline-none transition placeholder:text-faint focus:border-pink/60 focus:ring-2 focus:ring-pink/15";
+const FIELD = "w-full rounded-xl border border-line bg-panel2 px-3.5 py-2.5 text-sm text-text outline-none transition placeholder:text-faint focus:border-pink/70 focus:ring-2 focus:ring-pink/15";
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(FIELD, props.className)} />;
 }

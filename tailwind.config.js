@@ -29,9 +29,11 @@ export default {
         violet: c("--violet"),
       },
       fontFamily: {
-        display: ["Plus Jakarta Sans", "Inter", "system-ui", "sans-serif"],
-        sans: ["Inter", "IBM Plex Sans Arabic", "system-ui", "sans-serif"],
-        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
+        // Editorial serif for titles; geometric Plus Jakarta for UI + tabular data.
+        serif: ["Newsreader", "Georgia", "serif"],
+        display: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+        sans: ["Plus Jakarta Sans", "IBM Plex Sans Arabic", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       borderRadius: {
         "4xl": "28px",

@@ -9,61 +9,65 @@
    <html> swaps the palette. Premium fintech: clean neutrals + brand pink.
    =================================================================== */
 :root {
-  /* surfaces */
-  --bg: 246 247 249;        /* app canvas            */
-  --rail: 255 255 255;      /* sidebar               */
+  /* WARM EDITORIAL FINTECH — light. Warm bone canvas, hairline borders,
+     a single refined emerald accent + muted semantic tones. The --pink token
+     is kept as the app-wide accent slot but now carries emerald, so every
+     bg-pink / text-pink / shadow-pink re-skins to the new brand at once. */
+  --bg: 245 244 239;        /* warm bone canvas      */
+  --rail: 250 249 245;      /* sidebar               */
   --panel: 255 255 255;     /* cards                 */
-  --panel2: 244 245 248;    /* insets / inputs       */
-  --line: 228 231 236;      /* borders               */
-  --line2: 238 240 244;     /* subtle borders / hover*/
-  /* brand */
-  --pink: 219 45 152;       /* deep brand pink (contrast on white) */
-  --pink-bright: 248 104 200;
-  --berry: 136 24 72;
-  --ink: 255 255 255;       /* text ON pink/accent   */
-  /* text */
-  --text: 16 19 26;
-  --muted: 90 99 112;
-  --dim: 132 142 156;
-  --faint: 168 176 188;
-  /* semantic */
-  --good: 22 163 100;
-  --bad: 224 49 67;
-  --warn: 217 142 12;
-  --info: 47 112 240;
-  --violet: 124 92 255;
-  /* effects */
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 26px -12px rgba(16, 24, 40, 0.14);
-  --shadow-pop: 0 12px 40px -12px rgba(16, 24, 40, 0.22);
-  --shadow-pink: 0 10px 26px -8px rgba(219, 45, 152, 0.45);
-  --glow: rgba(219, 45, 152, 0.10);
+  --panel2: 247 245 240;    /* insets / inputs       */
+  --line: 226 222 213;      /* warm hairline border  */
+  --line2: 236 233 225;     /* subtle border / hover */
+  /* accent (emerald) */
+  --pink: 22 116 82;        /* emerald — money/trust, AA on white */
+  --pink-bright: 47 162 119;
+  --berry: 17 74 53;
+  --ink: 255 255 255;       /* text ON accent        */
+  /* text — warm off-black, never pure */
+  --text: 27 26 23;
+  --muted: 109 105 96;
+  --dim: 140 135 124;
+  --faint: 176 170 158;
+  /* semantic — refined, muted */
+  --good: 31 122 86;        /* emerald — in / positive */
+  --bad: 178 68 58;         /* clay red — out          */
+  --warn: 173 119 28;       /* ochre — attention       */
+  --info: 56 104 150;       /* slate blue — info       */
+  --violet: 103 86 196;     /* muted indigo — charts   */
+  /* effects — ultra-diffuse, low opacity (editorial flatness) */
+  --shadow-card: 0 1px 2px rgba(38, 34, 26, 0.03), 0 8px 22px -16px rgba(38, 34, 26, 0.12);
+  --shadow-pop: 0 16px 44px -20px rgba(38, 34, 26, 0.20);
+  --shadow-pink: 0 8px 22px -12px rgba(22, 116, 82, 0.28);
+  --glow: rgba(22, 116, 82, 0.045);
   color-scheme: light;
 }
 
 .dark {
-  --bg: 11 13 16;
-  --rail: 14 16 20;
-  --panel: 22 25 31;
-  --panel2: 28 32 39;
-  --line: 39 44 53;
-  --line2: 31 36 44;
-  --pink: 248 104 200;
-  --pink-bright: 248 104 200;
-  --berry: 136 24 72;
-  --ink: 26 7 16;
-  --text: 240 243 247;
-  --muted: 158 167 179;
-  --dim: 112 122 135;
-  --faint: 80 90 104;
-  --good: 84 214 154;
-  --bad: 255 107 107;
-  --warn: 242 179 61;
-  --info: 92 141 255;
-  --violet: 155 108 255;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 34px -14px rgba(0, 0, 0, 0.6);
-  --shadow-pop: 0 18px 50px -16px rgba(0, 0, 0, 0.7);
-  --shadow-pink: 0 12px 30px -8px rgba(248, 104, 200, 0.5);
-  --glow: rgba(248, 104, 200, 0.16);
+  /* WARM EDITORIAL FINTECH — dark. Warm near-black, not blue-black. */
+  --bg: 17 16 14;
+  --rail: 21 20 17;
+  --panel: 27 25 22;
+  --panel2: 34 31 27;
+  --line: 47 44 39;
+  --line2: 37 34 30;
+  --pink: 60 168 123;       /* emerald, brighter on dark */
+  --pink-bright: 90 196 150;
+  --berry: 17 74 53;
+  --ink: 12 20 16;
+  --text: 243 240 233;
+  --muted: 158 153 142;
+  --dim: 124 119 108;
+  --faint: 110 105 95;
+  --good: 76 196 142;
+  --bad: 226 118 106;
+  --warn: 224 176 92;
+  --info: 112 160 208;
+  --violet: 157 140 240;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.32), 0 12px 28px -18px rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 18px 48px -20px rgba(0, 0, 0, 0.62);
+  --shadow-pink: 0 10px 24px -12px rgba(60, 168, 123, 0.32);
+  --glow: rgba(60, 168, 123, 0.06);
   color-scheme: dark;
 }
 
@@ -94,7 +98,7 @@
 
 @layer components {
   .panel {
-    @apply bg-panel border border-line rounded-3xl shadow-card;
+    @apply bg-panel border border-line rounded-2xl shadow-card;
   }
   .panel-2 {
     @apply bg-panel2 border border-line rounded-2xl;

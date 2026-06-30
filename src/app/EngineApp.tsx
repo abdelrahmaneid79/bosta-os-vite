@@ -169,10 +169,10 @@ function Rail({ onAdd }: { onAdd: () => void }) {
     <aside className="no-scrollbar sticky top-0 hidden h-screen w-[244px] flex-shrink-0 flex-col overflow-y-auto border-r border-line bg-rail md:flex">
       <div className="px-4 pb-4 pt-5">
         <NavLink to="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pink shadow-pink"><img src="/mascot-96.png" alt="Bosta Bites" className="h-7 w-7 object-contain" /></div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-pink shadow-pink"><img src="/mascot-96.png" alt="Bosta Bites" className="h-7 w-7 object-contain" /></div>
           <div>
-            <div className="font-display text-[17px] font-extrabold leading-none tracking-tight">BostaOS</div>
-            <div className="mt-1 text-[11px] font-medium text-dim">Bosta Bites</div>
+            <div className="font-serif text-[19px] font-semibold leading-none tracking-[-0.01em]">BostaOS</div>
+            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-dim">Bosta Bites</div>
           </div>
         </NavLink>
         <button onClick={onAdd} className="lift mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-pink py-2.5 font-display text-sm font-bold text-ink shadow-pink">
@@ -314,8 +314,8 @@ function Header({ onAdd }: { onAdd: () => void }) {
   return (
     <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/80 px-4 py-3.5 backdrop-blur-xl sm:px-8">
       <div className="min-w-0">
-        <div className="truncate font-display text-xl font-extrabold leading-tight tracking-tight sm:text-2xl">{title}</div>
-        <div className="text-[12.5px] font-medium text-dim">Bosta Bites</div>
+        <div className="truncate font-serif text-2xl font-semibold leading-tight tracking-[-0.015em] sm:text-[26px]">{title}</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-dim">Bosta Bites</div>
       </div>
       <div className="flex-1" />
       <button onClick={() => setCommandOpen(true)} className="lift hidden items-center gap-2 rounded-2xl border border-line bg-panel px-3.5 py-2.5 text-sm text-faint shadow-card hover:text-muted lg:flex">
