@@ -1,15 +1,29 @@
 /**
  * read-day-report — vision reader for the POS daily product report.
  * Receives a base64 photo, asks Claude (vision) to extract the day's product
- * lines + grand total as strict JSON. The Anthropic key lives ONLY here (Supabase
- * secret ANTHROPIC_API_KEY) — never in the browser.
+ * lines + grand total as strict JSON.
  *
- * Set the secret (deterministic):
- *   npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-... --project-ref <ref>
- *   npx supabase secrets list --project-ref <ref>   # confirm it appears
+ * Key resolution: prefers the ANTHROPIC_API_KEY edge secret; if that isn't set
+ * it falls back to the private_config table (read with the service role — never
+ * exposed to the browser). Set the secret later and remove the row to migrate.
  */
-const KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? Deno.env.get("ANTHROPIC_KEY") ?? Deno.env.get("anthropic_api_key");
 const MODEL = Deno.env.get("OCR_MODEL") ?? "claude-opus-4-8";
+
+async function getKey(): Promise<string | null> {
+  const env = Deno.env.get("ANTHROPIC_API_KEY") ?? Deno.env.get("ANTHROPIC_KEY") ?? Deno.env.get("anthropic_api_key");
+  if (env) return env;
+  const url = Deno.env.get("SUPABASE_URL");
+  const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !svc) return null;
+  try {
+    const r = await fetch(`${url}/rest/v1/private_config?key=eq.anthropic_api_key&select=value`, {
+      headers: { apikey: svc, authorization: `Bearer ${svc}` },
+    });
+    if (!r.ok) return null;
+    const rows = await r.json();
+    return rows?.[0]?.value ?? null;
+  } catch { return null; }
+}
 
 const SYSTEM = `You read a photo of a point-of-sale DAILY PRODUCT SALES report for a snacks/nuts retail stand. The report is Arabic (right-to-left); each row is one product's sales for a single day.
 
@@ -42,7 +56,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   try {
-    if (!KEY) return json({ error: "ANTHROPIC_API_KEY is not set on the server", keyPresent: false }, 500);
+    const KEY = await getKey();
+    if (!KEY) return json({ error: "No Anthropic API key available (set ANTHROPIC_API_KEY secret or private_config row)", keyPresent: false }, 500);
     const { image, mediaType } = await req.json();
     if (!image || typeof image !== "string") return json({ error: "missing base64 image" }, 400);
 
