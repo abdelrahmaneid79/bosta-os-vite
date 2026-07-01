@@ -20,7 +20,7 @@ export function Card({
 }: { className?: string; children: ReactNode; glow?: boolean; accent?: string; as?: "div" | "section" }) {
   const Tag = as ?? "div";
   return (
-    <Tag className={cn("lift relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-card backdrop-blur-xl hover:border-white/[0.16] sm:p-6", className)}>
+    <Tag className={cn("lift relative overflow-hidden rounded-[26px] border border-white/[0.09] bg-gradient-to-b from-white/[0.045] to-white/[0.02] p-5 shadow-card backdrop-blur-xl hover:border-white/[0.18] sm:p-6", className)}>
       {glow && (
         <div
           className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl"

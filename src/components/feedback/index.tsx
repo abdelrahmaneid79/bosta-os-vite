@@ -9,7 +9,7 @@ export function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex max-w-[92vw] animate-toastIn items-start gap-2.5 rounded-xl border border-line bg-panel2 px-5 py-3 font-display text-sm font-medium text-text shadow-sheet"
+          className="pointer-events-auto flex max-w-[92vw] animate-toastIn items-start gap-2.5 rounded-2xl border border-white/[0.1] bg-[#12141a]/95 px-5 py-3 font-display text-sm font-medium text-text shadow-pop backdrop-blur-xl"
         >
           <span
             className={cn(

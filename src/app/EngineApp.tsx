@@ -104,11 +104,11 @@ function groupForPath(pathname: string): Group | undefined {
 function SectionTabs({ group }: { group: Group }) {
   if (group.tabs.length < 2) return null;
   return (
-    <div className="mb-5 inline-flex flex-wrap gap-1 rounded-full border border-line bg-panel p-1 shadow-card">
+    <div className="mb-5 inline-flex flex-wrap gap-1 rounded-2xl border border-white/[0.09] bg-white/[0.04] p-1.5">
       {group.tabs.map((t) => (
         <NavLink key={t.to} to={t.to} end
-          className={({ isActive }) => cn("rounded-full px-4 py-2 text-[13px] font-semibold transition",
-            isActive ? "bg-pink text-ink shadow-pink" : "text-muted hover:text-text")}>
+          className={({ isActive }) => cn("rounded-xl px-4 py-2 text-[13px] font-semibold transition",
+            isActive ? "bg-gradient-to-br from-pink to-violet text-white shadow-pink" : "text-muted hover:text-text")}>
           {t.label}
         </NavLink>
       ))}
@@ -117,7 +117,26 @@ function SectionTabs({ group }: { group: Group }) {
 }
 
 function Page({ group, children }: { group: Group; children: React.ReactNode }) {
-  return <><SectionTabs group={group} />{children}</>;
+  const { pathname } = useLocation();
+  const activeTab = group.tabs.find((t) => pathname === t.to || pathname.startsWith(t.to + "/"));
+  // The Today screen carries its own ticker/hero header; every other section
+  // gets a consistent Command Deck identity header (accent icon tile + title).
+  if (group.id === "today") return <>{children}</>;
+  return (
+    <>
+      <div className="mb-5 flex items-center gap-3.5">
+        <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-white/[0.08]" style={{ background: `${group.accent}1f`, color: group.accent }}>
+          <Icon d={group.icon} className="h-[22px] w-[22px]" />
+        </span>
+        <div className="min-w-0">
+          <h1 className="truncate font-display text-[26px] font-extrabold leading-none tracking-tight text-text">{group.label}</h1>
+          {activeTab && group.tabs.length > 1 && <div className="mt-1.5 text-[13px] font-medium text-dim">{activeTab.label}</div>}
+        </div>
+      </div>
+      <SectionTabs group={group} />
+      {children}
+    </>
+  );
 }
 
 function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
