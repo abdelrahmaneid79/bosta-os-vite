@@ -20,11 +20,11 @@ export function Card({
 }: { className?: string; children: ReactNode; glow?: boolean; accent?: string; as?: "div" | "section" }) {
   const Tag = as ?? "div";
   return (
-    <Tag className={cn("relative overflow-hidden rounded-3xl border border-line bg-panel p-5 shadow-card sm:p-6", className)}>
+    <Tag className={cn("lift relative overflow-hidden rounded-[24px] border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-card backdrop-blur-xl hover:border-white/[0.16] sm:p-6", className)}>
       {glow && (
         <div
           className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl"
-          style={{ background: accent ? `${accent}22` : "rgb(var(--pink) / 0.14)" }}
+          style={{ background: accent ? `${accent}22` : "rgb(var(--pink) / 0.18)" }}
         />
       )}
       {children}
@@ -81,9 +81,9 @@ export function Stat({
 }: { label: string; value: ReactNode; sub?: ReactNode; accent?: string; onClick?: () => void }) {
   return (
     <div onClick={onClick}
-      className={cn("rounded-2xl border border-line bg-panel p-4 shadow-card", onClick && "lift cursor-pointer hover:shadow-pop")}>
+      className={cn("rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-4 backdrop-blur-xl", onClick && "lift cursor-pointer hover:border-white/[0.16]")}>
       <div className="mb-1.5 text-[12px] font-medium text-muted">{label}</div>
-      <div className={cn("tnum font-display text-2xl font-extrabold leading-none", accent)}>{value}</div>
+      <div className={cn("tnum font-display text-2xl font-bold leading-none", accent)}>{value}</div>
       {sub && <div className="mt-1.5 text-[12px] text-dim">{sub}</div>}
     </div>
   );
@@ -98,13 +98,13 @@ export function StatCard({
 }) {
   return (
     <div onClick={onClick}
-      className={cn("group rounded-3xl border border-line bg-panel p-5 shadow-card", onClick && "lift cursor-pointer hover:shadow-pop")}>
+      className={cn("group lift rounded-[22px] border border-white/[0.08] bg-gradient-to-b from-white/[0.05] to-white/[0.02] p-5 shadow-card backdrop-blur-xl hover:border-white/[0.18]", onClick && "cursor-pointer")}>
       <div className="flex items-center justify-between">
         {icon ? <IconChip d={icon} accent={accent} /> : <span className="text-[12px] font-medium text-muted">{label}</span>}
         <DeltaChip pct={delta ?? undefined} />
       </div>
       {icon && <div className="mt-3 text-[12px] font-medium text-muted">{label}</div>}
-      <div className="mt-1 tnum font-display text-[28px] font-extrabold leading-none text-text">{value}</div>
+      <div className="mt-1 tnum font-display text-[28px] font-bold leading-none text-text">{value}</div>
       {sub && <div className="mt-1.5 text-[12px] text-dim">{sub}</div>}
       {children && <div className="mt-3">{children}</div>}
     </div>
@@ -182,14 +182,14 @@ export function Ring({ value, size = 128, stroke = 12, color, children }: {
 /* ─ Buttons ────────────────────────────────────────────────────────────── */
 export function Button({ variant = "primary", size = "md", className, children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "outline" | "danger"; size?: "sm" | "md" }) {
   const V: Record<string, string> = {
-    primary: "bg-pink text-ink shadow-pink hover:brightness-[1.06]",
-    ghost: "bg-panel2 text-text hover:bg-panel2",
-    outline: "border border-line bg-panel text-text hover:bg-panel2",
-    danger: "bg-bad/12 text-bad hover:bg-bad/20",
+    primary: "bg-gradient-to-br from-pink to-violet text-white shadow-pink hover:brightness-[1.08]",
+    ghost: "border border-white/[0.09] bg-white/[0.05] text-text hover:bg-white/[0.09]",
+    outline: "border border-white/[0.09] bg-white/[0.03] text-text hover:bg-white/[0.07]",
+    danger: "bg-bad/15 text-bad hover:bg-bad/25",
   };
   const S = size === "sm" ? "px-3 py-2 text-[13px]" : "px-4 py-2.5 text-sm";
   return (
-    <button className={cn("lift inline-flex items-center justify-center gap-2 rounded-2xl font-display font-bold transition disabled:cursor-not-allowed disabled:opacity-45", S, V[variant], className)} {...props}>
+    <button className={cn("lift inline-flex items-center justify-center gap-2 rounded-xl font-display font-semibold transition disabled:cursor-not-allowed disabled:opacity-45", S, V[variant], className)} {...props}>
       {children}
     </button>
   );
@@ -210,7 +210,7 @@ export function Field({ label, error, children }: { label: string; error?: strin
     </label>
   );
 }
-const FIELD = "w-full rounded-2xl border border-line bg-panel2 px-3.5 py-2.5 text-sm text-text outline-none transition placeholder:text-faint focus:border-pink/60 focus:ring-2 focus:ring-pink/15";
+const FIELD = "w-full rounded-xl border border-white/[0.09] bg-white/[0.04] px-3.5 py-2.5 text-sm text-text outline-none transition placeholder:text-faint focus:border-pink/60 [color-scheme:dark]";
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(FIELD, props.className)} />;
 }
@@ -221,10 +221,10 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
 /* ─ Segmented tabs / chips ─────────────────────────────────────────────── */
 export function Tabs<T extends string>({ value, options, onChange, className }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; className?: string }) {
   return (
-    <div className={cn("inline-flex gap-1 rounded-full border border-line bg-panel2 p-1", className)}>
+    <div className={cn("inline-flex gap-1 rounded-xl border border-white/[0.09] bg-white/[0.04] p-1", className)}>
       {options.map((o) => (
         <button key={o.value} onClick={() => onChange(o.value)}
-          className={cn("rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition", value === o.value ? "bg-pink text-ink shadow-pink" : "text-muted hover:text-text")}>
+          className={cn("rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition", value === o.value ? "bg-gradient-to-br from-pink to-violet text-white shadow-pink" : "text-muted hover:text-text")}>
           {o.label}
         </button>
       ))}

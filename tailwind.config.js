@@ -27,11 +27,14 @@ export default {
         warn: c("--warn"),
         info: c("--info"),
         violet: c("--violet"),
+        lime: c("--lime"),
+        cyan: c("--cyan"),
       },
       fontFamily: {
-        display: ["Plus Jakarta Sans", "Inter", "system-ui", "sans-serif"],
-        sans: ["Inter", "IBM Plex Sans Arabic", "system-ui", "sans-serif"],
-        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
+        // Command Deck: Clash Display for headings/numbers, Satoshi for body/UI.
+        display: ["Clash Display", "Satoshi", "system-ui", "sans-serif"],
+        sans: ["Satoshi", "IBM Plex Sans Arabic", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       borderRadius: {
         "4xl": "28px",
