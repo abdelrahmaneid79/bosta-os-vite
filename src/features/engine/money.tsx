@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardHead, Eyebrow, StatCard, Button, Select } from "@/components/ui";
 import { Stat, DeckTile, TileHead, MBars } from "./deck";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
@@ -20,13 +19,6 @@ import { CashForm, ChequeForm, ExpenseForm } from "./forms";
 import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
-const MI = {
-  cash: "M3 7h18v11H3zM3 11h18M7 15h2",
-  in: "M12 5v14M5 12l7 7 7-7",
-  out: "M12 19V5M5 12l7-7 7 7",
-  bag: "M6 8h12l1 12H5zM9 8a3 3 0 0 1 6 0",
-  bank: "M3 21h18M5 21V10M19 21V10M3 10l9-6 9 6M9 21v-6h6v6",
-} as const;
 const monthKey = (d: string) => d.slice(0, 7);
 const KIND_LABEL: Record<string, string> = {
   cheque: "cheque in", withdrawal: "withdrawal · not an expense", expense: "expense",
@@ -56,67 +48,65 @@ export function MoneyScreen() {
   if (!en) return <EmptyState title="Sign in to load money" />;
 
   const titles = { count: "Count cash", in: "Add cash", out: "Cash out", withdraw: "Owner withdrawal" } as const;
+  const flowFilters: { v: typeof filter; label: string }[] = [{ v: "all", label: "All" }, { v: "in", label: "In" }, { v: "out", label: "Out" }, { v: "withdrawals", label: "Withdrawals" }];
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Cash on hand · cheques in − expenses, stock &amp; withdrawals out</Eyebrow>
-        <div className="flex-1" />
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 600 }}>Cheques in − expenses, stock &amp; withdrawals out</div>
+        <div style={{ flex: 1 }} />
         <DateRangePicker />
-      </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Cash on hand" accent="blue" icon={MI.cash} value={c ? (c.balance == null ? "—" : egpShort(c.balance)) : "—"} sub={c?.since ? `opening ${egpShort(c.opening)} · since ${fmtDate(c.since)}` : "current drawer"} />
-        <StatCard label="Money in" accent="mint" icon={MI.in} value={c ? egpShort(c.inflow) : "—"} sub="in range" />
-        <StatCard label="Money out" accent="red" icon={MI.out} value={c ? egpShort(Math.abs(c.outflow)) : "—"} sub="in range" />
-        <StatCard label="Withdrawals" accent="amber" icon={MI.bag} value={c ? egpShort(c.withdrawals) : "—"} sub="not an expense" />
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={() => setSheet("count")}>Count cash</Button>
-        <Button variant="outline" onClick={() => setSheet("withdraw")}>Withdraw</Button>
+        <button className="addbtn" onClick={() => setSheet("withdraw")}>Withdraw</button>
+        <button className="qadd" style={{ height: 38 }} onClick={() => setSheet("count")}><span>Count cash</span></button>
       </div>
 
-      {months.length > 0 && (
-        <Card>
-          <CardHead title="Cash flow" sub="Money in vs out, by month" accent="blue" icon={MI.bank} />
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div><div className="mb-1 text-[11px] font-semibold text-good">Money in</div><BarChart data={inflowSeries} height={150} color="rgb(var(--good))" /></div>
-            <div><div className="mb-1 text-[11px] font-semibold text-bad">Money out</div><BarChart data={outflowSeries} height={150} color="rgb(var(--bad))" /></div>
-          </div>
-        </Card>
-      )}
+      <div className="statgrid">
+        <Stat label="Cash on hand" color="var(--cyan)" value={c ? (c.balance == null ? "—" : egp(c.balance)) : "—"} sub={<div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600, marginTop: 8 }}>{c?.since ? `opening ${egpShort(c.opening)} · since ${fmtDate(c.since)}` : "count to set →"}</div>} />
+        <Stat label="Money in" color="var(--green)" value={c ? egp(c.inflow) : "—"} />
+        <Stat label="Money out" color="var(--red)" value={c ? egp(Math.abs(c.outflow)) : "—"} />
+        <Stat label="Withdrawals" color="var(--amber)" value={c ? egp(c.withdrawals) : "—"} />
+      </div>
 
-      <Card className="!p-0">
-        <div className="flex flex-wrap items-center gap-2 p-5 pb-3">
-          <Eyebrow>Cash flow · every in &amp; out</Eyebrow>
-          <div className="flex-1" />
-          <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="max-w-[170px]">
-            <option value="all">All flow</option>
-            <option value="in">Cash in</option>
-            <option value="out">Cash out</option>
-            <option value="withdrawals">Withdrawals</option>
-          </Select>
-        </div>
-        {mv.isLoading ? <div className="p-4"><SkeletonRows /></div> : mv.isError ? <div className="p-4"><ErrorState message={String((mv.error as Error)?.message)} /></div> :
-          movements.length === 0 ? <div className="p-4"><EmptyState title="No cash flow in range" /></div> : (
-          <div className="divide-y divide-line">
-            {movements.map((m) => {
-              const voidable = m.id.startsWith("mv-");
-              return (
-              <div key={m.id} className="row-hover flex items-center gap-3 px-5 py-3">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${m.amount >= 0 ? "bg-good/10 text-good" : "bg-bad/10 text-bad"}`}>
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={m.amount >= 0 ? MI.in : MI.out} /></svg>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium capitalize text-text">{m.label}</div>
-                  <div className="text-[12px] text-dim">{fmtDate(m.date)} · {KIND_LABEL[m.kind] ?? m.kind}</div>
-                </div>
-                <div className={`tnum font-display text-sm font-bold ${m.amount >= 0 ? "text-good" : "text-bad"}`}>{m.amount >= 0 ? "+" : "−"}{egp(Math.abs(m.amount))}</div>
-                {voidable ? <button onClick={() => setVoidMv(m.id.slice(3))} className="text-dim hover:text-bad" title="Void">✕</button> : <span className="w-[14px] flex-shrink-0" />}
-              </div>
-              );
-            })}
+      <div className="row2">
+        <DeckTile style={{ padding: 0, display: "flex", flexDirection: "column", height: 560 }}>
+          <div style={{ padding: "22px 24px 8px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span className="tname">Cash flow</span>
+            <div className="seg" style={{ marginLeft: "auto" }}>
+              {flowFilters.map((f) => <span key={f.v} className={filter === f.v ? "on" : ""} onClick={() => setFilter(f.v)}>{f.label}</span>)}
+            </div>
           </div>
-        )}
-      </Card>
+          <div className="scroll" style={{ flex: 1, maxHeight: "none" }}>
+            {mv.isLoading ? <div style={{ padding: 16 }}><SkeletonRows /></div> : mv.isError ? <div style={{ padding: 16 }}><ErrorState message={String((mv.error as Error)?.message)} /></div> : (
+              <table className="tbl">
+                <thead><tr><th>Date</th><th>Flow</th><th className="r">Amount</th><th style={{ width: 34 }} /></tr></thead>
+                <tbody>
+                  {movements.map((m) => (
+                    <tr key={m.id}>
+                      <td>{fmtDate(m.date, "EEE d MMM yyyy")}</td>
+                      <td style={{ textTransform: "capitalize" }}>{m.label} <span style={{ color: "var(--dim)", fontSize: 12 }}>· {KIND_LABEL[m.kind] ?? m.kind}</span></td>
+                      <td className="r" style={{ color: m.amount >= 0 ? "var(--green)" : "var(--red)" }}>{m.amount >= 0 ? "+" : "−"}{egp(Math.abs(m.amount))}</td>
+                      <td>{m.id.startsWith("mv-") ? <button onClick={() => setVoidMv(m.id.slice(3))} title="Void" style={{ color: "var(--faint)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>✕</button> : null}</td>
+                    </tr>
+                  ))}
+                  {movements.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--faint)", padding: 28 }}>No cash flow in this range.</td></tr>}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </DeckTile>
+
+        <DeckTile style={{ height: 560, display: "flex", flexDirection: "column" }}>
+          <TileHead name="Money in vs out" right="by month" />
+          {months.length === 0 ? <div style={{ fontSize: 12.5, color: "var(--faint)", padding: "10px 0" }}>No flow in range.</div> : (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", marginBottom: 4 }}>Money in</div>
+              <BarChart data={inflowSeries} height={150} color="rgb(var(--good))" />
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--red)", margin: "14px 0 4px" }}>Money out</div>
+              <BarChart data={outflowSeries} height={150} color="rgb(var(--bad))" />
+            </div>
+          )}
+        </DeckTile>
+      </div>
+
       {sheet && <Modal open onClose={() => setSheet(null)} title={titles[sheet]}><CashForm mode={sheet} onDone={() => setSheet(null)} /></Modal>}
       <Confirm open={!!voidMv} title="Void this movement?" danger busy={del.isPending}
         message="The cash balance is recomputed without this entry. The row is kept for audit." confirmLabel="Void"
