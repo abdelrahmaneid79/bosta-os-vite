@@ -65,15 +65,18 @@ export async function getCashPosition(): Promise<CashPosition> {
   const anchored = !!(books.date && books.openingCash != null);
   const from = anchored ? books.date! : EPOCH;
   const opening = anchored ? books.openingCash! : 0;
-  const [mvRes, expFwd, purFwd] = await Promise.all([
+  const [mvRes, chqRes, expFwd, purFwd] = await Promise.all([
     sb.from("money_movements").select("amount").is("voided_at", null).gte("movement_date", from),
+    sb.from("cheques").select("amount_received").is("voided_at", null).not("received_date", "is", null).gte("received_date", from),
     getExpenseTotal({ from, to: today }),
     getPurchaseTotal({ from, to: today }),
   ]);
   if (mvRes.error) throw mvRes.error;
+  if (chqRes.error) throw chqRes.error;
   let mvIn = 0, mvOut = 0;
   for (const m of mvRes.data) { if (m.amount >= 0) mvIn += m.amount; else mvOut += Math.abs(m.amount); }
-  const inflowsAll = r2(opening + mvIn);
+  const chqIn = (chqRes.data ?? []).reduce((s, c) => s + Number(c.amount_received ?? 0), 0);
+  const inflowsAll = r2(opening + mvIn + chqIn);
   const outflowsAll = r2(mvOut + expFwd + purFwd);
   return { onHand: r2(inflowsAll - outflowsAll), inflowsAll, outflowsAll, opening, since: anchored ? books.date : null };
 }
@@ -85,9 +88,18 @@ export interface CashEntry { id: string; date: string; label: string; amount: nu
  *  When a clean-books opening balance is set, flows before the books-start date
  *  are excluded (that era is carried forward as the opening balance instead). */
 export async function getCashLedger(range: DateRange): Promise<CashEntry[]> {
-  const [mv, exps, purs, books] = await Promise.all([getMoneyMovements(range, 1000), getExpenses(range), getPurchases(range), getBooksStart()]);
-  const floor = books.date && books.openingCash != null ? books.date : null;
+  const sb = requireEngine();
+  const [mv, exps, purs, chqRes] = await Promise.all([
+    getMoneyMovements(range, 1000), getExpenses(range), getPurchases(range),
+    sb.from("cheques").select("id,received_date,amount_received").is("voided_at", null)
+      .not("received_date", "is", null).gte("received_date", range.from).lte("received_date", range.to),
+  ]);
+  if (chqRes.error) throw chqRes.error;
   const entries: CashEntry[] = [];
+  // Cheques settled by the mall are real cash coming IN.
+  for (const c of chqRes.data ?? []) {
+    if (c.amount_received != null && c.received_date) entries.push({ id: `ch-${c.id}`, date: c.received_date, label: "Cheque · mall settlement", amount: Number(c.amount_received), kind: "cheque" });
+  }
   for (const m of mv) {
     const label = m.notes ? `${m.type.replace(/_/g, " ")} · ${m.notes}` : m.type.replace(/_/g, " ");
     const kind: CashKind = m.isWithdrawal ? "withdrawal" : m.type === "cheque_inflow" ? "cheque" : m.amount >= 0 ? "cash_in" : "cash_out";
@@ -95,8 +107,7 @@ export async function getCashLedger(range: DateRange): Promise<CashEntry[]> {
   }
   for (const e of exps) entries.push({ id: `ex-${e.id}`, date: e.date, label: e.category + (e.notes ? ` · ${e.notes}` : ""), amount: -e.amount, kind: "expense" });
   for (const p of purs) entries.push({ id: `pu-${p.id}`, date: p.date, label: `Stock · ${p.productName}`, amount: -p.totalCost, kind: "purchase" });
-  const kept = floor ? entries.filter((e) => e.date >= floor) : entries;
-  return kept.sort((a, b) => b.date.localeCompare(a.date));
+  return entries.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export interface CashSummary {

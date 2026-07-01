@@ -230,7 +230,7 @@ function TopNav({ onAdd }: { onAdd: () => void }) {
       <SpotlightSearch />
       <button onClick={onAdd} className="qadd" title="Quick add"><Icon d={I.plus} w={2.6} className="h-4 w-4" /></button>
       <AlertBell />
-      <button onClick={() => navigate("/settings")} className="avt" title="Settings">BB</button>
+      <button onClick={() => navigate("/settings")} className="iconbtn" title="Settings"><Icon d={I.settings} className="h-[18px] w-[18px]" /></button>
     </div>
   );
 }

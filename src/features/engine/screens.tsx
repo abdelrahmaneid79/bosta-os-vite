@@ -13,7 +13,7 @@ import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { useBooksStartDate } from "@/store/books";
-import { egp, egpShort, num, pct } from "@/core/utils/format";
+import { egp, num, pct } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
@@ -28,7 +28,7 @@ import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
 import { ProductDetailScreen } from "./product";
 import { PageHdr, Stat, DeckTile, TileHead, MBars } from "./deck";
 import { todayCairo } from "@/core/time";
-import { voidSaleItem, voidSale } from "@/core/db/mutations";
+import { voidSaleItem, voidSale, setProductActive, deleteProduct } from "@/core/db/mutations";
 import { useUI } from "@/store/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Tables } from "@/core/db/tables";
@@ -67,47 +67,43 @@ export function ConnectPanel() {
 
 // ── Stock / Goods (operational: create + edit) ───────────────────────────────
 export function StockScreen() {
-  const navigate = useNavigate();
   const q = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: isEngineConfigured });
   const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<null | { mode: "add" } | { mode: "edit"; product: Tables<"products"> }>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
   const s = q.data;
   const byId = new Map((prods.data ?? []).map((p) => [p.id, p]));
   const term = search.trim().toLowerCase();
   const positions = (s?.positions ?? []).filter((p) => !term || p.nameEn.toLowerCase().includes(term) || (byId.get(p.id)?.name_ar ?? "").toLowerCase().includes(term));
-  const maxPrice = Math.max(1, ...(s?.positions ?? []).map((p) => p.sellingPrice ?? 0));
+  const counted = (s?.positions ?? []).filter((p) => p.onHand !== 0).length;
   return (
     <div>
       <div className="statgrid">
-        <Stat label="Products" color="var(--mag)" value={s ? s.positions.length : "—"} sub={<div style={{ fontSize: 11, color: "var(--mag)", fontWeight: 700, marginTop: 8 }}>Search & open any item ↓</div>} />
-        <Stat label="Stock value · COGS" color="var(--violet)" value={s ? egpShort(s.totalValue) : "—"} />
-        <Stat label="Missing COGS" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
-        <Stat label="Negative stock" color="var(--cyan)" value={s ? s.negativeCount : "—"} />
+        <Stat label="Total stock value" color="var(--violet)" value={s ? egp(s.totalValue) : "—"} sub={s && s.totalValue === 0 ? <div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600, marginTop: 8 }}>count stock to set →</div> : undefined} />
+        <Stat label="Products" color="var(--mag)" value={s ? s.positions.length : "—"} onClick={() => setManageOpen(true)} sub={<div style={{ fontSize: 11, color: "var(--mag)", fontWeight: 700, marginTop: 8 }}>Manage full list ↗</div>} />
+        <Stat label="Counted / uncounted" color="var(--cyan)" value={s ? `${counted} / ${s.positions.length - counted}` : "—"} />
+        <Stat label="Missing cost" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
       </div>
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        <input className="input" style={{ flex: 1 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…" />
-        <button className="addbtn" onClick={() => navigate("/costs")}>Import</button>
+        <input className="input" style={{ flex: 1 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search stock…" />
+        <button className="addbtn" onClick={() => setManageOpen(true)}>Products</button>
         <button className="qadd" style={{ height: "auto" }} onClick={() => setModal({ mode: "add" })}><span>+ Add product</span></button>
       </div>
       <Guarded q={q} empty={!!s && s.positions.length === 0}>
         <DeckTile style={{ padding: 0 }}>
           <div className="scroll">
             <table className="tbl">
-              <thead><tr><th>Product</th><th className="r">Price / kg</th></tr></thead>
+              <thead><tr><th>Product</th><th className="r">On hand</th><th className="r">Stock value</th></tr></thead>
               <tbody>
                 {positions.map((p) => (
                   <tr key={p.id} className="prodcell" onClick={() => setDetailId(p.id)}>
                     <td style={{ fontSize: 14 }}>{p.nameEn}{!p.active && <span style={{ color: "var(--faint)" }}> · inactive</span>}</td>
-                    <td className="r">
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 11, justifyContent: "flex-end" }}>
-                        <span style={{ width: 64, height: 5, borderRadius: 3, background: "rgba(255,255,255,.06)", overflow: "hidden" }}>
-                          <span style={{ display: "block", height: "100%", width: `${Math.round(((p.sellingPrice ?? 0) / maxPrice) * 100)}%`, background: "linear-gradient(90deg,var(--violet),var(--mag))" }} />
-                        </span>
-                        <span style={{ minWidth: 88 }}>{p.sellingPrice != null ? egp(p.sellingPrice) : "—"}</span>
-                      </span>
+                    <td className="r" style={{ color: p.isNegative ? "var(--red)" : p.onHand === 0 ? "var(--faint)" : undefined }}>
+                      {p.onHand === 0 ? "—" : num(p.onHand)} <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span>
                     </td>
+                    <td className="r">{p.hasCost && p.onHand !== 0 ? egp(p.stockValue) : <span style={{ color: "var(--faint)", fontFamily: "Satoshi", fontWeight: 500 }}>{p.hasCost ? "—" : "add cost"}</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -121,6 +117,57 @@ export function StockScreen() {
       <Modal open={!!detailId} onClose={() => setDetailId(null)} wide>
         {detailId && <ProductDetailScreen id={detailId} onClose={() => setDetailId(null)} />}
       </Modal>
+      <Modal open={manageOpen} onClose={() => setManageOpen(false)} wide title="All products">
+        <ManageProducts />
+      </Modal>
+    </div>
+  );
+}
+
+/** Manage-products popup — the design's catalog manager: every product with its
+ *  selling price, edit / activate / remove, plus quick add. */
+function ManageProducts() {
+  const qc = useQueryClient();
+  const { reportSuccess, reportError } = useUI();
+  const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
+  const [edit, setEdit] = useState<Tables<"products"> | null>(null);
+  const [add, setAdd] = useState(false);
+  const [del, setDel] = useState<Tables<"products"> | null>(null);
+  const remove = useMutation({ mutationFn: (id: string) => deleteProduct(id), onSuccess: () => { reportSuccess("Remove product", "Removed from catalog · sales history kept"); setDel(null); qc.invalidateQueries(); }, onError: (e) => reportError("Remove product", e) });
+  const toggle = useMutation({ mutationFn: (v: { id: string; active: boolean }) => setProductActive(v.id, v.active), onSuccess: () => qc.invalidateQueries(), onError: (e) => reportError("Update product", e) });
+  const list = prods.data ?? [];
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>{list.length} products · edit prices, activate/deactivate, or remove.</div>
+      {prods.isLoading ? <SkeletonRows rows={5} /> : (
+        <div className="scroll" style={{ maxHeight: "52vh" }}>
+          <table className="etbl">
+            <thead><tr><th>Product</th><th className="r">Selling / kg</th><th className="r">Status</th><th style={{ width: 92 }} /></tr></thead>
+            <tbody>
+              {list.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.name_en}{p.name_ar ? <span className="ar" style={{ color: "var(--dim)", fontSize: 12 }}> · {p.name_ar}</span> : null}</td>
+                  <td className="r">{p.selling_price != null ? egp(p.selling_price) : "—"}</td>
+                  <td className="r"><button onClick={() => toggle.mutate({ id: p.id, active: !p.active })} className="pill2" style={{ cursor: "pointer", color: p.active ? "var(--green)" : "var(--faint)" }}>{p.active ? "active" : "off"}</button></td>
+                  <td className="r" style={{ whiteSpace: "nowrap" }}>
+                    <button className="addbtn" style={{ padding: "6px 10px" }} onClick={() => setEdit(p)}>Edit</button>
+                    <button onClick={() => setDel(p)} title="Remove" style={{ marginLeft: 6, color: "var(--faint)", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{ marginTop: 14 }}><button className="btn" onClick={() => setAdd(true)}>+ Add product</button></div>
+      {(edit || add) && (
+        <Modal open onClose={() => { setEdit(null); setAdd(false); }} title={edit ? "Edit product" : "Add product"}>
+          <ProductForm product={edit ?? undefined} onDone={() => { setEdit(null); setAdd(false); qc.invalidateQueries(); }} />
+        </Modal>
+      )}
+      <Confirm open={!!del} title="Remove this product?" danger busy={remove.isPending}
+        message="It's removed from the catalog. Sales history that referenced it is kept." confirmLabel="Remove"
+        onConfirm={() => del && remove.mutate(del.id)} onClose={() => setDel(null)} />
     </div>
   );
 }
