@@ -54,7 +54,7 @@
 .cdk .livedot{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 0 var(--cyan);animation:cdk-pulse 1.8s infinite}
 
 /* grid + tiles */
-.cdk .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;grid-auto-rows:minmax(10px,auto)}
+.cdk .deckgrid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;grid-auto-rows:minmax(10px,auto)}
 .cdk .tile{background:linear-gradient(180deg,var(--surface),var(--surface2));border:1px solid var(--stroke);border-radius:26px;padding:24px;position:relative;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 30px 60px -34px rgba(0,0,0,.9);transition:transform .26s cubic-bezier(.2,.8,.2,1),border-color .26s,box-shadow .26s}
 .cdk .tile.clickable{cursor:pointer}
 .cdk .tile.clickable:hover{transform:translateY(-5px);border-color:rgba(255,255,255,.2);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 46px 84px -34px rgba(0,0,0,.96),0 18px 54px -26px rgba(255,61,168,.32)}
@@ -125,13 +125,13 @@
 .cdk .qinsight{grid-column:9/13;grid-row:4}
 
 @media (max-width:1100px){
-  .cdk .grid{grid-template-columns:repeat(6,1fr)}
+  .cdk .deckgrid{grid-template-columns:repeat(6,1fr)}
   .cdk .hero,.cdk .spend,.cdk .netcash,.cdk .perf,.cdk .trend,.cdk .catalog,.cdk .spendcat,.cdk .cheques,.cdk .qinsight{grid-row:auto}
   .cdk .hero{grid-column:1/7} .cdk .spend{grid-column:1/4} .cdk .netcash{grid-column:4/7} .cdk .perf{grid-column:1/7}
   .cdk .trend,.cdk .catalog,.cdk .spendcat,.cdk .cheques,.cdk .qinsight{grid-column:1/7}
 }
 @media (max-width:680px){
-  .cdk .grid{grid-template-columns:1fr}
+  .cdk .deckgrid{grid-template-columns:1fr}
   .cdk .hero,.cdk .spend,.cdk .netcash,.cdk .perf,.cdk .trend,.cdk .catalog,.cdk .spendcat,.cdk .cheques,.cdk .qinsight{grid-column:1;grid-row:auto}
 }
 

@@ -191,7 +191,7 @@ export function DashboardScreen() {
       </div>
 
       {/* ── grid ───────────────────────────────────────────────────────── */}
-      <div className="grid">
+      <div className="deckgrid">
         {/* hero — revenue this month */}
         <div className="tile hero">
           <div className="orb" />
