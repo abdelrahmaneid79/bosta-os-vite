@@ -81,8 +81,8 @@ export function StockScreen() {
   return (
     <div>
       <div className="statgrid">
-        <Stat label="Total stock value" color="var(--violet)" value={s ? egp(s.totalValue) : "—"} sub={s && s.totalValue === 0 ? <div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600, marginTop: 8 }}>count stock to set →</div> : undefined} />
         <Stat label="Products" color="var(--mag)" value={s ? s.positions.length : "—"} onClick={() => setManageOpen(true)} sub={<div style={{ fontSize: 11, color: "var(--mag)", fontWeight: 700, marginTop: 8 }}>Manage full list ↗</div>} />
+        <Stat label="Total stock value" color="var(--violet)" value={s ? egp(s.totalValue) : "—"} sub={s && s.totalValue === 0 ? <div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600, marginTop: 8 }}>count stock to set →</div> : undefined} />
         <Stat label="Counted / uncounted" color="var(--cyan)" value={s ? `${counted} / ${s.positions.length - counted}` : "—"} />
         <Stat label="Missing cost" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
       </div>
@@ -263,41 +263,54 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
 
   const lineSum = (items.data ?? []).reduce((a, l) => a + l.lineTotal, 0);
   const missingCogs = (items.data ?? []).filter((l) => l.productId && !l.hasCogs).length;
+  const diff = sale.total - lineSum;
+  const ok = Math.abs(diff) < 1;
+  const lines = items.data ?? [];
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between rounded-xl bg-panel p-3">
-        <div><div className="text-[11px] text-dim">Day total</div><div className="font-display text-lg font-semibold">{egp(sale.total)}</div></div>
-        <div className="text-right"><div className="text-[11px] text-dim">Lines</div><div className="font-display text-lg font-semibold">{egp(lineSum)}</div></div>
-        <Badge tone={sale.reconciled ? "good" : "warn"}>{sale.reconciled ? "reconciled" : "mismatch"}</Badge>
+    <div className="space-y-4">
+      {/* summary + reconciliation */}
+      <div style={{ display: "flex", alignItems: "center", gap: 26, flexWrap: "wrap" }}>
+        <div><div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600 }}>Day total</div><div className="disp" style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-.01em" }}>{egp(sale.total)}</div></div>
+        <div><div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600 }}>Breakdown</div><div className="disp" style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-.01em" }}>{egp(lineSum)}</div></div>
+        <span className="recon" style={{ marginLeft: "auto", color: ok ? "var(--green)" : "var(--amber)", background: ok ? "rgba(66,226,154,.13)" : "rgba(255,177,62,.12)" }}>
+          {ok ? "reconciled" : diff > 0 ? `${egp(diff)} unallocated` : `${egp(-diff)} over`}
+        </span>
       </div>
-      {missingCogs > 0 && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">{missingCogs} line(s) have no cost yet — add a purchase for those products so profit is exact.</div>}
+      {missingCogs > 0 && <div className="note" style={{ fontSize: 12.5 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg><div>{missingCogs} line(s) have no cost yet — add a purchase for those products so profit is exact.</div></div>}
 
-      {items.isLoading ? <SkeletonRows rows={3} /> : (items.data?.length ?? 0) === 0 ? (
-        <p className="py-2 text-sm text-dim">No product lines yet. Add lines to deduct stock and track COGS.</p>
-      ) : (
-        <div className="divide-y divide-line rounded-xl border border-line">
-          {items.data!.map((l) => (
-            <div key={l.id} className="flex items-center gap-2 px-3 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm text-text">{l.name}</div>
-                <div className="text-[11px] text-dim">{num(l.qty)} × {egp(l.unitPrice ?? 0)} {l.hasCogs ? "" : "· no COGS"}</div>
-              </div>
-              <div className="font-display text-sm font-semibold">{egp(l.lineTotal)}</div>
-              <button onClick={() => setEditItem(l)} className="px-1.5 text-dim hover:text-text" title="Edit">✎</button>
-              <button onClick={() => setConfirm({ kind: "line", item: l })} className="px-1.5 text-dim hover:text-bad" title="Void">✕</button>
-            </div>
-          ))}
-        </div>
+      {/* editable product table */}
+      {items.isLoading ? <SkeletonRows rows={3} /> : (
+        <table className="etbl">
+          <thead><tr><th>Product</th><th className="r">Qty sold</th><th className="r">Unit price</th><th className="r">Amount</th><th style={{ width: 74 }} /></tr></thead>
+          <tbody>
+            {lines.map((l) => (
+              <tr key={l.id}>
+                <td>{l.name}{!l.hasCogs && <span style={{ color: "var(--amber)", fontSize: 11 }}> · no cost</span>}</td>
+                <td className="r">{num(l.qty)}</td>
+                <td className="r">{egp(l.unitPrice ?? 0)}</td>
+                <td className="r">{egp(l.lineTotal)}</td>
+                <td className="r" style={{ whiteSpace: "nowrap" }}>
+                  <button onClick={() => setEditItem(l)} title="Edit" style={{ color: "var(--dim)", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✎</button>
+                  <button onClick={() => setConfirm({ kind: "line", item: l })} title="Void" style={{ color: "var(--faint)", background: "none", border: "none", cursor: "pointer", fontSize: 13, marginLeft: 6 }}>✕</button>
+                </td>
+              </tr>
+            ))}
+            {lines.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--dim)", padding: "22px 12px" }}>No product lines yet — add what sold below to deduct stock &amp; track profit.</td></tr>}
+          </tbody>
+        </table>
       )}
 
+      {/* add line */}
       {addLine ? (
-        <div className="rounded-xl border border-line p-3"><SaleItemForm saleId={sale.id} onDone={() => { setAddLine(false); refresh(); }} /></div>
+        <div style={{ border: "1px solid var(--stroke)", borderRadius: 14, padding: 16, background: "rgba(255,255,255,.02)" }}><SaleItemForm saleId={sale.id} onDone={() => { setAddLine(false); refresh(); }} /></div>
       ) : (
-        <Button variant="outline" className="w-full" onClick={() => setAddLine(true)}>+ Add product line</Button>
+        <button className="addbtn" style={{ width: "100%", justifyContent: "center", padding: "12px" }} onClick={() => setAddLine(true)}>+ Add product line</button>
       )}
 
-      <button onClick={() => setConfirm({ kind: "day" })} className="w-full pt-1 text-center text-xs text-bad hover:underline">Void this whole sale day</button>
+      <div style={{ borderTop: "1px solid var(--stroke2)", paddingTop: 12, textAlign: "center" }}>
+        <button onClick={() => setConfirm({ kind: "day" })} style={{ fontSize: 12, color: "var(--red)", background: "none", border: "none", cursor: "pointer" }}>Void this whole sale day</button>
+      </div>
 
       {editItem && <Modal open onClose={() => setEditItem(null)} title="Edit line"><SaleItemForm saleId={sale.id} item={editItem} onDone={() => { setEditItem(null); refresh(); }} /></Modal>}
       <Confirm open={confirm?.kind === "line"} title="Void this line?" danger busy={voidLine.isPending}

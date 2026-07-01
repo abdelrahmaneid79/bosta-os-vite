@@ -8,7 +8,7 @@ import { useId, useState, useRef, useEffect, useLayoutEffect } from "react";
 const PINK = "rgb(var(--pink))";
 const TEAL = "rgb(var(--good))";
 const GRID = "rgb(var(--line2))";
-const AXIS = "rgb(var(--dim))";
+const AXIS = "rgb(var(--muted))";
 const SURFACE = "rgb(var(--panel))";
 const SLICE = ["rgb(var(--pink))", "rgb(var(--good))", "rgb(var(--info))", "rgb(var(--warn))", "rgb(var(--violet))", "#FF6B8A", "#34D9C8", "#FFD166"];
 const EASE = "cubic-bezier(.22,1,.36,1)";

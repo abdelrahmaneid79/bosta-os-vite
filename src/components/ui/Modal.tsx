@@ -20,7 +20,7 @@ export function Modal({ open, onClose, title, children, wide }: {
   if (!open) return null;
   return (
     <div className="modal-root fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6">
-      <div onClick={onClose} className="absolute inset-0 bg-[rgba(4,5,7,0.72)] backdrop-blur-[6px]" />
+      <div onClick={onClose} className="absolute inset-0 bg-[rgba(3,4,6,0.84)] backdrop-blur-[10px]" />
       <div onClick={(e) => e.stopPropagation()}
         className={cn("relative max-h-[86vh] w-full overflow-y-auto rounded-[26px] border border-white/[0.09] bg-[linear-gradient(180deg,#16191f,#101319)] p-6 shadow-[0_50px_110px_-30px_#000]",
           wide ? "max-w-3xl" : "max-w-md")}>

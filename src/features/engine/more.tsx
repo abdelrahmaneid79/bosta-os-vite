@@ -471,7 +471,7 @@ export function SettingsScreen() {
 
   if (!en) return <EmptyState title="Sign in to manage settings" />;
   return (
-    <div className="mx-auto max-w-xl space-y-4">
+    <div className="max-w-2xl space-y-4">
       <Link to="/settings/history" className="lift block rounded-2xl border border-pink/40 bg-pink/[0.06] p-4">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
@@ -539,7 +539,7 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 export function PreferencesScreen() {
   const { landing, defaultRange, hiddenSections, accountingStart, theme, set, toggleSection, reset } = usePrefs();
   return (
-    <div className="mx-auto max-w-xl space-y-4">
+    <div className="max-w-2xl space-y-4">
       <Card>
         <Eyebrow>Appearance</Eyebrow>
         <p className="mt-1 text-[12px] text-dim">Choose the look. “System” follows your device’s light/dark setting.</p>

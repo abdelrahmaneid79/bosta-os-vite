@@ -101,9 +101,9 @@
 .cdk .grid-line{stroke:rgba(255,255,255,.05);stroke-width:1;shape-rendering:crispEdges}
 .cdk .ln{stroke-dasharray:1;stroke-dashoffset:0;animation:cdk-lndraw 1.3s cubic-bezier(.4,0,.2,1)}
 .cdk .ar-fill{opacity:1;animation:cdk-arfade .9s ease}
-.cdk .chyax{position:absolute;left:0;top:0;bottom:26px;display:flex;flex-direction:column;justify-content:space-between;font-size:10.5px;color:var(--faint);font-weight:500;pointer-events:none}
+.cdk .chyax{position:absolute;left:0;top:0;bottom:26px;display:flex;flex-direction:column;justify-content:space-between;font-size:11px;color:rgba(255,255,255,.55);font-weight:600;pointer-events:none}
 .cdk .chaxis{position:absolute;left:0;right:0;bottom:2px;height:16px;pointer-events:none}
-.cdk .chaxis span{position:absolute;transform:translateX(-50%);font-size:10.5px;color:var(--dim);font-weight:500;white-space:nowrap}
+.cdk .chaxis span{position:absolute;transform:translateX(-50%);font-size:10.5px;color:rgba(255,255,255,.5);font-weight:600;white-space:nowrap}
 
 /* performance / health gauge tile */
 .cdk .perf{padding:30px;display:flex;align-items:center;gap:34px;flex-wrap:wrap}
