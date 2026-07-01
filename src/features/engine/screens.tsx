@@ -7,7 +7,7 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, Eyebrow, StatCard, Badge, Button, Input, Select } from "@/components/ui";
+import { Card, Eyebrow, StatCard, Badge, Button, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
@@ -67,6 +67,7 @@ export function ConnectPanel() {
 
 // ── Stock / Goods (operational: create + edit) ───────────────────────────────
 export function StockScreen() {
+  const navigate = useNavigate();
   const q = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: isEngineConfigured });
   const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
   const [search, setSearch] = useState("");
@@ -76,44 +77,43 @@ export function StockScreen() {
   const byId = new Map((prods.data ?? []).map((p) => [p.id, p]));
   const term = search.trim().toLowerCase();
   const positions = (s?.positions ?? []).filter((p) => !term || p.nameEn.toLowerCase().includes(term) || (byId.get(p.id)?.name_ar ?? "").toLowerCase().includes(term));
+  const maxPrice = Math.max(1, ...(s?.positions ?? []).map((p) => p.sellingPrice ?? 0));
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Stock value" accent="blue" icon={SI.box} value={s ? egpShort(s.totalValue) : "—"} />
-        <StatCard label="Products" accent="pink" icon={SI.tag} value={s ? s.positions.length : "—"} />
-        <StatCard label="Missing COGS" accent="amber" icon={SI.warn} value={s ? s.missingCostCount : "—"} />
-        <StatCard label="Negative" accent="red" icon={SI.neg} value={s ? s.negativeCount : "—"} />
+    <div>
+      <div className="statgrid">
+        <Stat label="Products" color="var(--mag)" value={s ? s.positions.length : "—"} sub={<div style={{ fontSize: 11, color: "var(--mag)", fontWeight: 700, marginTop: 8 }}>Search & open any item ↓</div>} />
+        <Stat label="Stock value · COGS" color="var(--violet)" value={s ? egpShort(s.totalValue) : "—"} />
+        <Stat label="Missing COGS" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
+        <Stat label="Negative stock" color="var(--cyan)" value={s ? s.negativeCount : "—"} />
       </div>
-      <div className="flex items-center gap-2">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…" className="flex-1" />
-        <Button onClick={() => setModal({ mode: "add" })}>+ Product</Button>
+      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+        <input className="input" style={{ flex: 1 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products…" />
+        <button className="addbtn" onClick={() => navigate("/costs")}>Import</button>
+        <button className="qadd" style={{ height: "auto" }} onClick={() => setModal({ mode: "add" })}><span>+ Add product</span></button>
       </div>
       <Guarded q={q} empty={!!s && s.positions.length === 0}>
-        <Card className="!p-0">
-          <div className="divide-y divide-line">
-            {positions.map((p) => {
-              const prod = byId.get(p.id);
-              return (
-                <div key={p.id} className="row-hover flex w-full items-center gap-3 px-4 py-3">
-                  <button onClick={() => setDetailId(p.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm text-text">{p.nameEn}</span>
-                        {!p.active && <Badge>inactive</Badge>}
-                      </div>
-                      <div className="text-[12px] text-dim">{num(p.onHand)} {p.baseUnit} · {p.hasCost ? `${egp(p.avgCost)}/${p.baseUnit}` : "no cost"}</div>
-                    </div>
-                    {p.isNegative && <Badge tone="bad">negative</Badge>}
-                    {!p.isNegative && p.isLow && <Badge tone="warn">low</Badge>}
-                    {p.onHand > 0 && !p.hasCost && <Badge tone="warn">no COGS</Badge>}
-                    <div className="font-display text-sm font-semibold">{egp(p.stockValue)}</div>
-                  </button>
-                  <button onClick={() => prod && setModal({ mode: "edit", product: prod })} className="px-1 text-dim hover:text-text" title="Edit product">✎</button>
-                </div>
-              );
-            })}
+        <DeckTile style={{ padding: 0 }}>
+          <div className="scroll">
+            <table className="tbl">
+              <thead><tr><th>Product</th><th className="r">Price / kg</th></tr></thead>
+              <tbody>
+                {positions.map((p) => (
+                  <tr key={p.id} className="prodcell" onClick={() => setDetailId(p.id)}>
+                    <td style={{ fontSize: 14 }}>{p.nameEn}{!p.active && <span style={{ color: "var(--faint)" }}> · inactive</span>}</td>
+                    <td className="r">
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 11, justifyContent: "flex-end" }}>
+                        <span style={{ width: 64, height: 5, borderRadius: 3, background: "rgba(255,255,255,.06)", overflow: "hidden" }}>
+                          <span style={{ display: "block", height: "100%", width: `${Math.round(((p.sellingPrice ?? 0) / maxPrice) * 100)}%`, background: "linear-gradient(90deg,var(--violet),var(--mag))" }} />
+                        </span>
+                        <span style={{ minWidth: 88 }}>{p.sellingPrice != null ? egp(p.sellingPrice) : "—"}</span>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </Card>
+        </DeckTile>
       </Guarded>
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit product" : "Add product"}>
         <ProductForm product={modal?.mode === "edit" ? modal.product : undefined} onDone={() => setModal(null)} />
