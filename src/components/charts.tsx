@@ -87,10 +87,13 @@ export function BarChart({ data, height = 240, color = PINK, unit = "EGP", maxLa
           <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={1} /><stop offset="100%" stopColor={color} stopOpacity={0.5} /></linearGradient></defs>
           {Array.from({ length: ticks + 1 }).map((_, i) => {
             const y = PT + (plotH * i) / ticks;
+            const txt = short(max * (1 - i / ticks));
+            const tw = txt.length * 5.5;
             return (
               <g key={i}>
                 <line x1={PL} y1={y} x2={W - PR} y2={y} stroke={GRID} strokeWidth={1} />
-                <text x={PL - 8} y={y + 3.5} textAnchor="end" fontSize={11} fontWeight={600} fill={AXIS}>{short(max * (1 - i / ticks))}</text>
+                <rect x={PL - 12 - tw} y={y - 7} width={tw + 4} height={13} rx={3} fill="rgba(16,19,25,0.72)" />
+                <text x={PL - 8} y={y + 3.5} textAnchor="end" fontSize={11} fontWeight={600} fill={AXIS}>{txt}</text>
               </g>
             );
           })}
@@ -106,7 +109,10 @@ export function BarChart({ data, height = 240, color = PINK, unit = "EGP", maxLa
           })}
           {data.map((_, i) => <rect key={`hit${i}`} x={PL + i * bw} y={PT} width={bw} height={plotH} fill="transparent" onMouseEnter={() => setHover(i)} />)}
           {data.map((d, i) => i % labelEvery === 0 ? (
-            <text key={`lb${i}`} x={cx(i)} y={H - 8} textAnchor="middle" fontSize={11} fontWeight={600} fill={hover === i ? color : AXIS}>{d.label}</text>
+            <g key={`lb${i}`}>
+              <rect x={cx(i) - 22} y={H - 18} width={44} height={13} rx={3} fill="rgba(16,19,25,0.72)" />
+              <text x={cx(i)} y={H - 8} textAnchor="middle" fontSize={11} fontWeight={600} fill={hover === i ? color : AXIS}>{d.label}</text>
+            </g>
           ) : null)}
         </svg>
       )}
@@ -148,9 +154,12 @@ export function LineChart({ data, height = 240, color = TEAL, unit = "EGP", area
           <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={0.3} /><stop offset="100%" stopColor={color} stopOpacity={0} /></linearGradient></defs>
           {Array.from({ length: ticks + 1 }).map((_, i) => {
             const yy = PT + (plotH * i) / ticks;
+            const txt = short(max * (1 - i / ticks));
+            const tw = txt.length * 5.5;
             return (<g key={i}>
               <line x1={PL} y1={yy} x2={W - PR} y2={yy} stroke={GRID} strokeWidth={1} />
-              <text x={PL - 8} y={yy + 3.5} textAnchor="end" fontSize={11} fontWeight={600} fill={AXIS}>{short(max * (1 - i / ticks))}</text>
+              <rect x={PL - 12 - tw} y={yy - 7} width={tw + 4} height={13} rx={3} fill="rgba(16,19,25,0.72)" />
+              <text x={PL - 8} y={yy + 3.5} textAnchor="end" fontSize={11} fontWeight={600} fill={AXIS}>{txt}</text>
             </g>);
           })}
           {area && <path d={fill} fill={`url(#${id})`} opacity={shown ? 1 : 0} style={{ transition: "opacity .6s ease .3s" }} />}
@@ -161,7 +170,10 @@ export function LineChart({ data, height = 240, color = TEAL, unit = "EGP", area
             <circle cx={x(hover!)} cy={y(hp.value)} r={4.5} fill={color} stroke={SURFACE} strokeWidth={2} />
           </g>)}
           {data.map((d, i) => i % labelEvery === 0 ? (
-            <text key={`lb${i}`} x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fontWeight={600} fill={AXIS}>{d.label}</text>
+            <g key={`lb${i}`}>
+              <rect x={x(i) - 22} y={H - 18} width={44} height={13} rx={3} fill="rgba(16,19,25,0.72)" />
+              <text x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fontWeight={600} fill={AXIS}>{d.label}</text>
+            </g>
           ) : null)}
         </svg>
       )}
