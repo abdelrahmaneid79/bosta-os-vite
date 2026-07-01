@@ -367,7 +367,7 @@ export default function EngineApp() {
   return (
     <QueryClientProvider client={client}>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthGate><Shell /></AuthGate>
         </BrowserRouter>
       </AuthProvider>
