@@ -25,6 +25,7 @@ import { getRecentSales, getSalesStats, getSaleItems, type SaleRow as SaleRowVM,
 import { getPurchases, getInventoryPurchases } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
 import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
+import { ProductDetailScreen } from "./product";
 import { voidSaleItem, voidSale } from "@/core/db/mutations";
 import { useUI } from "@/store/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -68,6 +69,7 @@ export function StockScreen() {
   const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<null | { mode: "add" } | { mode: "edit"; product: Tables<"products"> }>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const s = q.data;
   const byId = new Map((prods.data ?? []).map((p) => [p.id, p]));
   const term = search.trim().toLowerCase();
@@ -91,7 +93,7 @@ export function StockScreen() {
               const prod = byId.get(p.id);
               return (
                 <div key={p.id} className="row-hover flex w-full items-center gap-3 px-4 py-3">
-                  <Link to={`/product/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <button onClick={() => setDetailId(p.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="truncate text-sm text-text">{p.nameEn}</span>
@@ -103,7 +105,7 @@ export function StockScreen() {
                     {!p.isNegative && p.isLow && <Badge tone="warn">low</Badge>}
                     {p.onHand > 0 && !p.hasCost && <Badge tone="warn">no COGS</Badge>}
                     <div className="font-display text-sm font-semibold">{egp(p.stockValue)}</div>
-                  </Link>
+                  </button>
                   <button onClick={() => prod && setModal({ mode: "edit", product: prod })} className="px-1 text-dim hover:text-text" title="Edit product">✎</button>
                 </div>
               );
@@ -113,6 +115,9 @@ export function StockScreen() {
       </Guarded>
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit product" : "Add product"}>
         <ProductForm product={modal?.mode === "edit" ? modal.product : undefined} onDone={() => setModal(null)} />
+      </Modal>
+      <Modal open={!!detailId} onClose={() => setDetailId(null)} wide>
+        {detailId && <ProductDetailScreen id={detailId} onClose={() => setDetailId(null)} />}
       </Modal>
     </div>
   );

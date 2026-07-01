@@ -31,8 +31,9 @@ const ADVICE_TONE: Record<AdviceTone, { wrap: string; text: string }> = {
   info: { wrap: "border-line bg-panel2", text: "text-info" },
 };
 
-export function ProductDetailScreen() {
-  const { id = "" } = useParams();
+export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onClose?: () => void } = {}) {
+  const { id: idParam = "" } = useParams();
+  const id = idProp ?? idParam;
   const range = useActiveRange();
   const rk = useFilters((s) => s.rangeKey);
   const [buy, setBuy] = useState(false);
@@ -61,7 +62,9 @@ export function ProductDetailScreen() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Link to="/stock" className="text-sm text-pink">← Goods</Link>
+        {onClose
+          ? <button onClick={onClose} className="text-sm font-semibold text-pink">← Back to stock</button>
+          : <Link to="/stock" className="text-sm text-pink">← Goods</Link>}
         <div className="flex-1" />
         <DateRangePicker />
       </div>
