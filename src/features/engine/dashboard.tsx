@@ -374,13 +374,16 @@ export function HealthScreen() {
         </DeckTile>
         <DeckTile>
           <TileHead name="Health by dimension" right="weighted score" />
-          {scored.map((c) => (
-            <div className="meter" key={c.key}>
-              <div className="mh"><span className="mn">{c.label}</span><span className="ms" style={{ color: cc(c.score) }}>{Math.round(c.score)}<span style={{ color: "var(--faint)", fontSize: 11 }}>/100</span></span></div>
-              <div className="track"><i style={{ width: `${Math.round(c.score)}%`, background: cc(c.score) }} /></div>
-              <div className="mt">{c.reason}</div>
-            </div>
-          ))}
+          {h.categories.map((c) => {
+            const col2 = c.score == null ? "var(--faint)" : cc(c.score);
+            return (
+              <div className="meter" key={c.key}>
+                <div className="mh"><span className="mn">{c.label}</span><span className="ms" style={{ color: col2 }}>{c.score == null ? "—" : Math.round(c.score)}<span style={{ color: "var(--faint)", fontSize: 11 }}>/100</span></span></div>
+                <div className="track"><i style={{ width: `${c.score == null ? 0 : Math.round(c.score)}%`, background: col2 }} /></div>
+                <div className="mt">{c.reason}</div>
+              </div>
+            );
+          })}
         </DeckTile>
       </div>
       <div className="row2" style={{ marginTop: 16 }}>

@@ -203,10 +203,17 @@ function SpotlightSearch() {
 
 /** Command Deck topbar — conic .wmark logo, .navpill primary nav, spotlight
  *  search, quick-add, alert bell, avatar. Wired to the app's router. */
+// The design's five primary pills. Reports folds under Insights; Settings lives
+// on the avatar — matching clean.png (one clean row, never wrapping).
+const PILL_IDS = ["today", "sales", "inventory", "money", "insights"] as const;
+const PILL_LABEL: Record<string, string> = { inventory: "Stock" };
+
 function TopNav({ onAdd }: { onAdd: () => void }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const active = groupForPath(pathname);
-  const nav = [...useVisibleGroups(), SETTINGS];
+  const groups = useVisibleGroups();
+  const pills = PILL_IDS.map((id) => groups.find((g) => g.id === id)).filter((g): g is Group => !!g);
   return (
     <div className="topbar">
       <NavLink to="/dashboard" className="wm">
@@ -214,16 +221,16 @@ function TopNav({ onAdd }: { onAdd: () => void }) {
         <div className="wmtxt"><b>Bosta<span>OS</span></b><small>BOSTA BITES · CAIRO</small></div>
       </NavLink>
       <nav className="navpill">
-        {nav.map((g) => (
+        {pills.map((g) => (
           <NavLink key={g.id} to={g.tabs[0].to} className={cn("np", active?.id === g.id && "on")}>
-            <Icon d={g.icon} className="h-4 w-4" /><span>{g.label}</span>
+            <Icon d={g.icon} className="h-4 w-4" /><span>{PILL_LABEL[g.id] ?? g.label}</span>
           </NavLink>
         ))}
       </nav>
       <SpotlightSearch />
       <button onClick={onAdd} className="qadd" title="Quick add"><Icon d={I.plus} w={2.6} className="h-4 w-4" /></button>
       <AlertBell />
-      <div className="avt" title="Bosta Bites">BB</div>
+      <button onClick={() => navigate("/settings")} className="avt" title="Settings">BB</button>
     </div>
   );
 }

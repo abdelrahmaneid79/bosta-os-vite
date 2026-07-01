@@ -24,7 +24,7 @@
 .cdk .wmtxt b{font-family:'Clash Display';font-weight:700;font-size:21px;letter-spacing:-.01em;line-height:1}
 .cdk .wmtxt b span{color:var(--mag)}
 .cdk .wmtxt small{display:block;font-size:11px;color:var(--dim);font-weight:600;letter-spacing:.04em;margin-top:2px}
-.cdk .navpill{display:flex;gap:3px;background:rgba(255,255,255,.04);border:1px solid var(--stroke);border-radius:16px;padding:5px;margin:0 auto;flex-wrap:wrap}
+.cdk .navpill{display:flex;gap:3px;background:rgba(255,255,255,.04);border:1px solid var(--stroke);border-radius:16px;padding:5px;margin:0 auto;flex-wrap:nowrap;white-space:nowrap}
 .cdk .np{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;transition:.18s;text-decoration:none}
 .cdk .np svg{width:16px;height:16px}
 .cdk .np:hover{color:var(--text)}
@@ -33,7 +33,7 @@
 .cdk .iconbtn:hover{color:var(--text);border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.07)}
 .cdk .iconbtn svg{width:18px;height:18px}
 .cdk .nd{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 3px;border-radius:50%;background:var(--mag);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #0a0c10}
-.cdk .avt{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--violet),var(--cyan));display:flex;align-items:center;justify-content:center;font-family:'Clash Display';font-weight:700;font-size:14px;color:#fff;cursor:pointer;transition:transform .18s}
+.cdk .avt{width:44px;height:44px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--violet),var(--cyan));display:flex;align-items:center;justify-content:center;font-family:'Clash Display';font-weight:700;font-size:14px;color:#fff;cursor:pointer;transition:transform .18s;flex-shrink:0}
 .cdk .avt:hover{transform:scale(1.05)}
 .cdk .qadd{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--mag),var(--violet));color:#fff;border:none;border-radius:13px;height:44px;padding:0 16px;font-family:'Satoshi',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 10px 24px -8px rgba(255,61,168,.7);transition:transform .15s,filter .15s}
 .cdk .qadd:hover{filter:brightness(1.08)} .cdk .qadd:active{transform:scale(.97)} .cdk .qadd svg{width:16px;height:16px}
