@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Pill, Ring, Badge, Button } from "@/components/ui";
+import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
+import { MBars, DeckTile, TileHead } from "./deck";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -10,7 +11,7 @@ import { getCommandCenter } from "@/core/read/dashboard";
 import { getMissingData } from "@/core/read/missing";
 import { getRiskInsights } from "@/core/read/insights";
 import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
-import { getHealthReport } from "@/core/read/health";
+import { getHealthReport, type HealthCategory } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getExpenses } from "@/core/read/expenses";
 import { getChequeCycle } from "@/core/read/settlements";
@@ -349,62 +350,76 @@ function Note({ children }: { children: React.ReactNode }) {
   return <div className="py-1 text-sm" style={{ color: "var(--dim)" }}>{children}</div>;
 }
 
-/* ─ Health Center (game-style, real signals) ───────────────────────────── */
+/* ─ Business Health — Command Deck layout (identical to the design) ───────── */
 export function HealthScreen() {
+  const today = todayCairo();
   const q = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
+  const daily = useQuery({ queryKey: ["dailyHist", "2024-01-01"], queryFn: () => getDailyRevenue({ from: "2024-01-01", to: today }), enabled: en });
+  const exp = useQuery({ queryKey: ["dash-spend", "2024-01-01"], queryFn: () => getExpenses({ from: "2024-01-01", to: today }), enabled: en });
   if (!en) return <EmptyState title="Sign in to compute health" hint="Built from your real data only — never faked." />;
   if (q.isLoading) return <SkeletonRows rows={5} />;
   if (q.isError) return <ErrorState message={String((q.error as Error)?.message)} />;
   const h = q.data!;
+  const score = h.overall ?? 0;
+  const col = score >= 75 ? "var(--green)" : score >= 55 ? "var(--amber)" : "var(--red)";
+  const R = 80, C = 2 * Math.PI * R;
 
-  return (
-    <div className="space-y-4">
-      <Card glow>
-        <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr]">
-          <Ring value={h.overall} size={150} stroke={13}>
-            <span className="tnum font-display text-4xl font-extrabold leading-none text-text">{h.overall ?? "—"}</span>
-            <span className="text-[11px] font-semibold text-dim">/ 100</span>
-          </Ring>
-          <div>
-            <Eyebrow>Overall business health</Eyebrow>
-            <div className="mb-2 font-display text-2xl font-extrabold text-text">{h.status}</div>
-            <div className="mb-4 flex flex-wrap gap-2">
-              {h.level != null && <Pill tone="warn">⚡ Level {h.level}</Pill>}
-              {h.streakDays > 0 && <Pill tone="pink">🔥 {h.streakDays}-day streak</Pill>}
-            </div>
-            <div className="grid grid-cols-2 gap-5">
-              <Col title="Helping" tone="text-good" rows={h.helping} dotClass="bg-good" />
-              <Col title="Hurting" tone="text-bad" rows={h.hurting} dotClass="bg-bad" />
-            </div>
-          </div>
-        </div>
-      </Card>
+  const rev = new Map<string, number>(); for (const r of daily.data ?? []) rev.set(r.date.slice(0, 7), (rev.get(r.date.slice(0, 7)) ?? 0) + r.total);
+  const spend = new Map<string, number>(); for (const e of exp.data ?? []) spend.set(e.date.slice(0, 7), (spend.get(e.date.slice(0, 7)) ?? 0) + e.amount);
+  const months = [...rev.keys()].sort().slice(-6);
+  const net6 = months.map((m) => ({ label: MON[+m.slice(5, 7) - 1], full: `${MON[+m.slice(5, 7) - 1]} ${m.slice(0, 4)}`, value: (rev.get(m) ?? 0) - (spend.get(m) ?? 0) }));
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {h.categories.map((cat) => (
-          <Card key={cat.key}>
-            <div className="flex items-center gap-3">
-              <Ring value={cat.score} size={56} stroke={7}><span className="tnum font-display text-xs font-bold text-text">{cat.score ?? "—"}</span></Ring>
-              <div className="min-w-0">
-                <div className="font-display text-sm font-bold">{cat.label}</div>
-                {cat.trend != null && <span className={`tnum text-[11px] font-semibold ${cat.trend >= 0 ? "text-good" : "text-bad"}`}>{cat.trend >= 0 ? "▲ +" : "▼ −"}{Math.abs(cat.trend)}% this month</span>}
-              </div>
-            </div>
-            <div className="mt-3 text-[12.5px] leading-relaxed text-muted">{cat.reason}</div>
-            <div className="mt-3 border-t border-line pt-2.5 text-[11px] font-semibold text-good">↑ {cat.lift}</div>
-          </Card>
-        ))}
-      </div>
+  const scored = h.categories.filter((c): c is HealthCategory & { score: number } => c.score != null);
+  const strengths = scored.filter((c) => c.score >= 65);
+  const risks = scored.filter((c) => c.score < 65);
+  const cc = (s: number) => (s >= 70 ? "var(--green)" : s >= 45 ? "var(--amber)" : "var(--red)");
+  const summary = `Overall health is ${h.status.toLowerCase()} at ${score}/100${strengths[0] ? `, led by ${strengths[0].label.toLowerCase()}` : ""}${risks[0] ? ` and held back by ${risks[0].label.toLowerCase()}` : ""}.`;
+  const li = (c: HealthCategory, good: boolean) => (
+    <div className="bhitem" key={c.key}>
+      <svg viewBox="0 0 24 24" fill="none" stroke={good ? "var(--green)" : "var(--amber)"} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        {good ? <path d="M20 6 9 17l-5-5" /> : <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />}
+      </svg>
+      <div><b style={{ color: "var(--text)", fontWeight: 600 }}>{c.label}</b> — {c.reason}</div>
     </div>
   );
-}
-function Col({ title, tone, rows, dotClass }: { title: string; tone: string; rows: { label: string; score: number }[]; dotClass: string }) {
+
   return (
     <div>
-      <div className={`mb-2 text-[10.5px] font-bold uppercase tracking-[0.12em] ${tone}`}>{title}</div>
-      {rows.length ? rows.map((r) => (
-        <div key={r.label} className="text-[13px] text-muted"><span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${dotClass}`} /> {r.label} · {r.score}</div>
-      )) : <div className="text-[13px] text-dim">—</div>}
+      <div className="bh">
+        <DeckTile>
+          <div className="bhscore">
+            <div className="pulse" style={{ borderColor: col }} />
+            <div className="pulse" style={{ borderColor: col, animationDelay: "1.6s" }} />
+            <svg width={200} height={200} viewBox="0 0 200 200">
+              <circle cx={100} cy={100} r={80} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth={14} />
+              <circle cx={100} cy={100} r={80} fill="none" stroke={col} strokeWidth={14} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - score / 100)} transform="rotate(-90 100 100)" style={{ filter: `drop-shadow(0 0 9px ${col})` }} />
+            </svg>
+            <div style={{ position: "absolute", textAlign: "center" }}>
+              <div className="bhbig" style={{ color: col }}>{score}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".09em", textTransform: "uppercase", color: col }}>{h.status}</div>
+            </div>
+          </div>
+          <div style={{ textAlign: "center", fontSize: 13, color: "var(--muted)", marginTop: 16, lineHeight: 1.55 }}>{summary}</div>
+          <div style={{ marginTop: 22, width: "100%" }}>
+            <div className="eyebrow" style={{ color: "var(--dim)", marginBottom: 10 }}>Net cash · last 6 months</div>
+            <MBars data={net6} height={74} gradient={`linear-gradient(180deg,${col},rgba(157,107,255,.4))`} />
+          </div>
+        </DeckTile>
+        <DeckTile>
+          <TileHead name="Health by dimension" right="weighted score" />
+          {scored.map((c) => (
+            <div className="meter" key={c.key}>
+              <div className="mh"><span className="mn">{c.label}</span><span className="ms" style={{ color: cc(c.score) }}>{Math.round(c.score)}<span style={{ color: "var(--faint)", fontSize: 11 }}>/100</span></span></div>
+              <div className="track"><i style={{ width: `${Math.round(c.score)}%`, background: cc(c.score) }} /></div>
+              <div className="mt">{c.reason}</div>
+            </div>
+          ))}
+        </DeckTile>
+      </div>
+      <div className="row2" style={{ marginTop: 16 }}>
+        <DeckTile><TileHead name={<span style={{ color: "var(--green)" }}>Working well</span>} />{strengths.length ? strengths.map((c) => li(c, true)) : <div className="bhitem"><div>Nothing is clearly strong yet — keep logging records.</div></div>}</DeckTile>
+        <DeckTile><TileHead name={<span style={{ color: "var(--amber)" }}>Watch closely</span>} />{risks.length ? risks.map((c) => li(c, false)) : <div className="bhitem"><div>Nothing flashing red — keep it up.</div></div>}</DeckTile>
+      </div>
     </div>
   );
 }

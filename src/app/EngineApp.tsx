@@ -116,12 +116,17 @@ function SectionTabs({ group }: { group: Group }) {
   );
 }
 
+// Sections whose screens own the full design layout (their own .pagehdr) — the
+// wrapper must not add a second header for these.
+const DECK_SECTIONS = new Set(["today", "sales"]);
+
 function Page({ group, children }: { group: Group; children: React.ReactNode }) {
   const { pathname } = useLocation();
   const activeTab = group.tabs.find((t) => pathname === t.to || pathname.startsWith(t.to + "/"));
   // The Today screen carries its own ticker/hero header; every other section
   // gets a consistent Command Deck identity header (accent icon tile + title).
   if (group.id === "today") return <>{children}</>;
+  if (DECK_SECTIONS.has(group.id)) return <><SectionTabs group={group} />{children}</>;
   return (
     <>
       <div className="mb-5 flex items-center gap-3.5">

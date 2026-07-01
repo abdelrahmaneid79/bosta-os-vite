@@ -4,8 +4,8 @@
  * (create/edit/void) on Goods, Sales and Purchases. No mock data: when the
  * connection isn't configured a Connect panel shows instead of fake numbers.
  */
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, Eyebrow, StatCard, Badge, Button, Input, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
@@ -21,11 +21,13 @@ import { rangeLabel } from "@/core/range";
 import { useFilters } from "@/store/filters";
 import { getStockSummary } from "@/core/read/stock";
 import { getProducts } from "@/core/read/common";
-import { getRecentSales, getSalesStats, getSaleItems, type SaleRow as SaleRowVM, type SaleLine } from "@/core/read/sales";
+import { getRecentSales, getSaleItems, type SaleRow as SaleRowVM, type SaleLine } from "@/core/read/sales";
 import { getPurchases, getInventoryPurchases } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
 import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
 import { ProductDetailScreen } from "./product";
+import { PageHdr, Stat, DeckTile, TileHead, MBars } from "./deck";
+import { todayCairo } from "@/core/time";
 import { voidSaleItem, voidSale } from "@/core/db/mutations";
 import { useUI } from "@/store/ui";
 import { useQueryClient } from "@tanstack/react-query";
@@ -123,45 +125,77 @@ export function StockScreen() {
   );
 }
 
-// ── Sales (operational: create day, add/edit/void lines, void day) ───────────
+// ── Sales — Command Deck layout (identical to the design), all-time ──────────
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const mName = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
+
 export function SalesScreen() {
-  const range = useActiveRange();
+  const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
   const [detail, setDetail] = useState<SaleRowVM | null>(null);
-  const stats = useQuery({ queryKey: ["salesStats", range], queryFn: () => getSalesStats(range), enabled: isEngineConfigured });
-  const recent = useQuery({ queryKey: ["recentSales", range], queryFn: () => getRecentSales(120, range), enabled: isEngineConfigured });
-  const s = stats.data;
+  const all = useQuery({ queryKey: ["salesAll"], queryFn: () => getRecentSales(3000, { from: "2024-01-01", to: todayCairo() }), enabled: isEngineConfigured });
+  const rows = all.data ?? [];
+
+  const d = useMemo(() => {
+    const lifetime = rows.reduce((s, r) => s + r.total, 0);
+    const days = rows.length;
+    const bucket = new Map<string, number>();
+    for (const r of rows) bucket.set(r.date.slice(0, 7), (bucket.get(r.date.slice(0, 7)) ?? 0) + r.total);
+    const monthly = [...bucket.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([m, v]) => ({ label: MONTHS[Number(m.slice(5, 7)) - 1].slice(0, 3), full: mName(m), value: v }));
+    const best = [...bucket.entries()].reduce((b, e) => (e[1] > b[1] ? e : b), ["", 0] as [string, number]);
+    const wsum = [0, 0, 0, 0, 0, 0, 0], wcnt = [0, 0, 0, 0, 0, 0, 0];
+    for (const r of rows) { const w = new Date(r.date + "T00:00:00").getDay(); wsum[w] += r.total; wcnt[w]++; }
+    const weekday = wsum.map((s, i) => ({ label: WD[i], full: `${WD[i]} average`, value: wcnt[i] ? Math.round(s / wcnt[i]) : 0 }));
+    return { lifetime, days, avgDay: days ? lifetime / days : 0, monthly, best, weekday, span: rows.length ? `${mName(rows[rows.length - 1].date.slice(0, 7))} – ${mName(rows[0].date.slice(0, 7))}` : "" };
+  }, [rows]);
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Revenue = Σ daily totals (canonical)</Eyebrow>
-        <div className="flex-1" />
-        <DateRangePicker />
-        <Button onClick={() => setAddOpen(true)}>+ Sale</Button>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Revenue" accent="mint" icon={SI.rev} value={s ? egpShort(s.total) : "—"} />
-        <StatCard label="Sales days" accent="pink" icon={SI.cal} value={s ? s.days : "—"} />
-        <StatCard label="Unreconciled" accent="amber" icon={SI.warn} value={s ? s.unreconciled : "—"} />
-      </div>
-      <Eyebrow>Sales in range · tap to open</Eyebrow>
-      <Guarded q={recent} empty={!!recent.data && recent.data.length === 0}>
-        <Card className="!p-0">
-          <div className="divide-y divide-line">
-            {recent.data?.map((r) => (
-              <button key={r.id} onClick={() => setDetail(r)} className="row-hover flex w-full items-center gap-3 px-4 py-3 text-left">
-                <span className={`h-2.5 w-2.5 rounded-full ${r.reconciled ? "bg-good" : "bg-warn"}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm text-text">{fmtDate(r.date)}</div>
-                  <div className="text-[12px] text-dim">{r.payment} · {r.source}</div>
-                </div>
-                {!r.reconciled && <Badge tone="warn">mismatch</Badge>}
-                <div className="font-display text-sm font-semibold text-good">{egp(r.total)}</div>
-              </button>
-            ))}
+    <div>
+      <PageHdr title="Sales" sub={`Revenue = sum of daily totals (canonical)${d.span ? ` · ${d.span}` : ""}`}
+        right={<>
+          <button className="addbtn" onClick={() => navigate("/sales/import")}>Import receipt</button>
+          <button className="qadd" style={{ height: 38 }} onClick={() => setAddOpen(true)}><span>+ New sale</span></button>
+        </>} />
+
+      {!isEngineConfigured ? <ConnectPanel /> : all.isLoading ? <SkeletonRows rows={6} /> : (
+        <>
+          <div className="statgrid">
+            <Stat label="Lifetime revenue" value={egp(d.lifetime)} color="var(--mag)" />
+            <Stat label="Trading days" value={d.days} color="var(--violet)" />
+            <Stat label="Avg / day" value={egp(d.avgDay)} color="var(--cyan)" />
+            <Stat label="Best month" value={egp(d.best[1])} color="var(--green)" />
           </div>
-        </Card>
-      </Guarded>
+
+          <div className="row2">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <DeckTile><TileHead name="Monthly revenue" right={`${d.monthly.length} months`} /><MBars data={d.monthly} /></DeckTile>
+              <DeckTile><TileHead name="Average revenue by weekday" right="all-time" /><MBars data={d.weekday} height={150} gradient="linear-gradient(180deg,var(--cyan),rgba(157,107,255,.45))" /></DeckTile>
+            </div>
+            <DeckTile style={{ padding: 0 }}>
+              <div style={{ padding: "22px 24px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="tname">Daily sales</span>
+                <button className="addbtn" style={{ marginLeft: "auto" }} onClick={() => setAddOpen(true)}>+ New sale</button>
+              </div>
+              <div className="scroll" style={{ maxHeight: 628 }}>
+                <table className="tbl">
+                  <thead><tr><th>Date</th><th className="r">Revenue</th></tr></thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.id} className="daycell" onClick={() => setDetail(r)}>
+                        <td>{fmtDate(r.date, "EEE d MMM yyyy")}</td>
+                        <td className="r">{egp(r.total)}</td>
+                      </tr>
+                    ))}
+                    {rows.length === 0 && <tr><td colSpan={2} style={{ textAlign: "center", color: "var(--faint)", padding: 28 }}>No sales recorded yet.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </DeckTile>
+          </div>
+        </>
+      )}
+
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="New sale day"><SaleForm onDone={() => setAddOpen(false)} /></Modal>
       {detail && <Modal open onClose={() => setDetail(null)} title={`Sale · ${fmtDate(detail.date)}`}><SaleDetail sale={detail} onClose={() => setDetail(null)} /></Modal>}
     </div>
