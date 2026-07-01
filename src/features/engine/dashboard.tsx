@@ -44,7 +44,7 @@ function smoothPath(p: { x: number; y: number }[]): string {
 
 /* ── Area chart — violet→magenta→cyan stroke over a magenta fill (the design's
       `renderLine`): responsive SVG + hover crosshair/dot/tooltip + optional axis. */
-interface ChartPt { label: string; value: number }
+interface ChartPt { label: string; value: number; full?: string }
 function AreaChart({ data, id, height = 200, strong = false, axis = false }: { data: ChartPt[]; id: string; height?: number; strong?: boolean; axis?: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -85,7 +85,7 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
       {hp && (<>
         <div className="cross" style={{ left: `${(pts[hover!].x / W) * 100}%` }} />
         <div className="cdot" style={{ left: `${(pts[hover!].x / W) * 100}%`, top: pts[hover!].y }} />
-        <div className="ctip" style={{ left: `${(pts[hover!].x / W) * 100}%`, top: pts[hover!].y }}><b>EGP {money2(hp.value)}</b><span>{hp.label}</span></div>
+        <div className="ctip" style={{ left: `${(pts[hover!].x / W) * 100}%`, top: pts[hover!].y }}><b>EGP {money2(hp.value)}</b><span>{hp.full ?? hp.label}</span></div>
       </>)}
     </div>
   );
@@ -171,7 +171,7 @@ export function DashboardScreen() {
   const monthDays = isoRangeDays(`${d.monthKey}-01`, mTo2 <= today ? mTo2 : today);
   const tradingDays = monthDays.filter((x) => (byDay.get(x) ?? 0) > 0).length || monthDays.length;
   const avgPerDay = tradingDays ? d.monthRev / tradingDays : 0;
-  const heroData: ChartPt[] = monthDays.map((x) => ({ label: fmtDate(x, "d MMM"), value: byDay.get(x) ?? 0 }));
+  const heroData: ChartPt[] = monthDays.map((x) => ({ label: fmtDate(x, "d MMM"), full: fmtDate(x, "d MMM yyyy"), value: byDay.get(x) ?? 0 }));
 
   const spendRows = spendAll.data ?? [];
   const monthSpend = spendRows.filter((e) => e.date.slice(0, 7) === d.monthKey).reduce((s, e) => s + e.amount, 0);
@@ -208,7 +208,7 @@ export function DashboardScreen() {
   const trendFrom = trendR === "Custom" ? (cFrom || d.earliest)
     : trendR === "All" ? d.earliest
     : (() => { const n = { "1D": 1, "1W": 7, "1M": 30, "3M": 90, "6M": 180 }[trendR]; const f = isoShift(trendTo, -(n - 1)); return f < d.earliest ? d.earliest : f; })();
-  const trendData: ChartPt[] = isoRangeDays(trendFrom, trendTo).map((x) => ({ label: fmtDate(x, "d MMM"), value: byDay.get(x) ?? 0 }));
+  const trendData: ChartPt[] = isoRangeDays(trendFrom, trendTo).map((x) => ({ label: fmtDate(x, "d MMM"), full: fmtDate(x, "d MMM yyyy"), value: byDay.get(x) ?? 0 }));
 
   return (
     <div className="cdk space-y-5">
