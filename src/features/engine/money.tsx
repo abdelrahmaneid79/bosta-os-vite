@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHead, Eyebrow, StatCard, Button, Select } from "@/components/ui";
+import { Stat, DeckTile, TileHead, MBars } from "./deck";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
 import { BarChart } from "@/components/charts";
@@ -13,7 +14,7 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getCashLedger, getCashSummary, getMoneyAccounts } from "@/core/read/money";
 import { getChequeCycle } from "@/core/read/settlements";
-import { getExpenses, getExpenseCategories } from "@/core/read/expenses";
+import { getExpenses } from "@/core/read/expenses";
 import { voidMovement, voidCheque, voidExpense } from "@/core/db/mutations";
 import { CashForm, ChequeForm, ExpenseForm } from "./forms";
 import { useUI } from "@/store/ui";
@@ -132,83 +133,82 @@ export function ExpensesScreen() {
   const r = useActiveRange();
   const [addOpen, setAddOpen] = useState(false);
   const [voidId, setVoidId] = useState<string | null>(null);
-  const [cat, setCat] = useState("");
+  const navigate = useNavigate();
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
-  const cats = useQuery({ queryKey: ["expense-cats"], queryFn: getExpenseCategories, enabled: en });
   const del = useMutation({ mutationFn: (id: string) => voidExpense(id), onSuccess: () => { reportSuccess("Void expense", "Expense voided · profit restored · kept for audit"); setVoidId(null); qc.invalidateQueries(); }, onError: (e) => reportError("Void expense", e) });
   if (!en) return <EmptyState title="Sign in to load expenses" />;
 
   const all = q.data ?? [];
-  const opTotal = all.filter((e) => e.isOperating).reduce((s, e) => s + e.amount, 0);
-  const invTotal = all.filter((e) => !e.isOperating).reduce((s, e) => s + e.amount, 0);
-
-  // category breakdown (each group's share is of its own group's subtotal)
-  const byCat = new Map<string, { amount: number; isOperating: boolean }>();
+  const total = all.reduce((s, e) => s + e.amount, 0);
+  const cat = new Map<string, number>(), ven = new Map<string, number>(), mon = new Map<string, number>();
   for (const e of all) {
-    const cur = byCat.get(e.category) ?? { amount: 0, isOperating: e.isOperating };
-    cur.amount += e.amount; byCat.set(e.category, cur);
+    cat.set(e.category, (cat.get(e.category) ?? 0) + e.amount);
+    if (e.notes) ven.set(e.notes, (ven.get(e.notes) ?? 0) + e.amount);
+    mon.set(e.date.slice(0, 7), (mon.get(e.date.slice(0, 7)) ?? 0) + e.amount);
   }
-  const groups = [...byCat.entries()].map(([category, v]) => ({ category, ...v })).sort((a, b) => b.amount - a.amount);
-  const opCats = groups.filter((g) => g.isOperating);
-  const invCats = groups.filter((g) => !g.isOperating);
-
-  const rows = all.filter((e) => !cat || e.category === cat);
+  const topCat = [...cat.entries()].sort((a, b) => b[1] - a[1])[0];
+  const topShare = topCat && total ? Math.round((topCat[1] / total) * 100) : 0;
+  const byVen = [...ven.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const em = [...mon.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const spendBars = em.map(([m, v]) => ({ label: fmtDate(m + "-01", "MMM"), full: fmtDate(m + "-01", "MMM yyyy"), value: v }));
+  const rows = all.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Running costs vs inventory · withdrawals are on Cash</Eyebrow>
-        <div className="flex-1" />
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <DateRangePicker />
-        <Link to="/expenses/import" className="lift rounded-2xl border border-line bg-panel px-4 py-2.5 font-display text-sm font-bold text-text hover:bg-panel2">Import</Link>
-        <Button onClick={() => setAddOpen(true)}>+ Expense</Button>
+        <div style={{ flex: 1 }} />
+        <button className="addbtn" onClick={() => navigate("/expenses/import")}>Import</button>
+        <button className="qadd" style={{ height: 38 }} onClick={() => setAddOpen(true)}><span>+ Add expense</span></button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard label="Operating expenses" accent="red" icon={MI.out} value={egp(opTotal)} sub="rent, salary, packaging — hits profit" />
-        <StatCard label="Inventory purchases" accent="violet" icon={MI.bag} value={egp(invTotal)} sub="cost of goods — profit via COGS" />
-        <StatCard label="Total spend" accent="amber" icon={MI.cash} value={egp(opTotal + invTotal)} sub="in range · all categories" />
-      </div>
-
-      {q.isLoading ? <SkeletonRows /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : all.length === 0 ? (
-        <EmptyState title="No expenses in range" hint="Add rent, supplies, salary, transport…" />
-      ) : (
+      {q.isLoading ? <SkeletonRows /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : (
         <>
-          {/* By-category breakdown, grouped */}
-          <div className="grid gap-3 lg:grid-cols-2">
-            <CatGroup title="Operating costs" sub="recurring running expenses" total={opTotal} cats={opCats} accent="rgb(var(--bad))"
-              active={cat} onPick={(c) => setCat((p) => p === c ? "" : c)} />
-            <CatGroup title="Inventory (cost of goods)" sub="stock you buy to resell" total={invTotal} cats={invCats} accent="rgb(var(--violet))"
-              active={cat} onPick={(c) => setCat((p) => p === c ? "" : c)} hint="For future buying, use Inventory → Purchases so it feeds real product cost." />
+          <div className="statgrid c3">
+            <Stat label="Total spend" color="var(--amber)" value={egp(total)} />
+            <Stat label="Top category" color="var(--mag)" value={topCat ? <span style={{ textTransform: "capitalize" }}>{topCat[0]} · {topShare}%</span> : "—"} />
+            <Stat label="Monthly avg spend" color="var(--violet)" value={em.length ? egp(total / em.length) : "—"} />
           </div>
 
-          {/* Records */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Eyebrow>{cat ? `${cat} · ${rows.length} record${rows.length === 1 ? "" : "s"}` : `All records · ${rows.length}`}</Eyebrow>
-            <div className="flex-1" />
-            <Select value={cat} onChange={(e) => setCat(e.target.value)} className="max-w-[200px]">
-              <option value="">All categories</option>
-              {(cats.data ?? []).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </Select>
-            {cat && <Button variant="ghost" onClick={() => setCat("")}>Clear</Button>}
-          </div>
-          <Card className="!p-0"><div className="divide-y divide-line">
-            {rows.map((e) => (
-              <div key={e.id} className="row-hover flex items-center gap-3 px-5 py-3">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${e.isOperating ? "bg-warn/10 text-warn" : "bg-violet/10 text-violet"}`}>
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={e.isOperating ? "M6 2h9l5 5v15H4V2zM9 13h6M9 17h6" : MI.bag} /></svg>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium capitalize text-text">{e.category}{e.notes ? ` · ${e.notes}` : ""}</div>
-                  <div className="text-[12px] text-dim">{fmtDate(e.date)} · {e.paymentMethod}{e.isOperating ? "" : " · cost of goods"}</div>
-                </div>
-                <div className="tnum font-display text-sm font-bold text-bad">−{egp(e.amount)}</div>
-                <button onClick={() => setVoidId(e.id)} className="text-dim hover:text-bad" title="Void">✕</button>
+          <div className="row2">
+            <DeckTile style={{ padding: 0, display: "flex", flexDirection: "column", height: 608 }}>
+              <div style={{ padding: "22px 24px 8px", display: "flex", alignItems: "center", gap: 10 }}>
+                <span className="tname">Expenses</span>
+                <button className="addbtn" style={{ marginLeft: "auto" }} onClick={() => setAddOpen(true)}>+ Add expense</button>
               </div>
-            ))}
-          </div></Card>
+              <div className="scroll" style={{ flex: 1, maxHeight: "none" }}>
+                <table className="tbl">
+                  <thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th className="r">Amount</th><th style={{ width: 34 }} /></tr></thead>
+                  <tbody>
+                    {rows.map((e) => (
+                      <tr key={e.id}>
+                        <td>{fmtDate(e.date, "EEE d MMM yyyy")}</td>
+                        <td style={{ textTransform: "capitalize" }}>{e.category}</td>
+                        <td style={{ color: "var(--dim)" }}>{e.notes || "—"}</td>
+                        <td className="r">{egp(e.amount)}</td>
+                        <td><button onClick={() => setVoidId(e.id)} title="Void" style={{ color: "var(--faint)", cursor: "pointer", background: "none", border: "none", fontSize: 12 }} onMouseEnter={(ev) => (ev.currentTarget.style.color = "var(--red)")} onMouseLeave={(ev) => (ev.currentTarget.style.color = "var(--faint)")}>✕</button></td>
+                      </tr>
+                    ))}
+                    {rows.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--faint)", padding: 28 }}>No expenses in this range.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </DeckTile>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, height: 608 }}>
+              <DeckTile><TileHead name="Monthly spend" right="in range" /><MBars data={spendBars} height={150} gradient="linear-gradient(180deg,var(--amber),rgba(255,61,168,.4))" /></DeckTile>
+              <DeckTile style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                <TileHead name="Top suppliers" />
+                <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+                  {byVen.length ? byVen.map(([k, v]) => (
+                    <div className="lrow" key={k} style={{ cursor: "default" }}><div style={{ flex: 1 }}><div className="lname">{k}</div></div><div className="lamt">{egp(v)}</div></div>
+                  )) : <div style={{ fontSize: 12.5, color: "var(--faint)", padding: "10px 0" }}>No suppliers in range.</div>}
+                </div>
+              </DeckTile>
+            </div>
+          </div>
         </>
       )}
 
@@ -217,41 +217,6 @@ export function ExpensesScreen() {
         message="The row is kept for audit but no longer counts. Reversible only by re-entering it." confirmLabel="Void"
         onConfirm={() => voidId && del.mutate(voidId)} onClose={() => setVoidId(null)} />
     </div>
-  );
-}
-
-/** One spend bucket: subtotal + per-category share bars; tap a row to filter. */
-function CatGroup({ title, sub, total, cats, accent, active, onPick, hint }: {
-  title: string; sub: string; total: number; accent: string; active: string;
-  cats: { category: string; amount: number }[]; onPick: (c: string) => void; hint?: string;
-}) {
-  return (
-    <Card className="!p-0">
-      <div className="flex items-center justify-between px-5 pt-4">
-        <div><div className="font-display text-sm font-bold text-text">{title}</div><div className="text-[11px] text-dim">{sub}</div></div>
-        <div className="tnum font-display text-base font-bold text-text">{egp(total)}</div>
-      </div>
-      {cats.length === 0 ? (
-        <div className="px-5 py-4 text-[12px] text-dim">Nothing in range.</div>
-      ) : (
-        <div className="mt-2 space-y-1 px-3 pb-3">
-          {cats.map((c) => {
-            const share = total > 0 ? (c.amount / total) * 100 : 0;
-            return (
-              <button key={c.category} onClick={() => onPick(c.category)}
-                className={`block w-full rounded-xl px-2 py-2 text-left transition hover:bg-panel2 ${active === c.category ? "bg-panel2" : ""}`}>
-                <div className="flex items-center justify-between text-[13px]">
-                  <span className="truncate capitalize text-text">{c.category}</span>
-                  <span className="tnum ml-2 flex-shrink-0 font-display font-semibold text-text">{egp(c.amount)}<span className="ml-1 text-[11px] font-normal text-dim">{Math.round(share)}%</span></span>
-                </div>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"><div className="h-full rounded-full" style={{ width: `${Math.max(2, share)}%`, background: accent }} /></div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {hint && <div className="border-t border-line px-5 py-2.5 text-[11px] text-dim">{hint}</div>}
-    </Card>
   );
 }
 
@@ -267,55 +232,56 @@ export function ChequesScreen() {
   if (!en) return <EmptyState title="Sign in to load cheques" />;
   const c = cy.data;
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Cheques close the running sales tab — cross-referenced to your sales</Eyebrow>
-        <div className="flex-1" />
-        <Button onClick={() => setAddOpen(true)}>+ Cheque</Button>
-      </div>
+  const chq = c?.cheques ?? [];
+  const total = c?.totalReceived ?? 0;
+  const avg = chq.length ? total / chq.length : 0;
+  const largest = chq.length ? Math.max(...chq.map((x) => x.amount)) : 0;
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard label="Total cashed" accent="mint" icon={MI.in} value={c ? egpShort(c.totalReceived) : "—"} sub={`${c?.cheques.length ?? 0} cheques`} />
-        <StatCard label="Open tab" accent="amber" icon={MI.bank} value={c ? egpShort(c.openTab.revenue) : "—"} sub={c?.openTab.from ? `since ${fmtDate(c.openTab.from)}` : "awaiting sales"} />
-        <StatCard label="Avg mall deduction" accent="violet" icon={MI.out} value={c?.blendedDeductionPct != null ? `${c.blendedDeductionPct}%` : "—"} sub="of covered revenue" />
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 600 }}>Cheques close the running sales tab — cross-referenced to your sales</div>
+        <button className="qadd" style={{ height: 38, marginLeft: "auto" }} onClick={() => setAddOpen(true)}><span>+ Add cheque</span></button>
       </div>
 
       {c && c.openTab.revenue > 0 && (
-        <Card glow accent="#F7A23B">
-          <CardHead title="Open tab — awaiting next cheque" accent="amber" icon={MI.bank}
-            action={<Button size="sm" onClick={() => setAddOpen(true)}>Cash a cheque</Button>} />
-          <div className="text-sm text-muted">Sales since the last cheque ({c.openTab.from ? fmtDate(c.openTab.from) : "—"} → {fmtDate(c.openTab.to)}) total <b className="text-text">{egp(c.openTab.revenue)}</b> over {c.openTab.days} days. When the mall pays, record the cheque to close this tab.</div>
-        </Card>
+        <div className="note" style={{ marginBottom: 16, background: "rgba(255,177,62,.08)", borderColor: "rgba(255,177,62,.25)" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 16v-4M12 8h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" /></svg>
+          <div>Open tab: sales since the last cheque ({c.openTab.from ? fmtDate(c.openTab.from) : "—"} → {fmtDate(c.openTab.to)}) total <b style={{ color: "var(--text)" }}>{egp(c.openTab.revenue)}</b> over {c.openTab.days} days — the next cheque will close it.</div>
+        </div>
       )}
 
-      {cy.isLoading ? <SkeletonRows /> : (c?.cheques.length ?? 0) === 0 ? <EmptyState title="No cheques recorded" hint="Record a cheque when the mall pays out — it closes the running sales tab and counts as cash in." /> : (
-        <Card className="!p-0">
-          <div className="px-5 pt-4"><Eyebrow>Cheque history · newest first</Eyebrow></div>
-          <div className="mt-2 divide-y divide-line">
-            {c!.cheques.map((ch) => (
-              <div key={ch.id} className="row-hover flex items-center gap-3 px-5 py-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-good/10 text-good"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={MI.bank} /></svg></span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-text">{fmtDate(ch.date)}</div>
-                  <div className="text-[12px] text-dim">
-                    {ch.coverFrom
-                      ? `covers ${fmtDate(ch.coverFrom)} → ${fmtDate(ch.coverTo)} · sales ${egp(ch.coverRevenue ?? 0)}${ch.deductionPct == null ? "" : ch.deductionPct >= 0 ? ` · ${ch.deductionPct}% mall cut` : " · paid in arrears (covers earlier sales)"}`
-                      : "opening cheque · prior period not on record"}
-                  </div>
-                </div>
-                <div className="tnum font-display text-sm font-bold text-good">+{egp(ch.amount)}</div>
-                <button onClick={() => setVoidId(ch.id)} className="text-dim hover:text-bad" title="Void">✕</button>
-              </div>
-            ))}
+      {cy.isLoading ? <SkeletonRows /> : (
+        <>
+          <div className="statgrid">
+            <Stat label="Cheques logged" color="var(--cyan)" value={chq.length} />
+            <Stat label="Total value" color="var(--mag)" value={egp(total)} />
+            <Stat label="Average" color="var(--violet)" value={chq.length ? egp(avg) : "—"} />
+            <Stat label="Largest" color="var(--green)" value={chq.length ? egp(largest) : "—"} />
           </div>
-        </Card>
-      )}
-
-      {c?.cashEra && (
-        <Card>
-          <div className="text-[13px] text-dim"><b className="text-text">Before cheque records:</b> {egp(c.cashEra.revenue)} of sales ({fmtDate(c.cashEra.from)} → {fmtDate(c.cashEra.to)}) were settled as cash before cheque tracking began — counted in revenue, never shown as owed.</div>
-        </Card>
+          <DeckTile style={{ padding: 0 }}>
+            <div style={{ padding: "22px 24px 8px", display: "flex", alignItems: "center", gap: 10 }}>
+              <span className="tname">All cheques</span>
+              <button className="addbtn" style={{ marginLeft: "auto" }} onClick={() => setAddOpen(true)}>+ Add cheque</button>
+            </div>
+            <div className="scroll">
+              <table className="tbl">
+                <thead><tr><th>Date</th><th>Coverage</th><th className="r">Amount</th><th style={{ width: 34 }} /></tr></thead>
+                <tbody>
+                  {chq.map((ch) => (
+                    <tr key={ch.id}>
+                      <td>{fmtDate(ch.date, "EEE d MMM yyyy")}</td>
+                      <td style={{ color: "var(--dim)", fontSize: 12.5 }}>{ch.coverFrom ? `${fmtDate(ch.coverFrom, "d MMM")} → ${fmtDate(ch.coverTo, "d MMM")}${ch.deductionPct != null && ch.deductionPct >= 0 ? ` · ${ch.deductionPct}% cut` : ""}` : "opening cheque"}</td>
+                      <td className="r" style={{ color: "var(--green)" }}>{egp(ch.amount)}</td>
+                      <td><button onClick={() => setVoidId(ch.id)} title="Void" style={{ color: "var(--faint)", cursor: "pointer", background: "none", border: "none", fontSize: 12 }} onMouseEnter={(ev) => (ev.currentTarget.style.color = "var(--red)")} onMouseLeave={(ev) => (ev.currentTarget.style.color = "var(--faint)")}>✕</button></td>
+                    </tr>
+                  ))}
+                  {chq.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--faint)", padding: 28 }}>No cheques recorded yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </DeckTile>
+        </>
       )}
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Record cheque"><ChequeForm onDone={() => setAddOpen(false)} /></Modal>
