@@ -93,6 +93,11 @@
 .cdk .chip:hover{border-color:rgba(255,255,255,.16);background:rgba(255,255,255,.055)}
 .cdk .chip b{font-family:'Clash Display';font-weight:600;font-size:17px} .cdk .chip span{font-size:10.5px;color:var(--dim);font-weight:600}
 .cdk .chartbox{position:relative;width:100%} .cdk .chsvg{display:block;width:100%}
+.cdk .cross{position:absolute;top:6px;bottom:6px;width:1px;background:linear-gradient(180deg,transparent,rgba(255,61,168,.6),transparent);pointer-events:none;transform:translateX(-.5px)}
+.cdk .cdot{position:absolute;width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 0 0 4px rgba(255,61,168,.25),0 0 16px var(--mag);transform:translate(-50%,-50%);pointer-events:none}
+.cdk .ctip{position:absolute;transform:translate(-50%,calc(-100% - 14px));background:rgba(10,12,17,.96);border:1px solid var(--stroke);border-radius:12px;padding:8px 12px;pointer-events:none;white-space:nowrap;box-shadow:0 16px 34px -12px #000;z-index:6}
+.cdk .ctip b{font-family:'Clash Display','Satoshi',sans-serif;font-weight:600;font-size:14px;display:block;letter-spacing:-.01em}
+.cdk .ctip span{font-size:11px;color:var(--dim)}
 .cdk .grid-line{stroke:rgba(255,255,255,.05);stroke-width:1;shape-rendering:crispEdges}
 .cdk .ln{stroke-dasharray:1;stroke-dashoffset:0;animation:cdk-lndraw 1.3s cubic-bezier(.4,0,.2,1)}
 .cdk .ar-fill{opacity:1;animation:cdk-arfade .9s ease}

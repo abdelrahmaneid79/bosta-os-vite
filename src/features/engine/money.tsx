@@ -5,7 +5,7 @@ import { Card, CardHead, Eyebrow, StatCard, Button, Select } from "@/components/
 import { Stat, DeckTile, TileHead, MBars } from "./deck";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
-import { BarChart } from "@/components/charts";
+import { BarChart, DonutChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { egp, egpShort } from "@/core/utils/format";
@@ -150,6 +150,7 @@ export function ExpensesScreen() {
   }
   const topCat = [...cat.entries()].sort((a, b) => b[1] - a[1])[0];
   const topShare = topCat && total ? Math.round((topCat[1] / total) * 100) : 0;
+  const catData = [...cat.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
   const byVen = [...ven.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
   const em = [...mon.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
   const spendBars = em.map(([m, v]) => ({ label: fmtDate(m + "-01", "MMM"), full: fmtDate(m + "-01", "MMM yyyy"), value: v }));
@@ -209,6 +210,11 @@ export function ExpensesScreen() {
               </DeckTile>
             </div>
           </div>
+
+          <DeckTile style={{ marginTop: 16 }}>
+            <TileHead name="Spend by category" right="in range" />
+            {catData.length ? <div style={{ marginTop: 8 }}><DonutChart data={catData} size={220} /></div> : <div style={{ fontSize: 12.5, color: "var(--faint)", padding: "10px 0" }}>No categories in range.</div>}
+          </DeckTile>
         </>
       )}
 

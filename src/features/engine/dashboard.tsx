@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
@@ -47,31 +47,55 @@ function smoothPath(p: { x: number; y: number }[]): string {
 }
 
 /* ── Area chart — violet→magenta→cyan stroke over a magenta fill (the design's
-      `renderLine`). Pure SVG, responsive via preserveAspectRatio="none". ───── */
-function AreaChart({ series, id, height = 200, strong = false }: { series: number[]; id: string; height?: number; strong?: boolean }) {
+      `renderLine`): responsive SVG + hover crosshair/dot/tooltip + optional axis. */
+interface ChartPt { label: string; value: number }
+function AreaChart({ data, id, height = 200, strong = false, axis = false }: { data: ChartPt[]; id: string; height?: number; strong?: boolean; axis?: boolean }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const W = 700, H = height, padL = 4, padR = 6, padT = 14, padB = 8;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const vals = series.length ? series : [0, 0];
+  const d = data.length ? data : [{ label: "", value: 0 }, { label: "", value: 0 }];
+  const vals = d.map((x) => x.value);
   const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
   const lo = min - span * 0.16, hi = max + span * 0.16;
   const pts = vals.map((v, i) => ({ x: padL + (i / (vals.length - 1 || 1)) * plotW, y: padT + (1 - (v - lo) / (hi - lo)) * plotH }));
   const line = smoothPath(pts);
   const baseY = padT + plotH;
   const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${baseY.toFixed(1)} L${pts[0].x.toFixed(1)},${baseY.toFixed(1)} Z`;
+  const onMove = (e: React.MouseEvent) => {
+    const r = ref.current?.getBoundingClientRect(); if (!r) return;
+    const rel = ((e.clientX - r.left) / r.width - padL / W) / (plotW / W);
+    setHover(Math.max(0, Math.min(vals.length - 1, Math.round(rel * (vals.length - 1)))));
+  };
+  const hp = hover != null ? d[hover] : null;
+  const chart = (
+    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair" }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+      <svg className="chsvg" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`gf_${id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--mag)" stopOpacity={strong ? 0.42 : 0.26} /><stop offset="1" stopColor="var(--mag)" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id={`gs_${id}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="var(--violet)" /><stop offset="0.55" stopColor="var(--mag)" /><stop offset="1" stopColor="var(--cyan)" />
+          </linearGradient>
+        </defs>
+        {axis && [0, 0.5, 1].map((g, i) => <line key={i} x1={padL} y1={padT + plotH * g} x2={W - padR} y2={padT + plotH * g} className="grid-line" />)}
+        <path className="ar-fill" fill={`url(#gf_${id})`} d={area} />
+        <path className="ln" fill="none" stroke={`url(#gs_${id})`} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" pathLength={1} d={line} />
+      </svg>
+      {hp && (<>
+        <div className="cross" style={{ left: `${(pts[hover!].x / W) * 100}%` }} />
+        <div className="cdot" style={{ left: `${(pts[hover!].x / W) * 100}%`, top: pts[hover!].y }} />
+        <div className="ctip" style={{ left: `${(pts[hover!].x / W) * 100}%`, top: pts[hover!].y }}><b>EGP {money2(hp.value)}</b><span>{hp.label}</span></div>
+      </>)}
+    </div>
+  );
+  if (!axis) return chart;
   return (
-    <svg className="chsvg" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={`gf_${id}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--mag)" stopOpacity={strong ? 0.42 : 0.26} />
-          <stop offset="1" stopColor="var(--mag)" stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id={`gs_${id}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="var(--violet)" /><stop offset="0.55" stopColor="var(--mag)" /><stop offset="1" stopColor="var(--cyan)" />
-        </linearGradient>
-      </defs>
-      <path className="ar-fill" fill={`url(#gf_${id})`} d={area} />
-      <path className="ln" fill="none" stroke={`url(#gs_${id})`} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" pathLength={1} d={line} />
-    </svg>
+    <div style={{ position: "relative", paddingLeft: 46 }}>
+      <div className="chyax">{[hi, (hi + lo) / 2, lo].map((v, i) => <span key={i}>{egpShort(v).replace("EGP ", "")}</span>)}</div>
+      {chart}
+    </div>
   );
 }
 
@@ -152,7 +176,7 @@ export function DashboardScreen() {
   const daysInMonth = new Date(+d.monthKey.slice(0, 4), +d.monthKey.slice(5, 7), 0).getDate();
   const dayNum = isCurMonth ? new Date(today + "T00:00:00").getDate() : daysInMonth;
   const pacing = isCurMonth && dayNum > 0 && d.monthRev > 0 ? (d.monthRev / dayNum) * daysInMonth : null;
-  const heroSeries = (() => { const days = isoRangeDays(monthRange.from, monthRange.to); const byDay = new Map((daily.data ?? []).map((r) => [r.date, r.total])); return days.map((x) => byDay.get(x) ?? 0); })();
+  const heroData: ChartPt[] = (() => { const days = isoRangeDays(monthRange.from, monthRange.to); const byDay = new Map((daily.data ?? []).map((r) => [r.date, r.total])); return days.map((x) => ({ label: fmtDate(x, "d MMM"), value: byDay.get(x) ?? 0 })); })();
 
   const p = profitM.data;
   const cs = cash.data;
@@ -206,8 +230,8 @@ export function DashboardScreen() {
               {pacing ? ` · pacing to ${egpShort(pacing).replace("EGP ", "")}` : ""}
             </span>
           </div>
-          <div className="chartbox" style={{ height: 120, marginTop: "auto" }}>
-            {daily.isLoading ? null : <AreaChart series={heroSeries.length ? heroSeries : [0, 0]} id="hero" height={120} strong />}
+          <div style={{ marginTop: "auto" }}>
+            {daily.isLoading ? null : <AreaChart data={heroData} id="hero" height={120} strong />}
           </div>
         </div>
 
@@ -252,8 +276,8 @@ export function DashboardScreen() {
               {(["3M", "6M", "12M", "All"] as const).map((r) => <span key={r} className={trendR === r ? "on" : ""} onClick={() => setTrendR(r)}>{r}</span>)}
             </div>
           </div>
-          <div className="chartbox" style={{ height: 206, marginTop: 18 }}>
-            {daily.isLoading ? <SkeletonRows rows={4} /> : <AreaChart series={trendSlice.length ? trendSlice.map((m) => m.v) : [0, 0]} id="trend" height={206} />}
+          <div style={{ marginTop: 18 }}>
+            {daily.isLoading ? <SkeletonRows rows={4} /> : <AreaChart data={trendSlice.map((m) => ({ label: fmtDate(m.k + "-01", "MMM yyyy"), value: m.v }))} id="trend" height={206} axis />}
           </div>
         </div>
 
