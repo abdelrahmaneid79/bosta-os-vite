@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
 import { MBars, DeckTile, TileHead } from "./deck";
@@ -528,6 +528,7 @@ export function MissingScreen() {
 
 /* ─ Activity — full business event feed ────────────────────────────────── */
 export function ActivityScreen() {
+  const navigate = useNavigate();
   const feed = useQuery({ queryKey: ["activity-full"], queryFn: () => getActivityFeed(60, 200), enabled: en });
   if (!en) return <EmptyState title="Sign in to see activity" />;
   return (
@@ -540,20 +541,20 @@ export function ActivityScreen() {
         : feed.isError ? <ErrorState message={String((feed.error as Error)?.message)} onRetry={() => feed.refetch()} />
         : (feed.data?.length ?? 0) === 0 ? <EmptyState title="No events yet" hint="Record a sale, purchase, expense, or cash movement and it appears here." />
         : (
-        <Card><div className="-my-1 divide-y divide-line">
-          {feed.data!.map((e) => (
-            <Link key={`${e.kind}-${e.id}`} to={e.route} className="row-hover -mx-2 flex items-center gap-3 rounded-2xl px-2 py-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-panel2 text-base">{kindGlyph[e.kind]}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-text">{e.label}</div>
-                <div className="text-[11.5px] capitalize text-dim">{e.kind} · {fmtDate(e.date)}</div>
-              </div>
-              {e.amount !== 0 && (
-                <div className={`tnum font-display text-sm font-bold ${e.amount > 0 ? "text-good" : "text-muted"}`}>{e.amount > 0 ? "+" : "−"}{egp(Math.abs(e.amount))}</div>
-              )}
-            </Link>
-          ))}
-        </div></Card>
+        <DeckTile style={{ padding: 0 }}><div className="scroll" style={{ maxHeight: "70vh" }}>
+          <table className="tbl">
+            <thead><tr><th>Date</th><th>Event</th><th className="r">Amount</th></tr></thead>
+            <tbody>
+              {feed.data!.map((e) => (
+                <tr key={`${e.kind}-${e.id}`} className="prodcell" onClick={() => navigate(e.route)}>
+                  <td style={{ whiteSpace: "nowrap", color: "var(--dim)" }}>{fmtDate(e.date, "d MMM yyyy")}</td>
+                  <td><span style={{ marginRight: 8 }}>{kindGlyph[e.kind]}</span>{e.label}</td>
+                  <td className="r" style={{ color: e.amount > 0 ? "var(--green)" : "var(--muted)" }}>{e.amount !== 0 ? `${e.amount > 0 ? "+" : "−"}${egp(Math.abs(e.amount))}` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div></DeckTile>
       )}
     </div>
   );

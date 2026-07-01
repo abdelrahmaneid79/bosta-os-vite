@@ -5,9 +5,9 @@
  * connection isn't configured a Connect panel shows instead of fake numbers.
  */
 import { useState, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, Eyebrow, StatCard, Badge, Button, Select } from "@/components/ui";
+import { Card, Eyebrow, Badge, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
@@ -32,17 +32,6 @@ import { voidSaleItem, voidSale, setProductActive, deleteProduct } from "@/core/
 import { useUI } from "@/store/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Tables } from "@/core/db/tables";
-
-const SI = {
-  box: "M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10",
-  tag: "M20.6 13.4 12 22l-9-9V3h10zM7.5 7.5h.01",
-  warn: "M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z",
-  neg: "M12 8v4m0 4h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
-  rev: "M3 3v18h18M7 14l3-3 3 3 5-6",
-  cal: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5",
-  spend: "M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
-  batch: "M21 16V8l-9-5-9 5v8l9 5z",
-} as const;
 
 function Guarded({ q, children, empty }: { q: { isLoading: boolean; isError: boolean; error: unknown }; children: React.ReactNode; empty?: boolean }) {
   if (!isEngineConfigured) return <ConnectPanel />;
@@ -328,6 +317,7 @@ export function PurchasesScreen() {
   const range = useActiveRange();
   const [addOpen, setAddOpen] = useState(false);
   const [productId, setProductId] = useState("");
+  const [detailId, setDetailId] = useState<string | null>(null);
   const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
   const q = useQuery({ queryKey: ["purchases", range], queryFn: () => getPurchases(range), enabled: isEngineConfigured });
   const inv = useQuery({ queryKey: ["inv-purchases", range], queryFn: () => getInventoryPurchases(range), enabled: isEngineConfigured });
@@ -337,51 +327,51 @@ export function PurchasesScreen() {
   const filteredTotal = rows.reduce((s, r) => s + r.totalCost, 0) + lump.reduce((s, r) => s + r.totalCost, 0);
   const entries = rows.length + lump.length;
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Stock buying = cost of goods · per-product batches feed WAC</Eyebrow>
-        <div className="flex-1" />
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <DateRangePicker />
-        <Button onClick={() => setAddOpen(true)}>+ Purchase</Button>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
         <Select value={productId} onChange={(e) => setProductId(e.target.value)} className="max-w-xs">
           <option value="">All products</option>
           {(prods.data ?? []).filter((p) => p.active).map((p) => <option key={p.id} value={p.id}>{p.name_en}</option>)}
         </Select>
-        {productId && <Button variant="ghost" onClick={() => setProductId("")}>Clear</Button>}
+        {productId && <button className="addbtn" onClick={() => setProductId("")}>Clear</button>}
+        <div style={{ flex: 1 }} />
+        <button className="qadd" style={{ height: 38 }} onClick={() => setAddOpen(true)}><span>+ Add purchase</span></button>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label={productId ? "Spend (filtered)" : "Stock spend in range"} accent="amber" icon={SI.spend} value={egp(filteredTotal)} />
-        <StatCard label="Entries" accent="blue" icon={SI.batch} value={entries} sub={lump.length ? `${lump.length} historical` : undefined} />
+      <div className="statgrid c3">
+        <Stat label={productId ? "Spend · filtered" : "Stock spend · range"} color="var(--amber)" value={egp(filteredTotal)} />
+        <Stat label="Entries" color="var(--cyan)" value={entries} sub={lump.length ? <div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600, marginTop: 8 }}>{lump.length} historical</div> : undefined} />
+        <Stat label="Avg / entry" color="var(--violet)" value={entries ? egp(filteredTotal / entries) : "—"} />
       </div>
       <Guarded q={q} empty={entries === 0}>
-        <Card className="!p-0">
-          <div className="divide-y divide-line">
-            {rows.map((r) => (
-              <Link key={r.id} to={`/product/${r.productId}`} className="row-hover flex items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-text">{r.productName}</div>
-                  <div className="text-[12px] text-dim">{fmtDate(r.date)} · {num(r.quantity)} × {egp(r.unitCost)}</div>
-                </div>
-                <div className="font-display text-sm font-semibold">{egp(r.totalCost)}</div>
-              </Link>
-            ))}
-            {lump.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm text-text">{r.note}</div>
-                  <div className="text-[12px] text-dim">{fmtDate(r.date)} · stock purchase · no product breakdown</div>
-                </div>
-                <div className="font-display text-sm font-semibold">{egp(r.totalCost)}</div>
-              </div>
-            ))}
+        <DeckTile style={{ padding: 0 }}>
+          <div className="scroll">
+            <table className="tbl">
+              <thead><tr><th>Product</th><th>Date</th><th className="r">Qty × cost</th><th className="r">Total</th></tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="prodcell" onClick={() => setDetailId(r.productId)}>
+                    <td>{r.productName}</td>
+                    <td>{fmtDate(r.date, "d MMM yyyy")}</td>
+                    <td className="r">{num(r.quantity)} × {egp(r.unitCost)}</td>
+                    <td className="r">{egp(r.totalCost)}</td>
+                  </tr>
+                ))}
+                {lump.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.note}</td>
+                    <td>{fmtDate(r.date, "d MMM yyyy")}</td>
+                    <td className="r" style={{ color: "var(--dim)" }}>no breakdown</td>
+                    <td className="r">{egp(r.totalCost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </Card>
+        </DeckTile>
       </Guarded>
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add purchase">
-        <PurchaseForm onDone={() => setAddOpen(false)} />
-      </Modal>
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add purchase"><PurchaseForm onDone={() => setAddOpen(false)} /></Modal>
+      <Modal open={!!detailId} onClose={() => setDetailId(null)} wide>{detailId && <ProductDetailScreen id={detailId} onClose={() => setDetailId(null)} />}</Modal>
     </div>
   );
 }

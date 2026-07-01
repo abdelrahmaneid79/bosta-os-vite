@@ -155,32 +155,40 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
       {/* Sale lines */}
       <Eyebrow>Sale lines · {p.saleLines.length}</Eyebrow>
       {p.saleLines.length === 0 ? <Card><p className="text-sm text-dim">No sales of this product in range.</p></Card> : (
-        <Card className="!p-0"><div className="divide-y divide-line">
-          {p.saleLines.slice(0, 40).map((l, i) => (
-            <Link key={i} to="/sales" className="row-hover flex items-center gap-3 px-4 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-text">{fmtDate(l.date)}</div>
-                <div className="text-[11px] text-dim">{num(l.qty)} {p.baseUnit} × {egp(l.unitPrice ?? 0)}{l.hasCogs ? "" : " · no COGS"}</div>
-              </div>
-              <div className="font-display text-sm font-semibold text-good">{egp(l.lineTotal)}</div>
-            </Link>
-          ))}
+        <Card className="!p-0"><div className="scroll" style={{ maxHeight: 360 }}>
+          <table className="tbl">
+            <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Unit price</th><th className="r">Amount</th></tr></thead>
+            <tbody>
+              {p.saleLines.slice(0, 60).map((l, i) => (
+                <tr key={i}>
+                  <td>{fmtDate(l.date, "d MMM yyyy")}</td>
+                  <td className="r">{num(l.qty)} <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
+                  <td className="r">{egp(l.unitPrice ?? 0)}{l.hasCogs ? "" : <span style={{ color: "var(--amber)", fontSize: 11 }}> · no cost</span>}</td>
+                  <td className="r" style={{ color: "var(--green)" }}>{egp(l.lineTotal)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div></Card>
       )}
 
       {/* Purchases */}
       <Eyebrow>Purchase batches · {p.purchases.length}</Eyebrow>
       {p.purchases.length === 0 ? <Card><p className="text-sm text-dim">No purchases of this product in range.</p></Card> : (
-        <Card className="!p-0"><div className="divide-y divide-line">
-          {p.purchases.map((b) => (
-            <div key={b.id} className="flex items-center gap-3 px-4 py-2.5">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-text">{fmtDate(b.date)}</div>
-                <div className="text-[11px] text-dim">{num(b.qty)} {p.baseUnit} × {egp(b.unitCost)}</div>
-              </div>
-              <div className="font-display text-sm font-semibold">{egp(b.totalCost)}</div>
-            </div>
-          ))}
+        <Card className="!p-0"><div className="scroll" style={{ maxHeight: 360 }}>
+          <table className="tbl">
+            <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Unit cost</th><th className="r">Total</th></tr></thead>
+            <tbody>
+              {p.purchases.map((b) => (
+                <tr key={b.id}>
+                  <td>{fmtDate(b.date, "d MMM yyyy")}</td>
+                  <td className="r">{num(b.qty)} <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
+                  <td className="r">{egp(b.unitCost)}</td>
+                  <td className="r">{egp(b.totalCost)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div></Card>
       )}
 
