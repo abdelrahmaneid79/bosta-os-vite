@@ -1,12 +1,7 @@
-import { useState, useRef, useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardHead, Eyebrow, Pill, Ring, Badge, Button, StatCard, IconChip, DeltaChip, Tabs, type Accent } from "@/components/ui";
-import { DonutChart } from "@/components/charts";
-import { getExpenses } from "@/core/read/expenses";
-import { cn } from "@/core/utils/cn";
-import { useLayoutStore } from "@/store/layout";
-import { WIDGET_TITLES, type WidgetId } from "@/core/dashboardLayout";
+import { Card, Eyebrow, Pill, Ring, Badge, Button } from "@/components/ui";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -17,202 +12,316 @@ import { getRiskInsights } from "@/core/read/insights";
 import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
 import { getHealthReport } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
-import { getProfitReadout } from "@/core/read/profit";
-import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
+import { getExpenses } from "@/core/read/expenses";
+import { getChequeCycle } from "@/core/read/settlements";
+import { getProductProfit } from "@/core/read/products";
+import { todayCairo, monthBoundsCairo, isoDaysAgo } from "@/core/time";
 import { useBooksStartDate } from "@/store/books";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
 
-const I = {
-  revenue: "M3 3v18h18M7 14l3-3 3 3 5-6",
-  profit: "M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
-  cash: "M3 7h18v11H3zM3 11h18M7 15h2",
-  owed: "M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z",
-  stock: "M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10",
-  bolt: "M13 2 4 14h7l-1 8 9-12h-7z",
-  sale: "M3 3v18h18M7 14l3-3 3 3 5-6",
-} as const;
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMMAND DECK — the "Today" screen, recreated from the Claude Design file
+   "BostaOS Command Deck.dc.html": its own .ticker / .tile / .hero / .hgauge
+   markup and classes (see src/command-deck.css), wired to live Supabase data.
+   ═════════════════════════════════════════════════════════════════════════ */
 
-const delta = (cur: number, prev: number): number | null => (prev > 0 ? ((cur - prev) / prev) * 100 : null);
+const money2 = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pctDelta = (cur: number, prev: number): number | null => (prev > 0 ? ((cur - prev) / prev) * 100 : null);
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/* ─ Gradient hero balance card (reference-grade) — big number, delta pill, and
-   an inline bar-viz of the trailing months, all on a brand-pink gradient. ── */
-function HeroCard({ label, value, deltaPct, sub, bars }: { label: string; value: string; deltaPct: number | null; sub: string; bars: number[] }) {
-  const max = Math.max(1, ...bars);
+/* ── Catmull-Rom → cubic bézier smoothing (the design's `smooth`) ─────────── */
+function smoothPath(p: { x: number; y: number }[]): string {
+  if (p.length < 3) return "M" + p.map((q) => `${q.x.toFixed(1)},${q.y.toFixed(1)}`).join(" L");
+  let d = `M${p[0].x.toFixed(1)},${p[0].y.toFixed(1)}`;
+  for (let i = 0; i < p.length - 1; i++) {
+    const p0 = p[i - 1] || p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] || p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+/* ── Area chart — violet→magenta→cyan stroke over a magenta fill (the design's
+      `renderLine`). Pure SVG, responsive via preserveAspectRatio="none". ───── */
+function AreaChart({ series, id, height = 200, strong = false }: { series: number[]; id: string; height?: number; strong?: boolean }) {
+  const W = 700, H = height, padL = 4, padR = 6, padT = 14, padB = 8;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const vals = series.length ? series : [0, 0];
+  const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
+  const lo = min - span * 0.16, hi = max + span * 0.16;
+  const pts = vals.map((v, i) => ({ x: padL + (i / (vals.length - 1 || 1)) * plotW, y: padT + (1 - (v - lo) / (hi - lo)) * plotH }));
+  const line = smoothPath(pts);
+  const baseY = padT + plotH;
+  const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${baseY.toFixed(1)} L${pts[0].x.toFixed(1)},${baseY.toFixed(1)} Z`;
   return (
-    <div className="lift relative flex flex-col overflow-hidden rounded-3xl p-6 text-ink shadow-pink"
-      style={{ background: "linear-gradient(140deg, rgb(var(--pink)) 0%, rgb(var(--berry)) 100%)" }}>
-      <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/12 blur-2xl" />
-      <div className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-black/10 blur-2xl" />
-      <div className="relative flex items-center justify-between">
-        <div className="text-[12.5px] font-semibold uppercase tracking-[0.12em] opacity-90">{label}</div>
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 transition group-hover:bg-white/25">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg>
-        </span>
-      </div>
-      <div className="relative mt-3.5 flex flex-wrap items-end gap-2.5">
-        <div className="tnum font-display text-[44px] font-extrabold leading-[0.95]">{value}</div>
-        {deltaPct != null && Number.isFinite(deltaPct) && (
-          <span className="mb-2 inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-[12px] font-bold backdrop-blur">
-            <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">{deltaPct >= 0 ? <path d="M3 8l3-3 3 3" /> : <path d="M3 4l3 3 3-3" />}</svg>
-            {Math.abs(Math.round(deltaPct))}%
-          </span>
-        )}
-      </div>
-      <div className="relative mt-1.5 text-[12.5px] font-medium opacity-80">{sub}</div>
-      <div className="relative mt-auto flex h-20 items-end gap-[5px] pt-5">
-        {bars.map((b, i) => (
-          <div key={i} className="flex-1 rounded-t-[5px] bg-white/30" style={{ height: `${Math.max(5, (b / max) * 100)}%`, transition: "height .6s cubic-bezier(.22,1,.36,1)" }} />
-        ))}
-      </div>
+    <svg className="chsvg" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={`gf_${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="var(--mag)" stopOpacity={strong ? 0.42 : 0.26} />
+          <stop offset="1" stopColor="var(--mag)" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={`gs_${id}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="var(--violet)" /><stop offset="0.55" stopColor="var(--mag)" /><stop offset="1" stopColor="var(--cyan)" />
+        </linearGradient>
+      </defs>
+      <path className="ar-fill" fill={`url(#gf_${id})`} d={area} />
+      <path className="ln" fill="none" stroke={`url(#gs_${id})`} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" pathLength={1} d={line} />
+    </svg>
+  );
+}
+
+/* ── Health gauge — top semicircle arc (the design's `.hgauge` / `.gv`). ───── */
+function HealthGauge({ score, label }: { score: number; label: string }) {
+  const clamp = Math.max(0, Math.min(100, score));
+  const R = 84, cx = 100, cy = 110;
+  const arc = Math.PI * R; // semicircle length
+  const path = `M${cx - R},${cy} A${R},${R} 0 0 1 ${cx + R},${cy}`;
+  return (
+    <div className="hgauge">
+      <svg viewBox="0 0 200 122" width="200" height="122">
+        <defs>
+          <linearGradient id="gauge-grad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="var(--cyan)" /><stop offset="1" stopColor="var(--green)" />
+          </linearGradient>
+        </defs>
+        <path d={path} fill="none" stroke="rgba(255,255,255,.06)" strokeWidth={15} strokeLinecap="round" />
+        <path className="gv" d={path} stroke="url(#gauge-grad)" style={{ strokeDasharray: `${(clamp / 100) * arc} 999` }} />
+      </svg>
+      <div className="hscore">{Math.round(clamp)}%</div>
+      <div className="hslab">{label}</div>
     </div>
   );
 }
 
-/* ─ Interactive revenue chart ──────────────────────────────────────────────
-   Selectable period (3M/6M/12M/All) with automatic granularity, a labeled
-   value axis, dated x-axis, and hover read-out. Pure SVG + a little state. */
-type Period = "3M" | "6M" | "12M" | "All";
-const PERIOD_OPTS: { value: Period; label: string }[] = [
-  { value: "3M", label: "3M" }, { value: "6M", label: "6M" }, { value: "12M", label: "12M" }, { value: "All", label: "All" },
-];
-interface ChartPoint { key: string; label: string; full: string; value: number }
+const Ic = {
+  rev: <path d="M3 3v18h18M7 14l3-3 3 3 5-6" />,
+  spend: <path d="M6 2h9l5 5v15H4V2zM9 13h6M9 17h6" />,
+  cash: <path d="M3 7h18v11H3zM3 11h18M7 15h2" />,
+  bell: <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />,
+};
 
-const monthsAgoIso = (iso: string, m: number) => { const d = new Date(iso + "T00:00:00"); d.setMonth(d.getMonth() - m); return d.toISOString().slice(0, 10); };
-const mondayOf = (iso: string) => { const d = new Date(iso + "T00:00:00"); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return d.toISOString().slice(0, 10); };
-
-function buildPoints(daily: { date: string; total: number }[], period: Period, today: string): { points: ChartPoint[]; gran: "day" | "week" | "month"; prevTotal: number } {
-  const byDay = new Map(daily.map((d) => [d.date, d.total]));
-  const dates = daily.map((d) => d.date).sort();
-  const earliest = dates[0] ?? today;
-  const sumRange = (a: string, b: string) => daily.reduce((s, d) => (d.date >= a && d.date <= b ? s + d.total : s), 0);
-
-  let from: string, gran: "day" | "week" | "month";
-  if (period === "3M") { from = monthsAgoIso(today, 3); gran = "day"; }
-  else if (period === "6M") { from = monthsAgoIso(today, 6); gran = "week"; }
-  else if (period === "12M") { from = monthsAgoIso(today, 12); gran = "month"; }
-  else { from = earliest; gran = "month"; }
-  if (from < earliest && period !== "All") { /* keep window even if empty for honesty */ }
-
-  const points: ChartPoint[] = [];
-  if (gran === "day") {
-    for (const d of isoRange(from, today)) points.push({ key: d, label: fmtDate(d, "d MMM"), full: fmtDate(d, "EEE d MMM yyyy"), value: byDay.get(d) ?? 0 });
-  } else if (gran === "week") {
-    let ws = mondayOf(from);
-    while (ws <= today) {
-      const we = isoDaysAgo(ws, -6);
-      points.push({ key: ws, label: fmtDate(ws, "d MMM"), full: `Week of ${fmtDate(ws, "d MMM yyyy")}`, value: sumRange(ws, we > today ? today : we) });
-      ws = isoDaysAgo(ws, -7);
-    }
-  } else {
-    const start = new Date(from + "T00:00:00"); start.setDate(1);
-    const end = new Date(today + "T00:00:00");
-    for (const d = start; d <= end; d.setMonth(d.getMonth() + 1)) {
-      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      let v = 0; for (const r of daily) if (r.date.slice(0, 7) === ym) v += r.total;
-      points.push({ key: ym, label: fmtDate(ym + "-01", "MMM"), full: fmtDate(ym + "-01", "MMM yyyy"), value: v });
-    }
-  }
-  // previous equal-length window (for the period delta)
-  const spanDays = Math.max(1, Math.round((Date.parse(today) - Date.parse(from)) / 86400000));
-  const prevTotal = sumRange(isoDaysAgo(from, spanDays), isoDaysAgo(from, 1));
-  return { points, gran, prevTotal };
-}
-
-function RevenueChart({ daily, latestDay }: { daily: { date: string; total: number }[]; latestDay: string | null }) {
+/* ═══ TODAY / COMMAND DECK ═══════════════════════════════════════════════ */
+export function DashboardScreen() {
   const today = todayCairo();
-  const [period, setPeriod] = useState<Period>("12M");
-  const [hover, setHover] = useState<number | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  const { points, gran, prevTotal } = useMemo(() => buildPoints(daily, period, today), [daily, period, today]);
+  const month = monthBoundsCairo();
+  const histFrom = "2024-01-01";
+  const accStart = useBooksStartDate();
 
-  const W = 760, H = 230, padL = 52, padR = 12, padTop = 16, padBot = 28;
-  const n = points.length;
-  const max = Math.max(1, ...points.map((p) => p.value));
-  const niceMax = niceCeil(max);
-  const x = (i: number) => (n <= 1 ? padL : padL + (i * (W - padL - padR)) / (n - 1));
-  const y = (v: number) => padTop + (1 - v / niceMax) * (H - padTop - padBot);
-  const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
-  const area = `${line} L${x(n - 1).toFixed(1)},${(H - padBot).toFixed(1)} L${x(0).toFixed(1)},${(H - padBot).toFixed(1)} Z`;
-  const total = points.reduce((s, p) => s + p.value, 0);
-  const gridVals = [0, 0.25, 0.5, 0.75, 1].map((g) => niceMax * g);
-  const xStep = Math.max(1, Math.ceil(n / 7));
+  const cc = useQuery({ queryKey: ["cc"], queryFn: getCommandCenter, enabled: en });
+  const daily = useQuery({ queryKey: ["dailyHist", histFrom], queryFn: () => getDailyRevenue({ from: histFrom, to: today }), enabled: en });
+  const spendAll = useQuery({ queryKey: ["dash-spend", histFrom], queryFn: () => getExpenses({ from: histFrom, to: today }), enabled: en });
+  const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
+  const cycle = useQuery({ queryKey: ["cheque-cycle"], queryFn: getChequeCycle, enabled: en });
+  const week = useQuery({ queryKey: ["week-products"], queryFn: () => getProductProfit({ from: isoDaysAgo(today, 6), to: today }), enabled: en });
 
-  function onMove(e: React.MouseEvent) {
-    const r = ref.current?.getBoundingClientRect(); if (!r) return;
-    const f = (e.clientX - r.left) / r.width;
-    const plotStart = padL / W, plotEnd = (W - padR) / W;
-    const i = Math.round(((f - plotStart) / (plotEnd - plotStart)) * (n - 1));
-    setHover(Math.max(0, Math.min(n - 1, i)));
-  }
-  const hp = hover != null ? points[hover] : null;
+  const d = useMemo(() => {
+    const rows = daily.data ?? [];
+    // monthly buckets (chronological)
+    const bucket = new Map<string, number>();
+    for (const r of rows) bucket.set(r.date.slice(0, 7), (bucket.get(r.date.slice(0, 7)) ?? 0) + r.total);
+    const keys = [...bucket.keys()].sort();
+    const monthly = keys.map((k) => ({ k, v: bucket.get(k)! }));
+    // headline month = the latest month that actually has sales (the current
+    // calendar month may be empty on day one of accurate books).
+    const active = monthly.filter((m) => m.v > 0);
+    const cur = active[active.length - 1] ?? { k: month.from.slice(0, 7), v: 0 };
+    const prev = active[active.length - 2] ?? { k: "", v: 0 };
+    const heroSeries = monthly.slice(-7).map((m) => m.v);
+    const lifetimeRev = rows.reduce((s, r) => s + r.total, 0);
+    const best = monthly.reduce((b, m) => (m.v > b.v ? m : b), { k: "", v: 0 });
+    return {
+      monthKey: cur.k, monthRev: cur.v, lastRev: prev.v, monthly, heroSeries, lifetimeRev, best,
+      latest: rows.filter((r) => r.total > 0).map((r) => r.date).sort().pop() ?? null,
+    };
+  }, [daily.data, month.from]);
+
+  const spendRows = spendAll.data ?? [];
+  const monthSpend = spendRows.filter((e) => e.date.slice(0, 7) === d.monthKey).reduce((s, e) => s + e.amount, 0);
+  const netCash = d.monthRev - monthSpend;
+  const marginPct = d.monthRev > 0 ? (netCash / d.monthRev) * 100 : 0;
+  const spendRatio = d.monthRev > 0 ? Math.min(100, (monthSpend / d.monthRev) * 100) : 0;
+
+  // lifetime spend-by-category
+  const catMap = new Map<string, number>();
+  for (const e of spendRows) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
+  const cats = [...catMap.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 5);
+  const CATCOL = ["var(--mag)", "var(--violet)", "var(--cyan)", "var(--amber)", "var(--lime)"];
+
+  const cheques = (cycle.data?.cheques ?? []).slice(0, 5);
+  const weekTop = [...(week.data ?? [])].sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+  const weekMax = Math.max(1, ...weekTop.map((p) => p.revenue));
+
+  if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
+  if (!en) return <EmptyState title="Sign in to load your deck" hint="Wired to your live data only — never faked." />;
+
+  const monthLabel = `${MON[Number(d.monthKey.slice(5, 7)) - 1]} ${d.monthKey.slice(0, 4)}`;
+  const revDelta = pctDelta(d.monthRev, d.lastRev);
 
   return (
-    <div>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Eyebrow accent="text-pink">Revenue · {period === "All" ? "all time" : `last ${period}`}</Eyebrow>
-          <div className="mt-1.5 flex items-end gap-2.5">
-            <div className="tnum font-display text-[32px] font-extrabold leading-none text-text">{egp(total)}</div>
-            <DeltaChip pct={delta(total, prevTotal)} />
+    <div className="cdk space-y-5">
+      {/* ── ticker ─────────────────────────────────────────────────────── */}
+      <div className="ticker">
+        <div className="tk">
+          <div className="tkic" style={{ background: "rgba(255,61,168,.14)", color: "var(--mag)" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.rev}</svg>
           </div>
-          <div className="mt-1 text-[12.5px] text-dim">
-            {gran === "month" ? "monthly" : gran === "week" ? "weekly" : "daily"} · {latestDay ? `latest sales ${fmtDate(latestDay, "d MMM yyyy")}` : "—"}
+          <div><div className="tkl">Revenue · {monthLabel}</div>
+            <div className="tkv tnum">{money2(d.monthRev)}{revDelta != null && <em className={revDelta >= 0 ? "up" : "down"} style={{ color: revDelta >= 0 ? "var(--green)" : "var(--red)" }}>{revDelta >= 0 ? "▲" : "▼"}{Math.abs(revDelta).toFixed(1)}%</em>}</div>
           </div>
         </div>
-        <Tabs value={period} options={PERIOD_OPTS} onChange={(p) => { setPeriod(p); setHover(null); }} />
+        <div className="tk">
+          <div className="tkic" style={{ background: "rgba(157,107,255,.14)", color: "var(--violet)" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.spend}</svg>
+          </div>
+          <div><div className="tkl">Spend · {monthLabel}</div><div className="tkv tnum">{money2(monthSpend)}</div></div>
+        </div>
+        <div className="tk">
+          <div className="tkic" style={{ background: "rgba(39,229,204,.14)", color: "var(--cyan)" }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.cash}</svg>
+          </div>
+          <div><div className="tkl">Cheques logged</div><div className="tkv tnum">{cheques.length ? (cycle.data?.cheques.length ?? 0) : 0} · EGP {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</div></div>
+        </div>
+        <div className="tk">
+          <span className="live"><span className="livedot" /> LIVE</span>
+          <div><div className="tkl">Accurate books</div><div className="tkv" style={{ fontSize: 14 }}>from {fmtDate(accStart, "d MMM yyyy")}</div></div>
+        </div>
       </div>
 
-      <div ref={ref} className="relative mt-3" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 230 }}>
-          <defs>
-            <linearGradient id="rev-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgb(var(--pink))" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="rgb(var(--pink))" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {gridVals.map((v, i) => (
-            <g key={i}>
-              <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} style={{ stroke: "rgb(var(--line2))" }} strokeWidth={1} />
-              <text x={padL - 8} y={y(v) + 3.5} textAnchor="end" style={{ fontSize: 10.5, fontWeight: 600, fill: "rgb(var(--faint))" }}>{egpShort(v).replace("EGP ", "")}</text>
-            </g>
-          ))}
-          <path d={area} fill="url(#rev-fill)" />
-          <path d={line} fill="none" stroke="rgb(var(--pink))" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-          {points.map((p, i) => (i % xStep === 0 || i === n - 1) ? (
-            <text key={i} x={x(i)} y={H - 8} textAnchor="middle" style={{ fontSize: 10.5, fontWeight: 600, fill: "rgb(var(--dim))" }}>{p.label}</text>
-          ) : null)}
-          {hp && (
-            <g>
-              <line x1={x(hover!)} x2={x(hover!)} y1={padTop} y2={H - padBot} style={{ stroke: "rgb(var(--pink))" }} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
-              <circle cx={x(hover!)} cy={y(hp.value)} r={4.5} fill="rgb(var(--pink))" stroke="rgb(var(--panel))" strokeWidth={2} />
-            </g>
-          )}
-        </svg>
-        {hp && (
-          <div className="pointer-events-none absolute -translate-x-1/2 rounded-xl border border-line bg-panel px-3 py-2 shadow-pop"
-            style={{ left: `${(x(hover!) / W) * 100}%`, top: 0 }}>
-            <div className="text-[11px] font-medium text-dim">{hp.full}</div>
-            <div className="tnum font-display text-sm font-extrabold text-text">{egp(hp.value)}</div>
+      {/* ── grid ───────────────────────────────────────────────────────── */}
+      <div className="grid">
+        {/* hero — revenue this month */}
+        <div className="tile hero">
+          <div className="orb" />
+          <div className="heronut"><img src="/assets/bosta-mascot.svg" alt="" /></div>
+          <div className="th"><span className="eyebrow">Revenue · {monthLabel}</span></div>
+          <div className="hv tnum"><span className="hcur">EGP</span>{money2(d.monthRev)}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+            {revDelta != null && (
+              <span className={`delta ${revDelta >= 0 ? "up" : "down"}`}>
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">{revDelta >= 0 ? <path d="M3 8l3-3 3 3" /> : <path d="M3 4l3 3 3-3" />}</svg>
+                {Math.abs(revDelta).toFixed(1)}% vs last month
+              </span>
+            )}
+            <span style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500 }}>{d.latest ? `latest sales ${fmtDate(d.latest, "d MMM")}` : "no sales yet"}</span>
           </div>
-        )}
+          <div className="chartbox" style={{ height: 120, marginTop: "auto" }}>
+            {daily.isLoading ? null : <AreaChart series={d.heroSeries.length ? d.heroSeries : [0, 0]} id="hero" height={120} strong />}
+          </div>
+        </div>
+
+        {/* spend */}
+        <div className="tile spend">
+          <div className="th"><span className="tname">Spend · {monthLabel}</span></div>
+          <div className="bn tnum"><small>EGP</small>{money2(monthSpend)}</div>
+          <div className="bar" style={{ marginTop: 18 }}><i style={{ width: `${spendRatio}%`, background: "linear-gradient(90deg,var(--violet),var(--mag))" }} /></div>
+          <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500, marginTop: 10 }}>{Math.round(spendRatio)}% of this month's revenue</div>
+        </div>
+
+        {/* net cash */}
+        <div className="tile netcash">
+          <div className="th"><span className="tname">Net cash · {monthLabel}</span></div>
+          <div className="bn tnum" style={{ color: netCash >= 0 ? "var(--green)" : "var(--red)" }}><small>EGP</small>{money2(netCash)}</div>
+          <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500, marginTop: 18 }}>{Math.round(marginPct)}% cash margin · after all spend</div>
+        </div>
+
+        {/* performance gauge */}
+        <div className="tile perf">
+          <HealthGauge score={marginPct} label="Net cash margin" />
+          <div className="hbody">
+            <span className="eyebrow">Performance</span>
+            <div className="hhead">You keep {Math.round(marginPct)}% of every pound after all spending this month.</div>
+            <div className="hstats">
+              <div className="hstat"><div className="l">Lifetime revenue</div><div className="v tnum">{egpShort(d.lifetimeRev)}</div></div>
+              <div className="hstat"><div className="l">Cheques settled</div><div className="v tnum">{egpShort(cycle.data?.totalReceived ?? 0)}</div></div>
+              <div className="hstat"><div className="l">Best month</div><div className="v tnum">{d.best.k ? `${MON[Number(d.best.k.slice(5, 7)) - 1]} ${d.best.k.slice(0, 4)}` : "—"}</div></div>
+            </div>
+          </div>
+        </div>
+
+        {/* revenue trend */}
+        <div className="tile trend">
+          <div className="th"><span className="tname">Revenue trend</span><span className="eyebrow" style={{ marginLeft: "auto" }}>monthly · all time</span></div>
+          <div className="chartbox" style={{ height: 206, marginTop: 18 }}>
+            {daily.isLoading ? <SkeletonRows rows={4} /> : <AreaChart series={d.monthly.map((m) => m.v)} id="trend" height={206} />}
+          </div>
+        </div>
+
+        {/* this week — top products */}
+        <div className="tile catalog">
+          <div className="th"><span className="tname">This week</span><span className="eyebrow" style={{ marginLeft: "auto" }}>last 7 days</span></div>
+          {week.isLoading ? <SkeletonRows rows={4} /> : weekTop.length === 0 ? <Note>No sales in the last 7 days.</Note> :
+            weekTop.map((p) => (
+              <div className="lrow" key={p.productId}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="lname" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
+                  <div className="bar"><i style={{ width: `${(p.revenue / weekMax) * 100}%`, background: "linear-gradient(90deg,var(--mag),var(--violet))" }} /></div>
+                </div>
+                <div className="lamt tnum">{egpShort(p.revenue).replace("EGP ", "")}</div>
+              </div>
+            ))}
+        </div>
+
+        {/* spend by category */}
+        <div className="tile spendcat">
+          <div className="th"><span className="tname">Spend by category</span><span className="eyebrow" style={{ marginLeft: "auto" }}>lifetime</span></div>
+          {spendAll.isLoading ? <SkeletonRows rows={4} /> : cats.length === 0 ? <Note>No expenses recorded.</Note> :
+            cats.map((c, i) => (
+              <div className="lrow" key={c.label}>
+                <span style={{ width: 9, height: 9, borderRadius: 3, background: CATCOL[i % CATCOL.length], flexShrink: 0 }} />
+                <div style={{ minWidth: 0, flex: 1 }}><div className="lname" style={{ textTransform: "capitalize" }}>{c.label}</div></div>
+                <div className="lamt tnum">{egpShort(c.value).replace("EGP ", "")}</div>
+              </div>
+            ))}
+        </div>
+
+        {/* recent cheques */}
+        <div className="tile cheques">
+          <div className="th"><span className="tname">Recent cheques</span>
+            <span className="tag" style={{ marginLeft: "auto", color: "var(--cyan)", background: "rgba(39,229,204,.12)" }}>{cycle.data?.cheques.length ?? 0} · {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</span>
+          </div>
+          {cycle.isLoading ? <SkeletonRows rows={4} /> : cheques.length === 0 ? <Note>No cheques logged yet.</Note> :
+            cheques.map((c) => (
+              <div className="lrow" key={c.id}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="lname">{fmtDate(c.date, "d MMM yyyy")}</div>
+                  <div className="lsub">{c.coverFrom ? `covers ${fmtDate(c.coverFrom, "d MMM")}–${fmtDate(c.coverTo, "d MMM")}` : "settlement cheque"}</div>
+                </div>
+                <div className="lamt tnum" style={{ color: "var(--cyan)" }}>{egpShort(c.amount).replace("EGP ", "")}</div>
+              </div>
+            ))}
+        </div>
+
+        {/* quick insight */}
+        <div className="tile qinsight">
+          <div className="th"><span className="tname">Quick insight</span>
+            <Link className="go" to="/missing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg></Link>
+          </div>
+          <div style={{ fontFamily: "'Clash Display'", fontWeight: 600, fontSize: 18, letterSpacing: "-.01em", lineHeight: 1.25, marginTop: 4 }}>
+            {d.best.k ? `${MON[Number(d.best.k.slice(5, 7)) - 1]} ${d.best.k.slice(0, 4)} is your strongest month on record` : "Log a few days to unlock insights"}
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 14 }}>
+            <span className="disp" style={{ fontWeight: 700, fontSize: 26, color: "var(--green)" }}>{egp(d.best.v)}</span>
+            {d.best.k && <span className="delta up">peak</span>}
+          </div>
+          <div style={{ fontSize: 12.5, color: "var(--dim)", marginTop: 10, fontWeight: 500, lineHeight: 1.5 }}>
+            Health score {health.data?.overall ?? "—"}/100 · {health.data?.status ?? "computing"}. Net cash margin is running at {Math.round(marginPct)}% this month.
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-/** Round a max up to a clean axis bound (1/2/2.5/5 × 10^k). */
-function niceCeil(v: number): number {
-  if (v <= 0) return 1;
-  const mag = Math.pow(10, Math.floor(Math.log10(v)));
-  const f = v / mag;
-  const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10;
-  return nice * mag;
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   The remaining screens (Health, Gaps, Activity) keep the existing kit — they
+   are separate routes, ported in a later pass.
+   ═════════════════════════════════════════════════════════════════════════ */
 
-const dot = (s: string) => s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : "bg-dim";
-const sevDot = (s: Severity) => s === "critical" ? "bg-bad" : s === "warning" ? "bg-warn" : "bg-dim";
+const dot = (s: string) => (s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : "bg-dim");
+const sevDot = (s: Severity) => (s === "critical" ? "bg-bad" : s === "warning" ? "bg-warn" : "bg-dim");
 const confLabel: Record<Insight["confidence"], string> = { high: "", estimate: "estimate", "low-data": "needs data" };
 const kindGlyph: Record<ActivityEvent["kind"], string> = { sale: "🟢", purchase: "📦", expense: "🧾", cash: "💵", withdrawal: "🏷️", cheque: "🏦" };
 
@@ -236,245 +345,9 @@ export function InsightRow({ i }: { i: Insight }) {
   );
 }
 
-/* ─ Today / Command Center ─────────────────────────────────────────────── */
-export function DashboardScreen() {
-  const month = monthBoundsCairo();
-  const last = lastMonthBoundsCairo();
-  const today = todayCairo();
-  const histFrom = "2024-01-01"; // wide enough to cover all history for the chart's "All" view
-  const cc = useQuery({ queryKey: ["cc"], queryFn: getCommandCenter, enabled: en });
-  const miss = useQuery({ queryKey: ["missing"], queryFn: getMissingData, enabled: en });
-  const insights = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
-  const feed = useQuery({ queryKey: ["activity"], queryFn: () => getActivityFeed(30, 6), enabled: en });
-  const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
-  const daily = useQuery({ queryKey: ["dailyHist", histFrom], queryFn: () => getDailyRevenue({ from: histFrom, to: today }), enabled: en });
-  const accStart = useBooksStartDate();
-  const profitM = useQuery({ queryKey: ["profit", month, accStart], queryFn: () => getProfitReadout(month, accStart), enabled: en });
-  const spend = useQuery({ queryKey: ["dash-spend", histFrom], queryFn: () => getExpenses({ from: histFrom, to: today }), enabled: en });
-  const c = cc.data;
-  if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
-
-  const rows = daily.data ?? [];
-  const byDay = new Map(rows.map((p) => [p.date, p.total]));
-  const monthRev = isoRange(month.from, today).reduce((s, d) => s + (byDay.get(d) ?? 0), 0);
-  const lastRev = rows.filter((p) => p.date >= last.from && p.date <= last.to).reduce((s, p) => s + p.total, 0);
-  const latestDay = rows.filter((p) => p.total > 0).map((p) => p.date).sort().pop() ?? null;
-
-  // Monthly buckets for the trend chart (last 12 calendar months).
-  const monthly = new Map<string, number>();
-  for (const p of rows) { const k = p.date.slice(0, 7); monthly.set(k, (monthly.get(k) ?? 0) + p.total); }
-  const monthsAxis: string[] = [];
-  { const d = new Date(today + "T00:00:00"); for (let i = 11; i >= 0; i--) { const m = new Date(d.getFullYear(), d.getMonth() - i, 1); monthsAxis.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`); } }
-  const trendPoints = monthsAxis.map((k) => ({ label: fmtDate(k + "-01", "MMM"), value: monthly.get(k) ?? 0 }));
-  const trendTotal = trendPoints.reduce((s, p) => s + p.value, 0);
-  const sparkSeries = trendPoints.map((p) => p.value);
-
-  const pM = profitM.data;
-  const attention = (miss.data?.length ?? 0) + (insights.data?.filter((i) => i.severity !== "info").length ?? 0);
-  const loading = !c && cc.isLoading;
-
-  const widgets: Record<WidgetId, ReactNode> = {
-    kpis: (
-      <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
-        <HeroCard label="Revenue · last 12 months" value={loading ? "—" : egp(trendTotal)}
-          deltaPct={delta(monthRev, lastRev)}
-          sub={`this month ${egpShort(monthRev)}${latestDay ? ` · latest ${fmtDate(latestDay, "d MMM")}` : ""}`}
-          bars={sparkSeries} />
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard label="Cash on hand" accent="blue" icon={I.cash} value={loading ? "—" : c?.cashBalance == null ? "—" : egpShort(c.cashBalance)} sub="current" />
-          <StatCard label="Net profit · mo" accent="mint" icon={I.profit} value={pM ? (pM.netProfit == null ? "needs costs" : egpShort(pM.netProfit)) : "—"} sub={pM?.netMargin != null ? `${Math.round(pM.netMargin)}% margin` : "after costs"} />
-          <StatCard label="Awaiting cheque" accent="amber" icon={I.owed} value={loading ? "—" : egpShort(c?.owed ?? 0)} sub="open tab" />
-          <StatCard label="Stock value" accent="violet" icon={I.stock} value={loading ? "—" : egpShort(c?.stockValue ?? 0)} sub="on hand" />
-        </div>
-      </div>
-    ),
-    trend: (
-      <Card glow>
-        <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
-          <div className="min-w-0">
-            {daily.isLoading ? <div className="h-[300px] animate-pulse rounded-2xl bg-panel2" /> : <RevenueChart daily={rows} latestDay={latestDay} />}
-          </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-            <MiniStat label="This month" value={loading ? "—" : egp(monthRev)} accent="pink" delta={delta(monthRev, lastRev)} icon={I.revenue} />
-            <MiniStat label="Stock value" value={loading ? "—" : egp(c?.stockValue ?? 0)} accent="blue" icon={I.stock} />
-            <MiniStat label="Cash on hand" value={loading ? "—" : egp(c?.cashBalance ?? 0)} accent="mint" icon={I.cash} />
-          </div>
-        </div>
-      </Card>
-    ),
-    attention: (
-      <Card>
-        <CardHead title={`Needs attention${attention > 0 ? ` · ${attention}` : ""}`} accent="amber" icon={I.bolt}
-          action={<Link to="/missing" className="text-xs font-semibold text-pink">Open Gaps →</Link>} />
-        {!en ? <Note>Sign in to load.</Note> : miss.isLoading ? <SkeletonRows rows={3} /> :
-          (miss.data?.length ?? 0) === 0 ? <div className="flex items-center gap-2 py-1 text-sm font-medium text-good"><span className="h-2 w-2 rounded-full bg-good" /> All clear — nothing needs you right now.</div> : (
-          <div className="grid gap-1.5 sm:grid-cols-2">
-            {miss.data!.slice(0, 6).map((i) => (
-              <Link key={i.key} to={i.route} className="row-hover flex items-center gap-2.5 rounded-2xl border border-line p-3">
-                <span className={`h-2 w-2 rounded-full ${dot(i.severity)}`} />
-                <span className="flex-1 text-sm font-medium text-text">{i.title}</span>
-                <span className="tnum text-[12px] font-semibold text-dim">{i.count}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </Card>
-    ),
-    risks: (
-      <Card>
-        <CardHead title="Risks & signals" accent="red" icon={I.bolt}
-          action={(insights.data?.length ?? 0) > 3 ? <Link to="/missing" className="text-xs font-semibold text-pink">All {insights.data!.length} →</Link> : undefined} />
-        {insights.isLoading ? <SkeletonRows rows={2} /> : (insights.data?.length ?? 0) === 0
-          ? <div className="flex items-center gap-2 py-1 text-sm font-medium text-good"><span className="h-2 w-2 rounded-full bg-good" /> No risks flagged.</div>
-          : <div className="space-y-2">{insights.data!.slice(0, 3).map((i) => <InsightRow key={i.key} i={i} />)}</div>}
-      </Card>
-    ),
-    activity: (
-      <Card>
-        <CardHead title="Recent activity" accent="mint" icon={I.cash}
-          action={<Link to="/activity" className="text-xs font-semibold text-pink">All →</Link>} />
-        {!en ? <Note>Sign in to load.</Note>
-          : feed.isLoading ? <SkeletonRows rows={4} />
-          : (feed.data?.length ?? 0) === 0 ? <Note>No events recorded yet.</Note>
-          : (
-          <div className="-my-1 divide-y divide-line">
-            {feed.data!.map((e) => (
-              <Link key={`${e.kind}-${e.id}`} to={e.route} className="row-hover -mx-2 flex items-center gap-3 rounded-2xl px-2 py-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-panel2 text-base">{kindGlyph[e.kind]}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium text-text">{e.label}</div>
-                  <div className="text-[11.5px] text-dim">{fmtDate(e.date)}</div>
-                </div>
-                {e.amount !== 0 && (
-                  <div className={`tnum font-display text-sm font-bold ${e.amount > 0 ? "text-good" : "text-muted"}`}>
-                    {e.amount > 0 ? "+" : "−"}{egp(Math.abs(e.amount))}
-                  </div>
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
-      </Card>
-    ),
-    health: (
-      <Card glow accent="#9B6CFF" className="flex items-center gap-5">
-        <Ring value={health.data?.overall ?? null} size={104} stroke={12}>
-          <span className="tnum font-display text-[26px] font-extrabold text-text">{health.data?.overall ?? "—"}</span>
-          <span className="text-[10px] font-semibold text-dim">/ 100</span>
-        </Ring>
-        <div className="min-w-0 flex-1">
-          <Eyebrow accent="text-violet">Business health</Eyebrow>
-          <div className="font-display text-xl font-extrabold text-text">{health.data?.status ?? "—"}</div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {health.data?.level != null && <Pill tone="warn">⚡ Level {health.data.level}</Pill>}
-            {health.data && health.data.streakDays > 0 && <Pill tone="pink">🔥 {health.data.streakDays}-day streak</Pill>}
-          </div>
-        </div>
-        <Link to="/health" className="lift flex-shrink-0 rounded-2xl border border-line bg-panel px-3.5 py-2 text-xs font-semibold text-text hover:bg-panel2">Open →</Link>
-      </Card>
-    ),
-    spend: (() => {
-      const rowsE = spend.data ?? [];
-      const opTotal = rowsE.filter((e) => e.isOperating).reduce((s, e) => s + e.amount, 0);
-      const invTotal = rowsE.filter((e) => !e.isOperating).reduce((s, e) => s + e.amount, 0);
-      const byCat = new Map<string, number>();
-      for (const e of rowsE) byCat.set(e.category, (byCat.get(e.category) ?? 0) + e.amount);
-      const donut = [...byCat.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
-      return (
-        <Card>
-          <CardHead title="Where money goes" sub="all spend by category · since launch" accent="violet" icon="M6 2h9l5 5v15H4V2zM9 13h6M9 17h6"
-            action={<Link to="/expenses" className="text-xs font-semibold text-pink">Open Expenses →</Link>} />
-          {spend.isLoading ? <SkeletonRows rows={3} /> : donut.length === 0 ? <Note>No expenses recorded yet.</Note> : (
-            <div className="grid items-center gap-6 lg:grid-cols-[1.15fr_1fr]">
-              <DonutChart data={donut} size={208} />
-              <div className="grid grid-cols-2 gap-3">
-                <MiniStat label="Operating costs" value={egp(opTotal)} accent="amber" icon={I.owed} />
-                <MiniStat label="Inventory" value={egp(invTotal)} accent="violet" icon={I.stock} />
-                <MiniStat label="Total spend" value={egp(opTotal + invTotal)} accent="pink" icon={I.revenue} />
-                <MiniStat label="Cash on hand" value={loading ? "—" : egpShort(c?.cashBalance ?? 0)} accent="mint" icon={I.cash} />
-              </div>
-            </div>
-          )}
-        </Card>
-      );
-    })(),
-  };
-
-  return <CustomizableDashboard widgets={widgets} />;
+function Note({ children }: { children: React.ReactNode }) {
+  return <div className="py-1 text-sm" style={{ color: "var(--dim)" }}>{children}</div>;
 }
-
-function MiniStat({ label, value, accent, delta, icon }: { label: string; value: string; accent: Accent; delta?: number | null; icon?: string }) {
-  return (
-    <div className="rounded-2xl border border-line bg-panel2 p-3.5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {icon && <IconChip d={icon} accent={accent} size="sm" />}
-          <span className="text-[12px] font-medium text-muted">{label}</span>
-        </div>
-        <DeltaChip pct={delta ?? undefined} />
-      </div>
-      <div className="mt-2 tnum font-display text-xl font-extrabold text-text">{value}</div>
-    </div>
-  );
-}
-
-/** Drag-to-reorder, click-to-hide dashboard. Layout saved per-browser. */
-function CustomizableDashboard({ widgets }: { widgets: Record<WidgetId, ReactNode> }) {
-  const { layout, reorder, toggle, reset } = useLayoutStore();
-  const [edit, setEdit] = useState(false);
-  const [drag, setDrag] = useState<WidgetId | null>(null);
-  const [over, setOver] = useState<WidgetId | null>(null);
-  const hidden = layout.filter((x) => !x.on);
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-dim">{edit ? "Drag cards to reorder · tap Hide to remove" : "Your dashboard"}</div>
-        <button onClick={() => setEdit((e) => !e)}
-          className={`lift rounded-2xl border px-3.5 py-2 text-xs font-bold transition ${edit ? "border-pink bg-pink text-ink shadow-pink" : "border-line bg-panel text-muted hover:text-text"}`}>
-          {edit ? "✓ Done" : "✎ Customize"}
-        </button>
-      </div>
-
-      {layout.filter((x) => x.on).map((item) => (
-        <div key={item.id}
-          draggable={edit}
-          onDragStart={() => setDrag(item.id)}
-          onDragEnd={() => { setDrag(null); setOver(null); }}
-          onDragOver={(e) => { if (edit && drag) { e.preventDefault(); setOver(item.id); } }}
-          onDrop={(e) => { e.preventDefault(); if (drag && drag !== item.id) reorder(drag, item.id); setDrag(null); setOver(null); }}
-          className={cn("animate-rise", edit && "rounded-3xl border border-dashed p-2 transition", edit && (over === item.id ? "border-pink bg-pink/5" : "border-line"), drag === item.id && "opacity-40")}
-        >
-          {edit && (
-            <div className="mb-2 flex items-center gap-2 px-1">
-              <span className="cursor-grab text-dim active:cursor-grabbing" title="Drag">⠿</span>
-              <span className="flex-1 text-[11px] font-bold uppercase tracking-wider text-faint">{WIDGET_TITLES[item.id]}</span>
-              <button onClick={() => toggle(item.id)} className="rounded-lg bg-panel2 px-2.5 py-1 text-[11px] font-semibold text-muted hover:text-bad">Hide</button>
-            </div>
-          )}
-          <div className={edit ? "pointer-events-none" : ""}>{widgets[item.id]}</div>
-        </div>
-      ))}
-
-      {edit && (
-        <Card>
-          <div className="flex items-center justify-between">
-            <Eyebrow>Hidden widgets</Eyebrow>
-            <button onClick={reset} className="text-xs font-semibold text-pink hover:underline">Reset to default</button>
-          </div>
-          {hidden.length === 0 ? <p className="mt-2 text-sm text-dim">All widgets are visible. Drag the cards above to reorder.</p> : (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {hidden.map((h) => (
-                <button key={h.id} onClick={() => toggle(h.id)} className="rounded-2xl border border-line bg-panel2 px-3.5 py-2 text-[12px] font-semibold text-muted hover:border-pink/40 hover:text-text">+ {WIDGET_TITLES[h.id]}</button>
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
-    </div>
-  );
-}
-function Note({ children }: { children: React.ReactNode }) { return <div className="py-1 text-sm text-dim">{children}</div>; }
 
 /* ─ Health Center (game-style, real signals) ───────────────────────────── */
 export function HealthScreen() {
