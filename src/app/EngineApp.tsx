@@ -13,6 +13,7 @@ import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
 import { CommandPalette } from "@/features/engine/CommandPalette";
+import { useUI } from "@/store/ui";
 import { NAV_SECTIONS, SETTINGS_SECTION } from "@/core/nav";
 import { usePrefs, useApplyTheme } from "@/store/prefs";
 import { useFilters } from "@/store/filters";
@@ -187,8 +188,21 @@ function useVisibleGroups(): Group[] {
   return GROUPS.filter((g) => !hidden.includes(g.id));
 }
 
-/** Command Deck topbar — conic .wmark logo, .navpill primary nav, quick-add,
- *  alert bell, avatar. Recreated from the design; wired to the app's router. */
+/** Topbar spotlight search — opens the ⌘K command palette (jump to any screen). */
+function SpotlightSearch() {
+  const setCommandOpen = useUI((s) => s.setCommandOpen);
+  return (
+    <button onClick={() => setCommandOpen(true)} title="Search — ⌘K"
+      className="hidden h-11 items-center gap-2.5 rounded-2xl border border-white/[0.09] bg-white/[0.04] px-3.5 text-sm text-dim transition hover:border-white/20 hover:text-muted lg:flex" style={{ minWidth: 220 }}>
+      <Icon d={I.search} className="h-[15px] w-[15px]" />
+      <span className="flex-1 text-left">Ask or jump to…</span>
+      <kbd className="rounded-md border border-white/10 bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-semibold text-faint">⌘K</kbd>
+    </button>
+  );
+}
+
+/** Command Deck topbar — conic .wmark logo, .navpill primary nav, spotlight
+ *  search, quick-add, alert bell, avatar. Wired to the app's router. */
 function TopNav({ onAdd }: { onAdd: () => void }) {
   const { pathname } = useLocation();
   const active = groupForPath(pathname);
@@ -206,7 +220,8 @@ function TopNav({ onAdd }: { onAdd: () => void }) {
           </NavLink>
         ))}
       </nav>
-      <button onClick={onAdd} className="qadd"><Icon d={I.plus} w={2.6} className="h-4 w-4" /> Quick add</button>
+      <SpotlightSearch />
+      <button onClick={onAdd} className="qadd" title="Quick add"><Icon d={I.plus} w={2.6} className="h-4 w-4" /></button>
       <AlertBell />
       <div className="avt" title="Bosta Bites">BB</div>
     </div>
