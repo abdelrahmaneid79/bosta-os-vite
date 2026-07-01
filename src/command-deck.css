@@ -37,6 +37,8 @@
 .cdk .avt:hover{transform:scale(1.05)}
 .cdk .qadd{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--mag),var(--violet));color:#fff;border:none;border-radius:13px;height:44px;padding:0 16px;font-family:'Satoshi',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 10px 24px -8px rgba(255,61,168,.7);transition:transform .15s,filter .15s}
 .cdk .qadd:hover{filter:brightness(1.08)} .cdk .qadd:active{transform:scale(.97)} .cdk .qadd svg{width:16px;height:16px}
+@media (max-width:860px){ .cdk .navpill{display:none} .cdk .wmtxt small{display:none} }
+@media (max-width:520px){ .cdk .qadd span,.cdk .qadd{font-size:0} .cdk .qadd svg{font-size:16px} }
 
 /* ticker */
 .cdk .ticker{display:flex;align-items:stretch;background:rgba(255,255,255,.03);border:1px solid var(--stroke2);border-radius:18px;padding:4px;margin-bottom:20px;overflow:hidden;flex-wrap:wrap}

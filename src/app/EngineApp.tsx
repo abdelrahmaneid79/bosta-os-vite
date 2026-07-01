@@ -13,9 +13,8 @@ import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
 import { CommandPalette } from "@/features/engine/CommandPalette";
-import { useUI } from "@/store/ui";
 import { NAV_SECTIONS, SETTINGS_SECTION } from "@/core/nav";
-import { usePrefs, useApplyTheme, type ThemeMode } from "@/store/prefs";
+import { usePrefs, useApplyTheme } from "@/store/prefs";
 import { useFilters } from "@/store/filters";
 import { isEngineConfigured } from "@/core/db/engine";
 import { getAlerts, getDismissedAlertKeys } from "@/core/read/alerts";
@@ -164,54 +163,28 @@ function useVisibleGroups(): Group[] {
   return GROUPS.filter((g) => !hidden.includes(g.id));
 }
 
-function Rail({ onAdd }: { onAdd: () => void }) {
-  return (
-    <aside className="no-scrollbar sticky top-0 hidden h-screen w-[244px] flex-shrink-0 flex-col overflow-y-auto border-r border-line bg-rail md:flex">
-      <div className="px-4 pb-4 pt-5">
-        <NavLink to="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pink shadow-pink"><img src="/mascot-96.png" alt="Bosta Bites" className="h-7 w-7 object-contain" /></div>
-          <div>
-            <div className="font-display text-[17px] font-extrabold leading-none tracking-tight">BostaOS</div>
-            <div className="mt-1 text-[11px] font-medium text-dim">Bosta Bites</div>
-          </div>
-        </NavLink>
-        <button onClick={onAdd} className="lift mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-pink py-2.5 font-display text-sm font-bold text-ink shadow-pink">
-          <Icon d={I.plus} w={2.6} className="h-4 w-4" /> Quick add
-        </button>
-      </div>
-      <nav className="flex-1 px-3 pb-2">{useVisibleGroups().map((g) => <RailGroup key={g.id} group={g} />)}</nav>
-      <div className="mt-2 border-t border-line px-3 py-3"><RailGroup group={SETTINGS} /></div>
-    </aside>
-  );
-}
-
-function RailLink({ to, label, icon, accent, depth = 0 }: { to: string; label: string; icon?: string; accent: string; depth?: number }) {
+/** Command Deck topbar — conic .wmark logo, .navpill primary nav, quick-add,
+ *  alert bell, avatar. Recreated from the design; wired to the app's router. */
+function TopNav({ onAdd }: { onAdd: () => void }) {
   const { pathname } = useLocation();
-  const here = pathname === to || pathname.startsWith(to + "/");
+  const active = groupForPath(pathname);
+  const nav = [...useVisibleGroups(), SETTINGS];
   return (
-    <NavLink to={to} end
-      className={cn("lift relative mb-0.5 flex items-center gap-2.5 rounded-2xl py-2.5 text-[13.5px] font-semibold transition",
-        depth ? "pl-11 pr-3" : "px-3",
-        here ? "bg-pink/10 text-pink" : "text-muted hover:bg-panel2 hover:text-text")}>
-      {here && <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full" style={{ background: accent }} />}
-      {icon && <Icon d={icon} className="h-[19px] w-[19px]" />}
-      {!icon && depth > 0 && <span className={cn("h-1.5 w-1.5 flex-shrink-0 rounded-full", here ? "bg-pink" : "bg-line")} />}
-      <span>{label}</span>
-    </NavLink>
-  );
-}
-
-function RailGroup({ group }: { group: Group }) {
-  if (group.tabs.length === 1) {
-    return <RailLink to={group.tabs[0].to} label={group.label} icon={group.icon} accent={group.accent} />;
-  }
-  return (
-    <div className="mb-2 mt-1">
-      <div className="flex items-center gap-2 px-3 pb-1.5 pt-2 text-faint">
-        <Icon d={group.icon} className="h-[15px] w-[15px]" />
-        <span className="text-[10.5px] font-bold uppercase tracking-[0.12em]">{group.label}</span>
-      </div>
-      {group.tabs.map((t) => <RailLink key={t.to} to={t.to} label={t.label} accent={group.accent} depth={1} />)}
+    <div className="topbar">
+      <NavLink to="/dashboard" className="wm">
+        <div className="wmark"><img src="/mascot-96.png" alt="Bosta Bites" /></div>
+        <div className="wmtxt"><b>Bosta<span>OS</span></b><small>BOSTA BITES · CAIRO</small></div>
+      </NavLink>
+      <nav className="navpill">
+        {nav.map((g) => (
+          <NavLink key={g.id} to={g.tabs[0].to} className={cn("np", active?.id === g.id && "on")}>
+            <Icon d={g.icon} className="h-4 w-4" /><span>{g.label}</span>
+          </NavLink>
+        ))}
+      </nav>
+      <button onClick={onAdd} className="qadd"><Icon d={I.plus} w={2.6} className="h-4 w-4" /> Quick add</button>
+      <AlertBell />
+      <div className="avt" title="Bosta Bites">BB</div>
     </div>
   );
 }
@@ -236,10 +209,9 @@ function AlertBell() {
   const go = (a: Alert) => { setOpen(false); navigate(a.route); };
   return (
     <div className="relative">
-      <button title="Alerts" onClick={() => setOpen((o) => !o)}
-        className="lift relative flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-panel text-muted hover:text-text">
+      <button title="Alerts" onClick={() => setOpen((o) => !o)} className="iconbtn">
         <Icon d={I.bell} className="h-[18px] w-[18px]" />
-        {count > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-pink px-1 text-[10px] font-bold text-ink ring-2 ring-bg">{count > 9 ? "9+" : count}</span>}
+        {count > 0 && <span className="nd">{count > 9 ? "9+" : count}</span>}
       </button>
       {open && (
         <>
@@ -292,44 +264,6 @@ function AlertBell() {
   );
 }
 
-function ThemeToggle() {
-  const theme = usePrefs((s) => s.theme);
-  const set = usePrefs((s) => s.set);
-  const order: ThemeMode[] = ["light", "dark", "system"];
-  const next = order[(order.indexOf(theme) + 1) % order.length];
-  const isDark = document.documentElement.classList.contains("dark");
-  return (
-    <button onClick={() => set({ theme: next })} title={`Theme: ${theme} — switch to ${next}`}
-      className="lift flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-panel text-muted hover:text-text">
-      <Icon d={isDark ? I.moon : I.sun} className="h-[18px] w-[18px]" />
-    </button>
-  );
-}
-
-function Header({ onAdd }: { onAdd: () => void }) {
-  const { pathname } = useLocation();
-  const setCommandOpen = useUI((s) => s.setCommandOpen);
-  const group = groupForPath(pathname);
-  const title = pathname.startsWith("/product/") ? "Product" : group?.label ?? "BostaOS";
-  return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/80 px-4 py-3.5 backdrop-blur-xl sm:px-8">
-      <div className="min-w-0">
-        <div className="truncate font-display text-xl font-extrabold leading-tight tracking-tight sm:text-2xl">{title}</div>
-        <div className="text-[12.5px] font-medium text-dim">Bosta Bites</div>
-      </div>
-      <div className="flex-1" />
-      <button onClick={() => setCommandOpen(true)} className="lift hidden items-center gap-2 rounded-2xl border border-line bg-panel px-3.5 py-2.5 text-sm text-faint shadow-card hover:text-muted lg:flex">
-        <Icon d={I.search} className="h-4 w-4" /> <span className="pr-8">Search…</span>
-        <kbd className="rounded-md bg-panel2 px-1.5 py-0.5 text-[10px] font-semibold text-dim">⌘K</kbd>
-      </button>
-      <button onClick={() => setCommandOpen(true)} className="lift flex h-10 w-10 items-center justify-center rounded-2xl border border-line bg-panel text-muted hover:text-text lg:hidden"><Icon d={I.search} className="h-[18px] w-[18px]" /></button>
-      <ThemeToggle />
-      <AlertBell />
-      <button onClick={onAdd} className="lift flex h-10 items-center gap-1.5 rounded-2xl bg-pink px-3 font-display text-sm font-bold text-ink shadow-pink sm:hidden"><Icon d={I.plus} className="h-4 w-4" w={2.6} /></button>
-      <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-line bg-panel2"><img src="/mascot-96.png" alt="" className="h-7 w-7 object-contain" /></div>
-    </header>
-  );
-}
 
 function MobileNav() {
   const { pathname } = useLocation();
@@ -383,11 +317,10 @@ function Shell() {
   const landing = usePrefs((s) => s.landing);
   useEffect(() => { useFilters.getState().setRangeKey(defaultRange); }, [defaultRange]);
   return (
-    <div className="flex min-h-screen bg-bg text-text">
-      <Rail onAdd={() => setAdd(true)} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header onAdd={() => setAdd(true)} />
-        <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 pb-28 pt-6 sm:px-8 md:pb-12">
+    <div className="cdk min-h-screen text-text">
+      <div className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-5 sm:px-7 md:pb-12">
+        <TopNav onAdd={() => setAdd(true)} />
+        <main>
           <Suspense fallback={<SkeletonRows rows={6} />}>
             <Routes>
               <Route path="/" element={<Navigate to={landing} replace />} />
