@@ -7,18 +7,14 @@ import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
-import { getCommandCenter } from "@/core/read/dashboard";
 import { getMissingData } from "@/core/read/missing";
 import { getRiskInsights } from "@/core/read/insights";
 import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
 import { getHealthReport, type HealthCategory } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getExpenses } from "@/core/read/expenses";
-import { getProfitReadout } from "@/core/read/profit";
-import { getCashSummary } from "@/core/read/money";
-import { getProductProfit } from "@/core/read/products";
+import { getChequeCycle } from "@/core/read/settlements";
 import { todayCairo, monthBoundsCairo } from "@/core/time";
-import { useBooksStartDate } from "@/store/books";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
@@ -52,12 +48,13 @@ interface ChartPt { label: string; value: number }
 function AreaChart({ data, id, height = 200, strong = false, axis = false }: { data: ChartPt[]; id: string; height?: number; strong?: boolean; axis?: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const W = 700, H = height, padL = 4, padR = 6, padT = 14, padB = 8;
+  const W = 700, H = height, padL = 4, padR = 6, padT = 14, padB = axis ? 24 : 8;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const d = data.length ? data : [{ label: "", value: 0 }, { label: "", value: 0 }];
   const vals = d.map((x) => x.value);
   const min = Math.min(...vals), max = Math.max(...vals), span = max - min || 1;
-  const lo = min - span * 0.16, hi = max + span * 0.16;
+  const lo = min < 0 ? min - span * 0.14 : 0;               // revenue starts the axis at 0
+  const hi = max <= 0 ? 1 : max + span * 0.14;
   const pts = vals.map((v, i) => ({ x: padL + (i / (vals.length - 1 || 1)) * plotW, y: padT + (1 - (v - lo) / (hi - lo)) * plotH }));
   const line = smoothPath(pts);
   const baseY = padT + plotH;
@@ -68,6 +65,7 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
     setHover(Math.max(0, Math.min(vals.length - 1, Math.round(rel * (vals.length - 1)))));
   };
   const hp = hover != null ? d[hover] : null;
+  const xStep = Math.max(1, Math.ceil(vals.length / 6));
   const chart = (
     <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair" }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
       <svg className="chsvg" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
@@ -83,6 +81,7 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
         <path className="ar-fill" fill={`url(#gf_${id})`} d={area} />
         <path className="ln" fill="none" stroke={`url(#gs_${id})`} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" pathLength={1} d={line} />
       </svg>
+      {axis && <div className="chaxis">{d.map((p, i) => (i % xStep === 0 || i === d.length - 1) ? <span key={i} style={{ left: `${(pts[i].x / W) * 100}%` }}>{p.label}</span> : null)}</div>}
       {hp && (<>
         <div className="cross" style={{ left: `${(pts[hover!].x / W) * 100}%` }} />
         <div className="cdot" style={{ left: `${(pts[hover!].x / W) * 100}%`, top: pts[hover!].y }} />
@@ -93,7 +92,7 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
   if (!axis) return chart;
   return (
     <div style={{ position: "relative", paddingLeft: 46 }}>
-      <div className="chyax">{[hi, (hi + lo) / 2, lo].map((v, i) => <span key={i}>{egpShort(v).replace("EGP ", "")}</span>)}</div>
+      <div className="chyax" style={{ bottom: padB }}>{[hi, (hi + lo) / 2, lo].map((v, i) => <span key={i}>{egpShort(v).replace("EGP ", "")}</span>)}</div>
       {chart}
     </div>
   );
@@ -137,168 +136,233 @@ export function DashboardScreen() {
   const today = todayCairo();
   const month = monthBoundsCairo();
   const histFrom = "2024-01-01";
-  const accStart = useBooksStartDate();
-  const [trendR, setTrendR] = useState<"3M" | "6M" | "12M" | "All">("12M");
+  const [trendR, setTrendR] = useState<"1D" | "1W" | "1M" | "3M" | "6M" | "All" | "Custom">("3M");
+  const [cFrom, setCFrom] = useState("");
+  const [cTo, setCTo] = useState("");
 
-  const cc = useQuery({ queryKey: ["cc"], queryFn: getCommandCenter, enabled: en });
   const daily = useQuery({ queryKey: ["dailyHist", histFrom], queryFn: () => getDailyRevenue({ from: histFrom, to: today }), enabled: en });
+  const spendAll = useQuery({ queryKey: ["dash-spend", histFrom], queryFn: () => getExpenses({ from: histFrom, to: today }), enabled: en });
   const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
+  const cycle = useQuery({ queryKey: ["cheque-cycle"], queryFn: getChequeCycle, enabled: en });
 
+  const rows = daily.data ?? [];
+  const byDay = useMemo(() => new Map(rows.map((r) => [r.date, r.total])), [rows]);
   const d = useMemo(() => {
-    const rows = daily.data ?? [];
     const bucket = new Map<string, number>();
     for (const r of rows) bucket.set(r.date.slice(0, 7), (bucket.get(r.date.slice(0, 7)) ?? 0) + r.total);
-    const keys = [...bucket.keys()].sort();
-    const monthly = keys.map((k) => ({ k, v: bucket.get(k)! }));
+    const monthly = [...bucket.keys()].sort().map((k) => ({ k, v: bucket.get(k)! }));
     const active = monthly.filter((m) => m.v > 0);
     const cur = active[active.length - 1] ?? { k: month.from.slice(0, 7), v: 0 };
     const prev = active[active.length - 2] ?? { k: "", v: 0 };
-    return { monthKey: cur.k, monthRev: cur.v, lastRev: prev.v, monthly, latest: rows.filter((r) => r.total > 0).map((r) => r.date).sort().pop() ?? null };
-  }, [daily.data, month.from]);
+    const lifetimeRev = rows.reduce((s, r) => s + r.total, 0);
+    const best = monthly.reduce((b, m) => (m.v > b.v ? m : b), { k: "", v: 0 });
+    const dates = rows.map((r) => r.date).sort();
+    const latest = rows.filter((r) => r.total > 0).map((r) => r.date).sort().pop() ?? today;
+    return { monthKey: cur.k, monthRev: cur.v, lastRev: prev.v, monthly, lifetimeRev, best, earliest: dates[0] ?? today, latest };
+  }, [rows, month.from, today]);
 
-  const monthRange = useMemo(() => {
-    const k = d.monthKey, y = +k.slice(0, 4), m = +k.slice(5, 7);
-    const last = new Date(y, m, 0).getDate();
-    return { from: `${k}-01`, to: `${k}-${String(last).padStart(2, "0")}` };
-  }, [d.monthKey]);
-
-  const profitM = useQuery({ queryKey: ["profit", monthRange, accStart], queryFn: () => getProfitReadout(monthRange, accStart), enabled: en });
-  const cash = useQuery({ queryKey: ["cash", monthRange], queryFn: () => getCashSummary(monthRange), enabled: en });
-  const topM = useQuery({ queryKey: ["month-products", d.monthKey], queryFn: () => getProductProfit(monthRange), enabled: en });
-
-  if (cc.isError) return <ErrorState message={String((cc.error as Error)?.message)} />;
+  if (daily.isError) return <ErrorState message={String((daily.error as Error)?.message)} />;
   if (!en) return <EmptyState title="Sign in to load your deck" hint="Wired to your live data only — never faked." />;
 
-  const isCurMonth = d.monthKey === month.from.slice(0, 7);
-  const monthLabel = `${MON[+d.monthKey.slice(5, 7) - 1]} ${d.monthKey.slice(0, 4)}`;
+  const monthNum = +d.monthKey.slice(5, 7), yearNum = +d.monthKey.slice(0, 4);
+  const monthLabel = `${MON[monthNum - 1]} ${yearNum}`, monthShort = MON[monthNum - 1], prevMonthShort = MON[(monthNum + 10) % 12];
   const revDelta = pctDelta(d.monthRev, d.lastRev);
-  const diff = d.monthRev - d.lastRev;
-  const daysInMonth = new Date(+d.monthKey.slice(0, 4), +d.monthKey.slice(5, 7), 0).getDate();
-  const dayNum = isCurMonth ? new Date(today + "T00:00:00").getDate() : daysInMonth;
-  const pacing = isCurMonth && dayNum > 0 && d.monthRev > 0 ? (d.monthRev / dayNum) * daysInMonth : null;
-  const heroData: ChartPt[] = (() => { const days = isoRangeDays(monthRange.from, monthRange.to); const byDay = new Map((daily.data ?? []).map((r) => [r.date, r.total])); return days.map((x) => ({ label: fmtDate(x, "d MMM"), value: byDay.get(x) ?? 0 })); })();
+  const mTo2 = `${d.monthKey}-${String(new Date(yearNum, monthNum, 0).getDate()).padStart(2, "0")}`;
+  const monthDays = isoRangeDays(`${d.monthKey}-01`, mTo2 <= today ? mTo2 : today);
+  const tradingDays = monthDays.filter((x) => (byDay.get(x) ?? 0) > 0).length || monthDays.length;
+  const avgPerDay = tradingDays ? d.monthRev / tradingDays : 0;
+  const heroData: ChartPt[] = monthDays.map((x) => ({ label: fmtDate(x, "d MMM"), value: byDay.get(x) ?? 0 }));
 
-  const p = profitM.data;
-  const cs = cash.data;
-  const topProd = [...(topM.data ?? [])].sort((a, b) => b.revenue - a.revenue).slice(0, 4);
-  const topMax = Math.max(1, ...topProd.map((x) => x.revenue));
+  const spendRows = spendAll.data ?? [];
+  const monthSpend = spendRows.filter((e) => e.date.slice(0, 7) === d.monthKey).reduce((s, e) => s + e.amount, 0);
+  const netCash = d.monthRev - monthSpend;
+  const marginPct = d.monthRev > 0 ? Math.round((netCash / d.monthRev) * 100) : 0;
+  const spendRatio = d.monthRev > 0 ? Math.min(100, Math.round((monthSpend / d.monthRev) * 100)) : 0;
+  const gaugeCol = marginPct >= 55 ? "var(--green)" : marginPct >= 35 ? "var(--amber)" : "var(--red)";
 
+  const catMap = new Map<string, number>();
+  for (const e of spendRows) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
+  const cats = [...catMap.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 5);
+  const catMax = Math.max(1, ...cats.map((c) => c.value));
+  const CATCOL = ["var(--mag)", "var(--violet)", "var(--cyan)", "var(--amber)", "var(--lime)"];
+
+  const venMap = new Map<string, number>();
+  for (const e of spendRows) if (e.notes) venMap.set(e.notes, (venMap.get(e.notes) ?? 0) + e.amount);
+  const topVen = [...venMap.entries()].sort((a, b) => b[1] - a[1])[0];
+  const stockSpend = spendRows.filter((e) => !e.isOperating).reduce((s, e) => s + e.amount, 0);
+  const venPct = topVen && stockSpend ? Math.round((topVen[1] / stockSpend) * 100) : 0;
+
+  const cheques = (cycle.data?.cheques ?? []).slice(0, 4);
   const hs = health.data;
-  const hscore = hs?.overall ?? 0;
-  const hcol = hscore >= 75 ? "var(--green)" : hscore >= 55 ? "var(--amber)" : "var(--red)";
-  const standing = hscore >= 75 ? "GOOD STANDING" : hscore >= 55 ? "STEADY" : "NEEDS ATTENTION";
-  const trendSlice = trendR === "All" ? d.monthly : d.monthly.slice(-({ "3M": 3, "6M": 6, "12M": 12 }[trendR]));
 
-  const tk = (bg: string, color: string, icon: React.ReactNode, label: string, value: React.ReactNode) => (
-    <div className="tk">
-      <div className="tkic" style={{ background: bg, color }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{icon}</svg></div>
-      <div><div className="tkl">{label}</div><div className="tkv tnum">{value}</div></div>
-    </div>
-  );
+  // this week — daily bars ending at the latest recorded day
+  const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekDays = isoRangeDays(isoShift(d.latest, -6), d.latest);
+  const weekBars = weekDays.map((x) => ({ label: WD[new Date(x + "T00:00:00").getDay()], full: fmtDate(x, "EEE d MMM"), value: byDay.get(x) ?? 0 }));
+  const weekTotal = weekBars.reduce((s, b) => s + b.value, 0);
+  const priorTotal = isoRangeDays(isoShift(d.latest, -13), isoShift(d.latest, -7)).reduce((s, x) => s + (byDay.get(x) ?? 0), 0);
+  const weekDelta = pctDelta(weekTotal, priorTotal);
+
+  // trend — daily over the selected window
+  const trendTo = trendR === "Custom" ? (cTo || d.latest) : d.latest;
+  const trendFrom = trendR === "Custom" ? (cFrom || d.earliest)
+    : trendR === "All" ? d.earliest
+    : (() => { const n = { "1D": 1, "1W": 7, "1M": 30, "3M": 90, "6M": 180 }[trendR]; const f = isoShift(trendTo, -(n - 1)); return f < d.earliest ? d.earliest : f; })();
+  const trendData: ChartPt[] = isoRangeDays(trendFrom, trendTo).map((x) => ({ label: fmtDate(x, "d MMM"), value: byDay.get(x) ?? 0 }));
 
   return (
     <div className="cdk space-y-5">
       {/* ── ticker ─────────────────────────────────────────────────────── */}
       <div className="ticker">
-        {tk("rgba(255,61,168,.14)", "var(--mag)", Ic.rev, "Revenue today", <>{money2(cc.data?.todayRevenue ?? 0)}</>)}
-        {tk("rgba(39,229,204,.14)", "var(--cyan)", Ic.cash, "Cash on hand", <>{cc.data?.cashBalance != null ? money2(cc.data.cashBalance) : "—"}</>)}
-        {tk("rgba(255,177,62,.14)", "var(--amber)", Ic.bank, "Cheques due", <>{money2(cc.data?.owed ?? 0)}</>)}
-        {tk("rgba(157,107,255,.14)", "var(--violet)", Ic.star, "Top mover", <span className="ar" style={{ fontSize: 15 }}>{topProd[0]?.name ?? "—"}</span>)}
+        <div className="tk">
+          <div className="tkic" style={{ background: "rgba(255,61,168,.14)", color: "var(--mag)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.rev}</svg></div>
+          <div><div className="tkl">Revenue · {monthShort}</div><div className="tkv tnum">{money2(d.monthRev)}{revDelta != null && <em style={{ color: revDelta >= 0 ? "var(--green)" : "var(--red)", fontStyle: "normal", fontSize: 11, fontWeight: 700 }}> {revDelta >= 0 ? "▲" : "▼"}{Math.abs(revDelta).toFixed(1)}%</em>}</div></div>
+        </div>
+        <div className="tk">
+          <div className="tkic" style={{ background: "rgba(157,107,255,.14)", color: "var(--violet)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.spend}</svg></div>
+          <div><div className="tkl">Spend · {monthShort}</div><div className="tkv tnum">{money2(monthSpend)}</div></div>
+        </div>
+        <div className="tk">
+          <div className="tkic" style={{ background: "rgba(39,229,204,.14)", color: "var(--cyan)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.bank}</svg></div>
+          <div><div className="tkl">Cheques logged</div><div className="tkv tnum">{cycle.data?.cheques.length ?? 0} · EGP {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</div></div>
+        </div>
         <div className="tk">
           <span className="live"><span className="livedot" /> LIVE</span>
-          <div><div className="tkl">Books from</div><div className="tkv" style={{ fontSize: 14 }}>{fmtDate(accStart, "d MMM yyyy")}</div></div>
+          <div><div className="tkl">Books to</div><div className="tkv" style={{ fontSize: 14 }}>{fmtDate(d.latest, "d MMM yyyy")}</div></div>
         </div>
       </div>
 
       {/* ── grid ───────────────────────────────────────────────────────── */}
       <div className="deckgrid">
-        {/* hero — total revenue */}
+        {/* hero — revenue for the latest reporting month */}
         <div className="tile hero">
           <div className="orb" />
           <div className="heronut"><img src="/assets/bosta-mascot.svg" alt="" /></div>
-          <div className="th"><span className="eyebrow">Total revenue · {isCurMonth ? `${monthLabel} · month to date` : monthLabel}</span></div>
-          <div className="hv tnum"><span className="hcur">EGP</span>{money2(d.monthRev)}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+          <div className="th"><span className="eyebrow">Revenue · {monthLabel}</span></div>
+          <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500, marginTop: 2 }}>Latest reporting month · {tradingDays} trading days</div>
+          <div className="hv tnum" style={{ marginTop: "auto" }}><span className="hcur">EGP</span>{money2(d.monthRev)}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
             {revDelta != null && (
-              <span className={`delta ${diff >= 0 ? "up" : "down"}`}>
-                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">{diff >= 0 ? <path d="M3 8l3-3 3 3" /> : <path d="M3 4l3 3 3-3" />}</svg>
+              <span className={`delta ${revDelta >= 0 ? "up" : "down"}`}>
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">{revDelta >= 0 ? <path d="M3 8l3-3 3 3" /> : <path d="M3 4l3 3 3-3" />}</svg>
                 {Math.abs(revDelta).toFixed(1)}%
               </span>
             )}
-            <span style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500 }}>
-              {d.lastRev > 0 ? `${diff >= 0 ? "+" : "−"}EGP ${money2(Math.abs(diff))} vs prior month` : d.latest ? `latest ${fmtDate(d.latest, "d MMM")}` : "no sales yet"}
-              {pacing ? ` · pacing to ${egpShort(pacing).replace("EGP ", "")}` : ""}
-            </span>
+            <span style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500 }}>{d.lastRev > 0 ? `vs EGP ${money2(d.lastRev)} in ${prevMonthShort}` : "first month"} · EGP {money2(avgPerDay)}/day avg</span>
           </div>
-          <div style={{ marginTop: "auto" }}>
-            {daily.isLoading ? null : <AreaChart data={heroData} id="hero" height={120} strong />}
-          </div>
+          <div style={{ marginTop: 14 }}>{daily.isLoading ? null : <AreaChart data={heroData} id="hero" height={110} strong />}</div>
         </div>
 
-        {/* net profit */}
+        {/* spend */}
         <div className="tile spend">
-          <div className="th"><span className="ti" style={{ background: "rgba(66,226,154,.13)", color: "var(--green)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">{Ic.profit}</svg></span><span className="tname">Net profit</span></div>
-          <div className="bn tnum" style={{ color: "var(--green)" }}><small>EGP</small>{p ? (p.netProfit == null ? "—" : money2(p.netProfit)) : "—"}</div>
-          <div className="bar" style={{ marginTop: 14 }}><i style={{ width: `${p && p.netMargin != null ? Math.max(3, Math.min(100, p.netMargin)) : 0}%`, background: "linear-gradient(90deg,var(--green),var(--cyan))" }} /></div>
-          <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 8, fontWeight: 600 }}>{p && p.netMargin != null ? `${Math.round(p.netMargin)}% margin` : "margin needs costs"}</div>
-          <div style={{ fontSize: 12, color: "var(--dim)", marginTop: 8 }}>Rev {p ? egpShort(p.revenue).replace("EGP ", "") : "—"} · COGS {p ? egpShort(p.cogs).replace("EGP ", "") : "—"} · Opex {p ? egpShort(p.operatingExpenses).replace("EGP ", "") : "—"}</div>
+          <div className="th"><span className="tname">Spend · {monthShort}</span></div>
+          <div className="bn tnum"><small>EGP</small>{money2(monthSpend)}</div>
+          <div className="bar" style={{ marginTop: 18 }}><i style={{ width: `${spendRatio}%`, background: "linear-gradient(90deg,var(--violet),var(--mag))" }} /></div>
+          <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of {monthShort} revenue · mostly stock</div>
         </div>
 
-        {/* cash on hand */}
+        {/* net cash */}
         <div className="tile netcash">
-          <div className="th"><span className="ti" style={{ background: "rgba(39,229,204,.13)", color: "var(--cyan)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">{Ic.cash}</svg></span><span className="tname">Cash on hand</span></div>
-          <div className="bn tnum"><small>EGP</small>{cc.data?.cashBalance != null ? money2(cc.data.cashBalance) : "—"}</div>
-          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-            <div className="chip"><b style={{ color: "var(--green)" }}>+{egpShort(cs?.inflow ?? 0).replace("EGP ", "")}</b><span>Inflow</span></div>
-            <div className="chip"><b style={{ color: "var(--red)" }}>−{egpShort(Math.abs(cs?.outflow ?? 0)).replace("EGP ", "")}</b><span>Outflow</span></div>
-          </div>
+          <div className="th"><span className="tname">Net cash · {monthShort}</span></div>
+          <div className="bn tnum" style={{ color: netCash >= 0 ? "var(--green)" : "var(--red)" }}><small>EGP</small>{money2(netCash)}</div>
+          <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500, marginTop: 18 }}>{marginPct}% cash margin · revenue − recorded spend</div>
         </div>
 
-        {/* business health */}
+        {/* performance gauge */}
         <div className="tile perf">
-          <HealthGauge score={hscore} suffix="" color={hcol} label={hs?.status ?? "—"} />
+          <HealthGauge score={marginPct} suffix="%" color={gaugeCol} label="Net cash margin" />
           <div className="hbody">
-            <span className="eyebrow" style={{ color: hcol }}>Business health · {standing}</span>
-            <div className="hhead">{hs?.status ? `${hs.status} — margin & cash tracked live from your records.` : "Computing health…"}</div>
-            <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
-              <div className="chip"><b style={{ color: revDelta != null && revDelta >= 0 ? "var(--green)" : "var(--red)" }}>{revDelta != null ? `${revDelta >= 0 ? "+" : ""}${Math.round(revDelta)}%` : "—"}</b><span>Revenue pace</span></div>
-              <div className="chip"><b>{p && p.netMargin != null ? `${Math.round(p.netMargin)}%` : "—"}</b><span>Net margin</span></div>
-              <div className="chip"><b style={{ color: (cc.data?.warnings.missingCogs ?? 0) > 0 ? "var(--amber)" : "var(--green)" }}>{cc.data?.warnings.missingCogs ?? 0}</b><span>Missing costs</span></div>
-              <div className="chip"><b style={{ color: (cc.data?.warnings.unreconciledSales ?? 0) > 0 ? "var(--amber)" : "var(--green)" }}>{cc.data?.warnings.unreconciledSales ?? 0}</b><span>Unreconciled</span></div>
+            <span className="eyebrow">Performance · lifetime</span>
+            <div className="hhead">EGP {money2(d.lifetimeRev)} earned to date — {hs?.status ? hs.status.toLowerCase() : "steady"} cash conversion.</div>
+            <div className="hstats">
+              <div className="hstat"><div className="l">Lifetime revenue</div><div className="v tnum">{egpShort(d.lifetimeRev).replace("EGP ", "")}</div></div>
+              <div className="hstat"><div className="l">Cheques settled</div><div className="v tnum">{egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</div></div>
+              <div className="hstat"><div className="l">Best month</div><div className="v tnum">{d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(2, 4)}` : "—"}</div></div>
             </div>
           </div>
         </div>
 
-        {/* revenue trend */}
+        {/* revenue trend — daily */}
         <div className="tile trend">
           <div className="th"><span className="tname">Revenue trend</span>
-            <div className="seg" id="trendSeg">
-              {(["3M", "6M", "12M", "All"] as const).map((r) => <span key={r} className={trendR === r ? "on" : ""} onClick={() => setTrendR(r)}>{r}</span>)}
+            <div className="seg big" style={{ marginLeft: "auto" }}>
+              {(["1D", "1W", "1M", "3M", "6M", "All"] as const).map((r) => <span key={r} className={trendR === r ? "on" : ""} onClick={() => setTrendR(r)}>{r}</span>)}
+              <span className={"cust" + (trendR === "Custom" ? " on" : "")} onClick={() => setTrendR("Custom")}>Custom</span>
             </div>
           </div>
-          <div style={{ marginTop: 18 }}>
-            {daily.isLoading ? <SkeletonRows rows={4} /> : <AreaChart data={trendSlice.map((m) => ({ label: fmtDate(m.k + "-01", "MMM yyyy"), value: m.v }))} id="trend" height={206} axis />}
-          </div>
+          {trendR === "Custom" && (
+            <div className="crange" style={{ marginTop: 12 }}>
+              <span style={{ fontSize: 12, color: "var(--dim)", fontWeight: 600 }}>From</span>
+              <input type="date" value={cFrom || d.earliest} min={d.earliest} max={d.latest} onChange={(e) => setCFrom(e.target.value)} />
+              <span style={{ fontSize: 12, color: "var(--dim)", fontWeight: 600 }}>to</span>
+              <input type="date" value={cTo || d.latest} min={d.earliest} max={d.latest} onChange={(e) => setCTo(e.target.value)} />
+            </div>
+          )}
+          <div style={{ marginTop: 18 }}>{daily.isLoading ? <SkeletonRows rows={4} /> : <AreaChart data={trendData} id="trend" height={206} axis />}</div>
         </div>
 
-        {/* top products */}
+        {/* this week */}
         <div className="tile catalog">
-          <div className="th"><span className="tname">Top products</span><span className="eyebrow" style={{ marginLeft: "auto" }}>{monthLabel}</span></div>
-          {topM.isLoading ? <SkeletonRows rows={4} /> : topProd.length === 0 ? <Note>No product sales this month.</Note> :
-            topProd.map((p2) => (
-              <div className="lrow" key={p2.productId}>
+          <div className="th"><span className="tname">This week</span><span className="eyebrow" style={{ marginLeft: "auto" }}>last 7 days</span></div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
+            <span className="disp" style={{ fontWeight: 700, fontSize: 27, letterSpacing: "-.02em" }}>EGP {money2(weekTotal)}</span>
+            {weekDelta != null && <span className={`delta ${weekDelta >= 0 ? "up" : "down"}`}>{weekDelta >= 0 ? "+" : ""}{weekDelta.toFixed(1)}%</span>}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--dim)", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM")} · vs EGP {money2(priorTotal)} prior 7 days</div>
+          <div style={{ marginTop: 14 }}><MBars data={weekBars} height={120} /></div>
+        </div>
+
+        {/* spend by category */}
+        <div className="tile spendcat">
+          <div className="th"><span className="tname">Spend by category</span><span className="eyebrow" style={{ marginLeft: "auto" }}>lifetime</span></div>
+          {spendAll.isLoading ? <SkeletonRows rows={4} /> : cats.length === 0 ? <Note>No expenses recorded.</Note> :
+            cats.map((c, i) => (
+              <div className="lrow" key={c.label}>
+                <span style={{ width: 9, height: 9, borderRadius: 3, background: CATCOL[i % CATCOL.length], flexShrink: 0 }} />
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="lname ar" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p2.name}</div>
-                  <div className="bar"><i style={{ width: `${(p2.revenue / topMax) * 100}%`, background: "linear-gradient(90deg,var(--mag),var(--violet))" }} /></div>
+                  <div className="lname" style={{ textTransform: "capitalize" }}>{c.label}</div>
+                  <div className="bar"><i style={{ width: `${(c.value / catMax) * 100}%`, background: CATCOL[i % CATCOL.length] }} /></div>
                 </div>
-                <div className="lamt tnum">{egpShort(p2.revenue).replace("EGP ", "")}</div>
+                <div className="lamt tnum">{money2(c.value)}</div>
               </div>
             ))}
+        </div>
+
+        {/* recent cheques */}
+        <div className="tile cheques">
+          <div className="th"><span className="tname">Recent cheques</span><span className="tag" style={{ marginLeft: "auto", color: "var(--cyan)", background: "rgba(39,229,204,.12)" }}>{cycle.data?.cheques.length ?? 0} · {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</span></div>
+          {cycle.isLoading ? <SkeletonRows rows={4} /> : cheques.length === 0 ? <Note>No cheques logged yet.</Note> :
+            cheques.map((c) => (
+              <div className="lrow" key={c.id}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="lname">Cheque deposited</div>
+                  <div className="lsub">{fmtDate(c.date, "d MMM yyyy")}</div>
+                </div>
+                <div className="lamt tnum" style={{ color: "var(--cyan)" }}>{money2(c.amount)}</div>
+              </div>
+            ))}
+        </div>
+
+        {/* quick insight */}
+        <div className="tile qinsight">
+          <div className="th"><span className="tname">Quick insight</span><Link className="go" to="/missing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg></Link></div>
+          <div style={{ fontFamily: "'Clash Display'", fontWeight: 600, fontSize: 18, letterSpacing: "-.01em", lineHeight: 1.25, marginTop: 4 }}>
+            {d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(0, 4)} was the strongest month on record` : "Log a few days to unlock insights"}
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 14 }}>
+            <span className="disp" style={{ fontWeight: 700, fontSize: 26, color: "var(--green)" }}>EGP {money2(d.best.v)}</span>
+            {d.best.k && <span className="delta up">peak</span>}
+          </div>
+          <div style={{ fontSize: 12.5, color: "var(--dim)", marginTop: 10, fontWeight: 500, lineHeight: 1.5 }}>
+            {topVen ? `Top supplier is ${topVen[0]} at EGP ${money2(topVen[1])} across all purchases — ${venPct}% of stock spend.` : "Add supplier notes on purchases to surface your top supplier."}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+const isoShift = (iso: string, days: number): string => { const dt = new Date(iso + "T00:00:00"); dt.setDate(dt.getDate() + days); return dt.toISOString().slice(0, 10); };
 
 /** Inclusive list of ISO dates between two bounds. */
 function isoRangeDays(from: string, to: string): string[] {
