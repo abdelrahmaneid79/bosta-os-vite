@@ -121,6 +121,72 @@ export function BarChart({ data, height = 240, color = PINK, unit = "EGP", maxLa
   );
 }
 
+/* ── Grouped bar chart (two series side-by-side, e.g. money in vs out) ────── */
+export interface GroupPoint { label: string; a: number; b: number }
+export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "rgb(var(--bad))", labelA = "In", labelB = "Out", unit = "EGP" }: {
+  data: GroupPoint[]; height?: number; colorA?: string; colorB?: string; labelA?: string; labelB?: string; unit?: string;
+}) {
+  const idA = useId(), idB = useId();
+  const [ref, W] = useWidth<HTMLDivElement>();
+  const shown = useEnter();
+  const [hover, setHover] = useState<number | null>(null);
+  const H = height, PL = 54, PR = 14, PT = 14, PB = 30;
+  const AX = "rgba(255,255,255,0.62)"; // bright, always-legible axis text
+  const max = niceMax(Math.max(1, ...data.flatMap((d) => [d.a, d.b])));
+  const plotW = Math.max(0, W - PL - PR), plotH = H - PT - PB;
+  const n = Math.max(1, data.length);
+  const gw = plotW / n;                       // per-month group width
+  const bw = Math.max(4, Math.min(15, gw * 0.34)); // each bar
+  const gap = Math.max(2, gw * 0.06);
+  const ticks = 4;
+  const cx = (i: number) => PL + i * gw + gw / 2;
+
+  return (
+    <div ref={ref} className="relative w-full select-none" style={{ height }} onMouseLeave={() => setHover(null)}>
+      {W > 0 && (
+        <svg width={W} height={H} className="block">
+          <defs>
+            <linearGradient id={idA} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={colorA} stopOpacity={1} /><stop offset="100%" stopColor={colorA} stopOpacity={0.5} /></linearGradient>
+            <linearGradient id={idB} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={colorB} stopOpacity={1} /><stop offset="100%" stopColor={colorB} stopOpacity={0.5} /></linearGradient>
+          </defs>
+          {Array.from({ length: ticks + 1 }).map((_, i) => {
+            const y = PT + (plotH * i) / ticks;
+            return (
+              <g key={i}>
+                <line x1={PL} y1={y} x2={W - PR} y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
+                <text x={PL - 9} y={y + 3.5} textAnchor="end" fontSize={11} fontWeight={600} fill={AX}>{short(max * (1 - i / ticks))}</text>
+              </g>
+            );
+          })}
+          {data.map((d, i) => {
+            const ha = Math.max(0, (d.a / max) * plotH), hb = Math.max(0, (d.b / max) * plotH);
+            const active = hover == null || hover === i;
+            const x0 = cx(i);
+            return (
+              <g key={i} opacity={active ? 1 : 0.38} style={{ transition: "opacity .15s linear" }}>
+                <rect x={x0 - bw - gap / 2} y={PT + plotH - (shown ? ha : 0)} width={bw} height={shown ? ha : 0} rx={Math.min(5, bw / 2)} fill={`url(#${idA})`} style={{ transition: `y .55s ${EASE} ${i * 14}ms, height .55s ${EASE} ${i * 14}ms` }} />
+                <rect x={x0 + gap / 2} y={PT + plotH - (shown ? hb : 0)} width={bw} height={shown ? hb : 0} rx={Math.min(5, bw / 2)} fill={`url(#${idB})`} style={{ transition: `y .55s ${EASE} ${i * 14}ms, height .55s ${EASE} ${i * 14}ms` }} />
+              </g>
+            );
+          })}
+          {data.map((_, i) => <rect key={`hit${i}`} x={PL + i * gw} y={PT} width={gw} height={plotH} fill="transparent" onMouseEnter={() => setHover(i)} />)}
+          {data.map((d, i) => (
+            <text key={`lb${i}`} x={cx(i)} y={H - 9} textAnchor="middle" fontSize={10.5} fontWeight={600} fill={hover === i ? "rgb(var(--text))" : AX}>{d.label}</text>
+          ))}
+        </svg>
+      )}
+      {hover != null && data[hover] && (
+        <div className="pointer-events-none absolute top-0 z-10 min-w-[150px] -translate-x-1/2 whitespace-nowrap rounded-lg border border-line bg-panel px-2.5 py-1.5 shadow-pop"
+          style={{ left: Math.min(Math.max(cx(hover), 78), W - 78) }}>
+          <div className="mb-1 text-[10px] font-semibold text-dim">{data[hover].label}</div>
+          <div className="flex items-center gap-1.5 text-[12px]"><span className="h-2 w-2 rounded-sm" style={{ background: colorA }} /><span className="text-muted">{labelA}</span><span className="tnum ml-auto font-bold text-text">{full(unit, data[hover].a)}</span></div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[12px]"><span className="h-2 w-2 rounded-sm" style={{ background: colorB }} /><span className="text-muted">{labelB}</span><span className="tnum ml-auto font-bold text-text">{full(unit, data[hover].b)}</span></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Line / area chart ───────────────────────────────────────────────────── */
 export function LineChart({ data, height = 240, color = TEAL, unit = "EGP", area = true, maxLabels = 9 }: {
   data: Point[]; height?: number; color?: string; unit?: string; area?: boolean; maxLabels?: number;
