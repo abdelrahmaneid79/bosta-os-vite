@@ -192,38 +192,59 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
   });
 
   const ready = !!loc && !!ch && !!date && (validLines.length > 0 || otherNum > 0);
+  const cellInput = "w-full rounded-lg border border-transparent bg-transparent px-2 py-2 text-right text-sm tnum text-text outline-none transition placeholder:text-faint focus:border-pink/40 focus:bg-white/[0.04]";
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
+    <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-4">
       {(!loc || !ch) && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No active location/channel found — set one up in Supabase first.</div>}
-      <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
 
-      <div className="space-y-2">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-dim">Products sold</div>
-        {lines.map((l) => (
-          <div key={l.key} className="space-y-2 rounded-xl border border-line p-2.5">
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1"><ProductPicker value={l.productId} onChange={(id) => pickProduct(l.key, id)} /></div>
-              {lines.length > 1 && <button type="button" onClick={() => removeLine(l.key)} className="px-1 text-dim hover:text-bad" title="Remove">✕</button>}
-            </div>
-            <div className="flex items-center gap-2">
-              <Input inputMode="decimal" placeholder="qty" value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} className="!w-20" />
-              <span className="text-dim">×</span>
-              <Input inputMode="decimal" placeholder="price" value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} className="!w-24" />
-              <div className="tnum flex-1 text-right text-sm font-semibold text-text">{egp(lineTotal(l))}</div>
-            </div>
-          </div>
-        ))}
-        <Button type="button" variant="ghost" onClick={addLine}>+ Add product</Button>
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-dim">Date</div>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="!w-48" />
+        </div>
+        <div className="ml-auto text-right">
+          <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-dim">Day total</div>
+          <div className="tnum font-display text-2xl font-extrabold text-text">{egp(dayTotal)}</div>
+        </div>
       </div>
 
-      <Field label="Other / untracked sales (optional)"><Input inputMode="decimal" value={other} onChange={(e) => setOther(e.target.value)} placeholder="items not in your catalog" /></Field>
-
-      <div className="flex items-center justify-between rounded-xl bg-panel p-3">
-        <span className="text-[12px] text-dim">Day total (auto)</span>
-        <span className="tnum font-display text-lg font-bold text-text">{egp(dayTotal)}</span>
+      <div>
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-dim">Products sold</div>
+        <div className="rounded-2xl border border-line">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-line text-[10.5px] uppercase tracking-wider text-dim">
+                <th className="px-3 py-2.5 text-left font-bold">Product</th>
+                <th className="w-[84px] px-2 py-2.5 text-right font-bold">Qty</th>
+                <th className="w-[110px] px-2 py-2.5 text-right font-bold">Unit price</th>
+                <th className="w-[120px] px-3 py-2.5 text-right font-bold">Line total</th>
+                <th className="w-9" />
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l) => (
+                <tr key={l.key} className="border-b border-line/50 last:border-0">
+                  <td className="px-1.5 py-1"><ProductPicker bare value={l.productId} onChange={(id) => pickProduct(l.key, id)} /></td>
+                  <td className="px-1 py-1"><input inputMode="decimal" placeholder="0" value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} className={cellInput} /></td>
+                  <td className="px-1 py-1"><input inputMode="decimal" placeholder="0" value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} className={cellInput} /></td>
+                  <td className="px-3 py-1 text-right tnum text-sm font-semibold text-text">{lineTotal(l) > 0 ? egp(lineTotal(l)) : <span className="text-faint">—</span>}</td>
+                  <td className="px-1 py-1 text-center">
+                    {lines.length > 1 && <button type="button" onClick={() => removeLine(l.key)} className="text-dim transition hover:text-bad" title="Remove row">✕</button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" onClick={addLine} className="row-hover flex w-full items-center gap-2 rounded-b-2xl border-t border-line px-3 py-2.5 text-left text-[13px] font-semibold text-pink">
+            <span className="text-base leading-none">＋</span> Add product row
+          </button>
+        </div>
       </div>
-      <p className="text-[11px] text-dim">Pick each product and quantity — the price fills from the product and the totals add up automatically. Each line deducts stock and captures cost (COGS).</p>
-      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Save sale day"}</Button>
+
+      <Field label="Other / untracked sales (optional)"><Input inputMode="decimal" value={other} onChange={(e) => setOther(e.target.value)} placeholder="lump EGP for items not in your catalog" /></Field>
+
+      <p className="text-[11px] text-dim">Pick a product, type quantity — price auto-fills and totals add up. Each row deducts stock and captures cost (COGS).</p>
+      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : `Save sale day · ${egp(dayTotal)}`}</Button>
     </form>
   );
 }

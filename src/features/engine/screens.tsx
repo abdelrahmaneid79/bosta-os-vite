@@ -232,7 +232,7 @@ export function SalesScreen() {
         </>
       )}
 
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="New sale day"><SaleForm onDone={() => setAddOpen(false)} /></Modal>
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="New sale day" wide><SaleForm onDone={() => setAddOpen(false)} /></Modal>
       {detail && <Modal open onClose={() => setDetail(null)} title={`Sale · ${fmtDate(detail.date)}`}><SaleDetail sale={detail} onClose={() => setDetail(null)} /></Modal>}
     </div>
   );

@@ -8,7 +8,7 @@ import { cn } from "@/core/utils/cn";
 import { getSearchableProducts } from "@/core/read/products";
 import { buildIndex, searchProducts } from "@/core/products/match";
 
-export function ProductPicker({ value, onChange, autoFocus }: { value: string; onChange: (id: string) => void; autoFocus?: boolean }) {
+export function ProductPicker({ value, onChange, autoFocus, bare }: { value: string; onChange: (id: string) => void; autoFocus?: boolean; bare?: boolean }) {
   const q = useQuery({ queryKey: ["searchable-products"], queryFn: getSearchableProducts });
   const products = q.data ?? [];
   const index = useMemo(() => buildIndex(products), [products]);
@@ -32,7 +32,9 @@ export function ProductPicker({ value, onChange, autoFocus }: { value: string; o
         onChange={(e) => { setTerm(e.target.value); setOpen(true); }}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         dir="auto"
-        className="w-full rounded-2xl border border-line bg-panel2 px-3.5 py-2.5 text-sm text-text outline-none transition placeholder:text-faint focus:border-pink/60 focus:ring-2 focus:ring-pink/15"
+        className={bare
+          ? "w-full rounded-lg border border-transparent bg-transparent px-2.5 py-2 text-sm text-text outline-none transition placeholder:text-faint focus:border-pink/40 focus:bg-white/[0.04]"
+          : "w-full rounded-2xl border border-line bg-panel2 px-3.5 py-2.5 text-sm text-text outline-none transition placeholder:text-faint focus:border-pink/60 focus:ring-2 focus:ring-pink/15"}
       />
       {open && (
         <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-2xl border border-line bg-panel shadow-pop">
