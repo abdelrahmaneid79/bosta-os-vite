@@ -12,10 +12,9 @@ import {
 } from "@/core/accounting/brain";
 import { requireEngine } from "@/core/db/engine";
 import { getLocations, getChannels } from "@/core/read/common";
-import { getMoneyAccounts } from "@/core/read/money";
 import {
-  createSale, addExpense, ensureExpenseCategory, createMovement,
-  createProduct, addAlias,
+  createSale, addExpense, ensureExpenseCategory,
+  createProduct, addAlias, openSettlementPeriod, recordCheque,
 } from "@/core/db/mutations";
 
 // ── Bundle shape ────────────────────────────────────────────────────────────
@@ -165,21 +164,32 @@ export async function runSeedImport(
     }
   }
 
-  // ---- CHEQUES → cash inflow ledger (never touches profit) ------------------
+  // ---- CHEQUES → the cheques table (the ONE canonical cheque store) ---------
+  // Never written to money_movements: cash reads treat `cheques` as truth, and
+  // a movement copy double-counts the same money (the 2026-07 audit voided 40
+  // such duplicates). Each cheque is filed under its month's settlement period.
   if (opts.cheques && bundle.cheques.length) {
-    const accts = await getMoneyAccounts();
-    const acc = accts[0];
-    if (!acc) throw new Error("No active cash account.");
-    const existing = await sb.from("money_movements").select("movement_date,amount,movement_type").is("voided_at", null).eq("movement_type", "cheque_inflow");
+    const locs = await getLocations();
+    const loc = locs[0];
+    if (!loc) throw new Error("No active location.");
+    const existing = await sb.from("cheques").select("received_date,amount_received").is("voided_at", null);
     if (existing.error) throw existing.error;
     const fp = (d: string, a: number) => `${d}|${r2(Math.abs(a))}`;
-    const seen = new Set((existing.data ?? []).map((m) => fp(m.movement_date, Number(m.amount))));
+    const seen = new Set((existing.data ?? [])
+      .filter((c) => c.received_date && c.amount_received != null)
+      .map((c) => fp(c.received_date as string, Number(c.amount_received))));
+    const periodCache = new Map<string, string>();
     let done = 0;
     for (const c of bundle.cheques) {
       onProgress?.({ phase: "cheques", done: ++done, total: bundle.cheques.length });
       if (seen.has(fp(c.date, c.amount))) { report.cheques.skipped++; continue; }
-      try { await createMovement({ accountId: acc.id, type: "cheque_inflow", amount: r2(c.amount), date: c.date, notes: "Mall settlement cheque (history)" }); seen.add(fp(c.date, c.amount)); report.cheques.created++; }
-      catch { report.cheques.failed++; }
+      try {
+        const monthStart = c.date.slice(0, 8) + "01";
+        let periodId = periodCache.get(monthStart);
+        if (!periodId) { periodId = await openSettlementPeriod(loc.id, monthStart); periodCache.set(monthStart, periodId); }
+        await recordCheque({ periodId, expected: r2(c.amount), received: r2(c.amount), receivedDate: c.date, status: "reconciled", notes: "Mall settlement cheque (history)" });
+        seen.add(fp(c.date, c.amount)); report.cheques.created++;
+      } catch { report.cheques.failed++; }
     }
   }
 
