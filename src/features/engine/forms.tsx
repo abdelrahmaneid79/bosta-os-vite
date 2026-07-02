@@ -7,7 +7,6 @@ import { egp } from "@/core/utils/format";
 import { getProducts, getLocations, getChannels } from "@/core/read/common";
 import { getExpenseCategories } from "@/core/read/expenses";
 import { getMoneyAccounts } from "@/core/read/money";
-import { requireEngine } from "@/core/db/engine";
 import { ProductPicker } from "@/components/ProductPicker";
 import type { Tables, Enums } from "@/core/db/tables";
 import type { SaleLine } from "@/core/read/sales";
@@ -29,6 +28,7 @@ function useWrite(context: string, onDone?: () => void) {
 }
 
 const num = (s: string): number | null => { const n = parseFloat(s); return Number.isFinite(n) ? n : null; };
+const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /* ─ Product create / edit ──────────────────────────────────────────────── */
 export function ProductForm({ product, onDone }: { product?: Tables<"products">; onDone?: () => void }) {
@@ -266,7 +266,7 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
   const computed = (num(qty) ?? 0) * (num(price) ?? 0);
   const m = useMutation({
     mutationFn: () => {
-      const payload = { productId, qty: num(qty) ?? 0, unitPrice: num(price) ?? 0, lineTotal: num(lineTotal) || computed, notes: null };
+      const payload = { productId, qty: num(qty) ?? 0, unitPrice: num(price) ?? 0, lineTotal: num(lineTotal) ?? r2(computed), notes: null };
       return item ? editSaleItem(item.id, payload) : addSaleItem({ saleId, ...payload });
     },
     onSuccess: () => w.ok(item
@@ -284,8 +284,8 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
         <Field label="Quantity (base units)"><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
         <Field label="Unit price"><Input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
       </div>
-      <Field label={`Line total (EGP)${computed ? ` · auto ${Math.round(computed)}` : ""}`}>
-        <Input type="number" step="any" value={lineTotal} onChange={(e) => setLineTotal(e.target.value)} placeholder={computed ? String(Math.round(computed)) : ""} />
+      <Field label={`Line total (EGP)${computed ? ` · auto ${r2(computed).toFixed(2)}` : ""}`}>
+        <Input type="number" step="any" value={lineTotal} onChange={(e) => setLineTotal(e.target.value)} placeholder={computed ? r2(computed).toFixed(2) : ""} />
       </Field>
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : item ? "Save line" : "Add line"}</Button>
     </form>
@@ -400,14 +400,10 @@ export function ChequeForm({ onDone }: { onDone?: () => void }) {
       const loc = locations.data?.[0];
       if (!loc) throw new Error("No active location.");
       const monthStart = date.slice(0, 8) + "01";
-      await openSettlementPeriod(loc.id, monthStart);          // idempotent: ensure a container period exists
-      const sb = requireEngine();
-      const { data, error } = await sb.from("settlement_periods").select("id")
-        .eq("location_id", loc.id).eq("start_date", monthStart).is("voided_at", null).limit(1).maybeSingle();
-      if (error) throw error;
-      if (!data) throw new Error("Couldn't resolve the period for that date.");
+      // idempotent: creates (or finds) the month's period and returns its id
+      const periodId = await openSettlementPeriod(loc.id, monthStart);
       const amt = num(amount) ?? 0;
-      return recordCheque({ periodId: data.id, expected: amt, received: amt, receivedDate: date, status: "reconciled", notes: notes || null });
+      return recordCheque({ periodId, expected: amt, received: amt, receivedDate: date, status: "reconciled", notes: notes || null });
     },
     onSuccess: () => w.ok(`Cheque recorded · ${egp(num(amount) ?? 0)} cashed · sales tab closed`), onError: w.fail,
   });

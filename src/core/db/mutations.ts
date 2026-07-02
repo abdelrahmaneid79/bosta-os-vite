@@ -135,10 +135,10 @@ export async function setProductActive(id: string, active: boolean): Promise<voi
  *  if the database blocks it (foreign-key references), the caller gets a clear
  *  error and should deactivate instead — we never silently orphan financial data. */
 export async function deleteProduct(id: string): Promise<void> {
-  const sb = requireEngine();
-  // remove aliases first (safe, owned by the product), then the product itself
-  await sb.from("product_aliases").delete().eq("product_id", id);
-  const { error } = await sb.from("products").delete().eq("id", id);
+  // Aliases cascade with the product (FK ON DELETE CASCADE) — never pre-delete
+  // them, or a product blocked by sale/purchase history loses its aliases while
+  // the product itself survives.
+  const { error } = await requireEngine().from("products").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -194,11 +194,6 @@ export async function createSale(input: SaleInput): Promise<string> {
   }).select("id").single();
   if (error) throw error;
   return data.id;
-}
-
-export async function updateSaleTotal(saleId: string, total: number): Promise<void> {
-  const { error } = await requireEngine().from("sales").update({ total_amount: total }).eq("id", saleId);
-  if (error) throw error;
 }
 
 export interface SaleItemInput { saleId: string; productId: string; qty: number; unitPrice: number; lineTotal: number; notes: string | null; }
@@ -319,8 +314,9 @@ export async function recordCashCount(accountId: string, counted: number, date: 
 // ════════════════════════════════════════════════════════════════════════════
 // PHASE 4 — CHEQUES / SETTLEMENTS
 // ════════════════════════════════════════════════════════════════════════════
-export async function openSettlementPeriod(locationId: string, month: string): Promise<void> {
-  await ensureMonthlySettlementPeriod(locationId, month); // idempotent RPC; seeds rent + 3%
+/** Idempotent RPC; seeds rent + 3% on first creation. Returns the period id. */
+export async function openSettlementPeriod(locationId: string, month: string): Promise<string> {
+  return await ensureMonthlySettlementPeriod(locationId, month);
 }
 export interface ChequeInput {
   periodId: string; expected: number; received: number | null;

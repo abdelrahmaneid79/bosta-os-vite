@@ -52,9 +52,24 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "content-type": "application/json" } });
 
+/** verify_jwt only checks the signature — the PUBLIC anon key is itself a valid
+ *  JWT (role "anon"), so without this guard anyone holding the anon key could
+ *  invoke the vision model on the owner's Anthropic account. Require a real
+ *  signed-in user (role "authenticated"). */
+function callerIsAuthenticated(req: Request): boolean {
+  try {
+    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return payload?.role === "authenticated";
+  } catch {
+    return false;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
+  if (!callerIsAuthenticated(req)) return json({ error: "sign in required" }, 401);
   try {
     const KEY = await getKey();
     if (!KEY) return json({ error: "No Anthropic API key available (set ANTHROPIC_API_KEY secret or private_config row)", keyPresent: false }, 500);
