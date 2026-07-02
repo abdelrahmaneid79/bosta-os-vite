@@ -17,7 +17,8 @@ function niceMax(v: number): number {
   if (v <= 0) return 1;
   const mag = Math.pow(10, Math.floor(Math.log10(v)));
   const n = v / mag;
-  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  // Finer steps so a 210K max rounds to 250K, not 500K — bars fill the plot.
+  const step = n <= 1 ? 1 : n <= 1.5 ? 1.5 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 3 ? 3 : n <= 4 ? 4 : n <= 5 ? 5 : n <= 7.5 ? 7.5 : 10;
   return step * mag;
 }
 /** Compact axis label: 1.2M / 540K / 25 / 2.5 — no duplicate ticks at small scale. */
@@ -122,7 +123,7 @@ export function BarChart({ data, height = 240, color = PINK, unit = "EGP", maxLa
 }
 
 /* ── Grouped bar chart (two series side-by-side, e.g. money in vs out) ────── */
-export interface GroupPoint { label: string; a: number; b: number }
+export interface GroupPoint { label: string; full?: string; a: number; b: number }
 export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "rgb(var(--bad))", labelA = "In", labelB = "Out", unit = "EGP" }: {
   data: GroupPoint[]; height?: number; colorA?: string; colorB?: string; labelA?: string; labelB?: string; unit?: string;
 }) {
@@ -178,7 +179,7 @@ export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "r
       {hover != null && data[hover] && (
         <div className="pointer-events-none absolute top-0 z-10 min-w-[150px] -translate-x-1/2 whitespace-nowrap rounded-lg border border-line bg-panel px-2.5 py-1.5 shadow-pop"
           style={{ left: Math.min(Math.max(cx(hover), 78), W - 78) }}>
-          <div className="mb-1 text-[10px] font-semibold text-dim">{data[hover].label}</div>
+          <div className="mb-1 text-[10px] font-semibold text-dim">{data[hover].full ?? data[hover].label}</div>
           <div className="flex items-center gap-1.5 text-[12px]"><span className="h-2 w-2 rounded-sm" style={{ background: colorA }} /><span className="text-muted">{labelA}</span><span className="tnum ml-auto font-bold text-text">{full(unit, data[hover].a)}</span></div>
           <div className="mt-0.5 flex items-center gap-1.5 text-[12px]"><span className="h-2 w-2 rounded-sm" style={{ background: colorB }} /><span className="text-muted">{labelB}</span><span className="tnum ml-auto font-bold text-text">{full(unit, data[hover].b)}</span></div>
         </div>

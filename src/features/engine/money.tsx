@@ -50,7 +50,8 @@ export function MoneyScreen() {
     while (y < ly || (y === ly && mo <= lm)) { allMonths.push(`${y}-${String(mo).padStart(2, "0")}`); if (++mo > 12) { mo = 1; y++; } }
   }
   const flowSeries = allMonths.map((ym) => ({
-    label: fmtDate(ym + "-01", "MMM"),
+    label: fmtDate(ym + "-01", "MMM ''yy"),
+    full: fmtDate(ym + "-01", "MMM yyyy"),
     a: all.filter((m) => monthKey(m.date) === ym && m.amount > 0).reduce((s, m) => s + m.amount, 0),
     b: all.filter((m) => monthKey(m.date) === ym && m.amount < 0).reduce((s, m) => s + Math.abs(m.amount), 0),
   }));
@@ -77,7 +78,7 @@ export function MoneyScreen() {
       </div>
 
       <div className="row2">
-        <DeckTile style={{ padding: 0, display: "flex", flexDirection: "column", height: 560 }}>
+        <DeckTile style={{ padding: 0, display: "flex", flexDirection: "column", height: 460 }}>
           <div style={{ padding: "22px 24px 8px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span className="tname">Cash flow</span>
             <div className="seg" style={{ marginLeft: "auto" }}>
@@ -104,7 +105,7 @@ export function MoneyScreen() {
           </div>
         </DeckTile>
 
-        <DeckTile style={{ height: 560, display: "flex", flexDirection: "column" }}>
+        <DeckTile style={{ height: 460, display: "flex", flexDirection: "column" }}>
           <TileHead name="Money in vs out" right="by month" />
           {allMonths.length === 0 ? <div style={{ fontSize: 12.5, color: "var(--faint)", padding: "10px 0" }}>No flow in range.</div> : (
             <>
@@ -113,7 +114,7 @@ export function MoneyScreen() {
                 <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color: "var(--red)" }}><span style={{ width: 11, height: 11, borderRadius: 3, background: "rgb(var(--bad))" }} />Money out</span>
               </div>
               <div style={{ flex: 1, display: "flex", alignItems: "stretch", borderRadius: 18, padding: "12px 10px 6px", background: "linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.012))", border: "1px solid var(--stroke)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.06), 0 18px 40px -24px rgba(0,0,0,.85)" }}>
-                <GroupedBarChart data={flowSeries} height={430} colorA="rgb(var(--good))" colorB="rgb(var(--bad))" labelA="Money in" labelB="Money out" />
+                <GroupedBarChart data={flowSeries} height={320} colorA="rgb(var(--good))" colorB="rgb(var(--bad))" labelA="Money in" labelB="Money out" />
               </div>
             </>
           )}
