@@ -50,32 +50,27 @@ export async function getProfitReadout(range: DateRange, since?: string): Promis
   const partialBefore = since && range.from < since ? since : null;
   const eff: DateRange = { from: partialBefore ?? range.from, to: range.to };
 
-  // 1) Non-voided sales in the accounted window → their ids.
-  const sales = await sb
-    .from("sales")
-    .select("id")
+  // Non-voided lines of non-voided sales in the accounted window, in ONE query.
+  // Inner-join filter on the parent sale — the previous two-step version put
+  // every sale id in the URL (`.in(saleIds)`), which breaks past ~hundreds of
+  // days. Semantics identical: same rows, same COGS/missing counts.
+  const items = await sb
+    .from("sale_items")
+    .select("cogs_at_sale,product_id,sales!inner(sale_date,voided_at)")
     .is("voided_at", null)
-    .gte("sale_date", eff.from)
-    .lte("sale_date", eff.to);
-  if (sales.error) throw sales.error;
-  const saleIds = sales.data.map((s) => s.id);
+    .is("sales.voided_at", null)
+    .gte("sales.sale_date", eff.from)
+    .lte("sales.sale_date", eff.to);
+  if (items.error) throw items.error;
 
   let cogs = 0;
   let lines = 0;
   let missing = 0;
-  if (saleIds.length > 0) {
-    const items = await sb
-      .from("sale_items")
-      .select("cogs_at_sale,product_id")
-      .is("voided_at", null)
-      .in("sale_id", saleIds);
-    if (items.error) throw items.error;
-    for (const r of items.data) {
-      if (r.product_id == null) continue; // unmapped lines don't gate COGS completeness
-      lines += 1;
-      if (r.cogs_at_sale == null) missing += 1;
-      else cogs += r.cogs_at_sale;
-    }
+  for (const r of items.data) {
+    if (r.product_id == null) continue; // unmapped lines don't gate COGS completeness
+    lines += 1;
+    if (r.cogs_at_sale == null) missing += 1;
+    else cogs += r.cogs_at_sale;
   }
 
   const [revenue, operatingExpenses] = await Promise.all([

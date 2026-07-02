@@ -4,10 +4,10 @@ import { Button, Field, Input, Select } from "@/components/ui";
 import { useUI } from "@/store/ui";
 import { todayCairo } from "@/core/time";
 import { egp } from "@/core/utils/format";
+import { requireEngine } from "@/core/db/engine";
 import { getProducts, getLocations, getChannels } from "@/core/read/common";
 import { getExpenseCategories } from "@/core/read/expenses";
 import { getMoneyAccounts } from "@/core/read/money";
-import { requireEngine } from "@/core/db/engine";
 import { ProductPicker } from "@/components/ProductPicker";
 import type { Tables, Enums } from "@/core/db/tables";
 import type { SaleLine } from "@/core/read/sales";
@@ -29,6 +29,17 @@ function useWrite(context: string, onDone?: () => void) {
 }
 
 const num = (s: string): number | null => { const n = parseFloat(s); return Number.isFinite(n) ? n : null; };
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Suggested base-units-per-sale-unit for the common unit pairs. The engine
+ *  multiplies sale-line qty by this factor to deduct stock in base units. */
+function suggestedFactor(baseUnit: string, saleUnit: string): number {
+  const b = baseUnit.trim().toLowerCase(), s = saleUnit.trim().toLowerCase();
+  if (!s || b === s) return 1;
+  if (b === "g" && s === "kg") return 1000;
+  if (b === "kg" && s === "g") return 0.001;
+  return 1; // unknown pair — owner sets it explicitly
+}
 
 /* ─ Product create / edit ──────────────────────────────────────────────── */
 export function ProductForm({ product, onDone }: { product?: Tables<"products">; onDone?: () => void }) {
@@ -41,7 +52,10 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
   const [price, setPrice] = useState(product?.selling_price != null ? String(product.selling_price) : "");
   const [low, setLow] = useState(product?.low_stock_threshold != null ? String(product.low_stock_threshold) : "");
   const [refCost, setRefCost] = useState(product?.reference_cost != null ? String(product.reference_cost) : "");
+  const [factor, setFactor] = useState(product?.base_units_per_sale_unit != null ? String(product.base_units_per_sale_unit) : "");
   const [active, setActive] = useState(product?.active ?? true);
+  const unitsDiffer = !!saleUnit.trim() && saleUnit.trim().toLowerCase() !== baseUnit.trim().toLowerCase();
+  const factorHint = suggestedFactor(baseUnit, saleUnit);
 
   const [confirmDel, setConfirmDel] = useState(false);
   const m = useMutation({
@@ -49,6 +63,10 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
       const input: ProductInput = {
         nameEn, nameAr: nameAr || null, unitType, baseUnit, saleUnit: saleUnit || null,
         sellingPrice: num(price), lowStock: num(low), active, referenceCost: num(refCost),
+        // sale-qty → base-units conversion; when units match it's 1, when they
+        // differ the owner-confirmed factor (suggested for g/kg) is required so
+        // stock deduction & COGS are never off by the unit ratio.
+        baseUnitsPerSaleUnit: unitsDiffer ? (num(factor) ?? factorHint) : 1,
       };
       return product ? updateProduct(product.id, input).then(() => product.id) : createProduct(input);
     },
@@ -77,6 +95,12 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
         <Field label="Low-stock alert (base units)"><Input type="number" step="any" value={low} onChange={(e) => setLow(e.target.value)} /></Field>
         <Field label="Unit cost (EGP, COGS)"><Input type="number" step="any" value={refCost} onChange={(e) => setRefCost(e.target.value)} placeholder="cost / unit" /></Field>
       </div>
+      {unitsDiffer && (
+        <Field label={`Base units per sale unit (${baseUnit} in one ${saleUnit})`}>
+          <Input type="number" step="any" value={factor} onChange={(e) => setFactor(e.target.value)} placeholder={String(factorHint)} />
+          <p className="mt-1 text-[11px] text-dim">Sales are entered in {saleUnit}; stock is kept in {baseUnit}. Each sold {saleUnit} deducts this many {baseUnit} — e.g. base g, sale kg → 1000. Wrong = stock &amp; cost off by this ratio.</p>
+        </Field>
+      )}
       <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
       <Button type="submit" disabled={m.isPending} className="w-full">{m.isPending ? "Saving…" : product ? "Save changes" : "Add product"}</Button>
       {product && (
@@ -264,9 +288,13 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
   };
 
   const computed = (num(qty) ?? 0) * (num(price) ?? 0);
+  // The engine multiplies qty by base_units_per_sale_unit to deduct stock, so
+  // qty is in SALE units (kg for weight goods, piece for count) — label it so.
+  const selProduct = products.data?.find((p) => p.id === productId);
+  const qtyUnit = selProduct?.sale_unit || selProduct?.base_unit || "units";
   const m = useMutation({
     mutationFn: () => {
-      const payload = { productId, qty: num(qty) ?? 0, unitPrice: num(price) ?? 0, lineTotal: num(lineTotal) || computed, notes: null };
+      const payload = { productId, qty: num(qty) ?? 0, unitPrice: num(price) ?? 0, lineTotal: num(lineTotal) ?? r2(computed), notes: null };
       return item ? editSaleItem(item.id, payload) : addSaleItem({ saleId, ...payload });
     },
     onSuccess: () => w.ok(item
@@ -281,11 +309,11 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
         <ProductPicker value={productId} onChange={onPickProduct} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Quantity (base units)"><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
-        <Field label="Unit price"><Input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
+        <Field label={`Quantity (${qtyUnit})`}><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
+        <Field label={`Unit price (EGP / ${qtyUnit})`}><Input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
       </div>
-      <Field label={`Line total (EGP)${computed ? ` · auto ${Math.round(computed)}` : ""}`}>
-        <Input type="number" step="any" value={lineTotal} onChange={(e) => setLineTotal(e.target.value)} placeholder={computed ? String(Math.round(computed)) : ""} />
+      <Field label={`Line total (EGP)${computed ? ` · auto ${r2(computed).toFixed(2)}` : ""}`}>
+        <Input type="number" step="any" value={lineTotal} onChange={(e) => setLineTotal(e.target.value)} placeholder={computed ? r2(computed).toFixed(2) : ""} />
       </Field>
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : item ? "Save line" : "Add line"}</Button>
     </form>
@@ -400,14 +428,17 @@ export function ChequeForm({ onDone }: { onDone?: () => void }) {
       const loc = locations.data?.[0];
       if (!loc) throw new Error("No active location.");
       const monthStart = date.slice(0, 8) + "01";
-      await openSettlementPeriod(loc.id, monthStart);          // idempotent: ensure a container period exists
-      const sb = requireEngine();
-      const { data, error } = await sb.from("settlement_periods").select("id")
-        .eq("location_id", loc.id).eq("start_date", monthStart).is("voided_at", null).limit(1).maybeSingle();
-      if (error) throw error;
-      if (!data) throw new Error("Couldn't resolve the period for that date.");
+      // idempotent: creates (or finds) the month's period and returns its id
+      const periodId = await openSettlementPeriod(loc.id, monthStart);
       const amt = num(amount) ?? 0;
-      return recordCheque({ periodId: data.id, expected: amt, received: amt, receivedDate: date, status: "reconciled", notes: notes || null });
+      // expected = what the settlement engine says the mall owes (net_expected),
+      // NOT the amount received — otherwise `difference` is always 0 and the
+      // cheque-vs-settlement control is dead. Status starts at 'received';
+      // 'reconciled' is a deliberate action on the Cheques screen.
+      const period = await requireEngine().from("settlement_periods")
+        .select("net_expected").eq("id", periodId).single();
+      if (period.error) throw period.error;
+      return recordCheque({ periodId, expected: period.data.net_expected, received: amt, receivedDate: date, status: "received", notes: notes || null });
     },
     onSuccess: () => w.ok(`Cheque recorded · ${egp(num(amount) ?? 0)} cashed · sales tab closed`), onError: w.fail,
   });

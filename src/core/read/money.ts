@@ -30,6 +30,7 @@ export interface MoneyMovement {
 export async function getMoneyMovements(range: DateRange, limit = 80): Promise<MoneyMovement[]> {
   const { data, error } = await requireEngine()
     .from("money_movements").select("id,movement_date,movement_type,amount,notes")
+    .is("voided_at", null) // voided movements are reversals — never shown or summed
     .gte("movement_date", range.from).lte("movement_date", range.to)
     .order("movement_date", { ascending: false }).limit(limit);
   if (error) throw error;
@@ -66,7 +67,7 @@ export async function getCashPosition(): Promise<CashPosition> {
   const from = anchored ? books.date! : EPOCH;
   const opening = anchored ? books.openingCash! : 0;
   const [mvRes, chqRes, expFwd, purFwd] = await Promise.all([
-    sb.from("money_movements").select("amount").is("voided_at", null).neq("movement_type", "cheque_inflow").gte("movement_date", from),
+    sb.from("money_movements").select("amount").is("voided_at", null).gte("movement_date", from),
     sb.from("cheques").select("amount_received").is("voided_at", null).not("received_date", "is", null).gte("received_date", from),
     getExpenseTotal({ from, to: today }),
     getPurchaseTotal({ from, to: today }),
@@ -100,12 +101,12 @@ export async function getCashLedger(range: DateRange): Promise<CashEntry[]> {
   for (const c of chqRes.data ?? []) {
     if (c.amount_received != null && c.received_date) entries.push({ id: `ch-${c.id}`, date: c.received_date, label: "Cheque · mall settlement", amount: Number(c.amount_received), kind: "cheque" });
   }
+  // Cheques live ONLY in the `cheques` table (single canonical store — the
+  // 2026-07 audit voided the movement duplicates and the importer no longer
+  // writes them), so every non-voided movement counts with no type filtering.
   for (const m of mv) {
-    // Cheques are counted once, from the authoritative `cheques` table above.
-    // Skip cheque_inflow movements (imported history duplicates) to avoid double-counting.
-    if (m.type === "cheque_inflow") continue;
     const label = m.notes ? `${m.type.replace(/_/g, " ")} · ${m.notes}` : m.type.replace(/_/g, " ");
-    const kind: CashKind = m.isWithdrawal ? "withdrawal" : m.amount >= 0 ? "cash_in" : "cash_out";
+    const kind: CashKind = m.isWithdrawal ? "withdrawal" : m.type === "cheque_inflow" ? "cheque" : m.amount >= 0 ? "cash_in" : "cash_out";
     entries.push({ id: `mv-${m.id}`, date: m.date, label, amount: m.amount, kind });
   }
   for (const e of exps) entries.push({ id: `ex-${e.id}`, date: e.date, label: e.category + (e.notes ? ` · ${e.notes}` : ""), amount: -e.amount, kind: "expense" });

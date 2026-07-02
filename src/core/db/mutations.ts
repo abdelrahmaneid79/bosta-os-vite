@@ -8,7 +8,7 @@
 import {
   requireEngine, createPurchase as rpcCreatePurchase,
   createSaleItem as rpcCreateSaleItem, updateSaleItem as rpcUpdateSaleItem,
-  deleteSaleItem as rpcDeleteSaleItem, voidSaleMovements as rpcVoidSaleMovements,
+  deleteSaleItem as rpcDeleteSaleItem, voidSaleAtomic,
   recalcMoneyAccount, ensureMonthlySettlementPeriod,
 } from "@/core/db/engine";
 import type { Enums } from "@/core/db/tables";
@@ -32,6 +32,10 @@ export interface ProductInput {
   lowStock: number | null;
   active: boolean;
   referenceCost?: number | null;         // manual per-unit cost (COGS fallback when no purchases)
+  /** Base units in ONE sale unit (e.g. base g, sale kg → 1000). The engine
+   *  multiplies sale-line qty by this to deduct stock — leaving it at 1 for a
+   *  weight product silently mis-deducts by the unit ratio. */
+  baseUnitsPerSaleUnit?: number | null;
 }
 
 export async function createProduct(input: ProductInput): Promise<string> {
@@ -47,6 +51,8 @@ export async function createProduct(input: ProductInput): Promise<string> {
       low_stock_threshold: input.lowStock,
       active: input.active,
       reference_cost: input.referenceCost ?? null,
+      ...(input.baseUnitsPerSaleUnit != null && input.baseUnitsPerSaleUnit > 0
+        ? { base_units_per_sale_unit: input.baseUnitsPerSaleUnit } : {}),
     })
     .select("id")
     .single();
@@ -65,6 +71,7 @@ export async function updateProduct(id: string, input: Partial<ProductInput>): P
   if (input.lowStock !== undefined) patch.low_stock_threshold = input.lowStock;
   if (input.active !== undefined) patch.active = input.active;
   if (input.referenceCost !== undefined) patch.reference_cost = input.referenceCost;
+  if (input.baseUnitsPerSaleUnit != null && input.baseUnitsPerSaleUnit > 0) patch.base_units_per_sale_unit = input.baseUnitsPerSaleUnit;
   const { error } = await requireEngine().from("products").update(patch).eq("id", id);
   if (error) throw error;
 }
@@ -88,7 +95,10 @@ export async function setCostUplift(pct: number): Promise<void> {
     const id = byName.get(it.name);
     if (!id) continue;
     const eff = Math.round(it.unitCost * (1 + pct / 100) * 100) / 100;
-    await sb.from("products").update({ reference_cost: eff, avg_cost: eff }).eq("id", id);
+    // reference_cost ONLY — avg_cost belongs to the inventory-ledger replay
+    // (ADR-001, migration 0006) and is wiped by the next recompute if app code
+    // writes it. COGS falls back to reference_cost when avg_cost is 0/missing.
+    await sb.from("products").update({ reference_cost: eff }).eq("id", id);
   }
 }
 
@@ -135,10 +145,10 @@ export async function setProductActive(id: string, active: boolean): Promise<voi
  *  if the database blocks it (foreign-key references), the caller gets a clear
  *  error and should deactivate instead — we never silently orphan financial data. */
 export async function deleteProduct(id: string): Promise<void> {
-  const sb = requireEngine();
-  // remove aliases first (safe, owned by the product), then the product itself
-  await sb.from("product_aliases").delete().eq("product_id", id);
-  const { error } = await sb.from("products").delete().eq("id", id);
+  // Aliases cascade with the product (FK ON DELETE CASCADE) — never pre-delete
+  // them, or a product blocked by sale/purchase history loses its aliases while
+  // the product itself survives.
+  const { error } = await requireEngine().from("products").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -196,11 +206,6 @@ export async function createSale(input: SaleInput): Promise<string> {
   return data.id;
 }
 
-export async function updateSaleTotal(saleId: string, total: number): Promise<void> {
-  const { error } = await requireEngine().from("sales").update({ total_amount: total }).eq("id", saleId);
-  if (error) throw error;
-}
-
 export interface SaleItemInput { saleId: string; productId: string; qty: number; unitPrice: number; lineTotal: number; notes: string | null; }
 
 /** Add a product line → deducts stock + snapshots COGS + reconciles the day (RPC). */
@@ -224,12 +229,10 @@ export async function voidSaleItem(itemId: string): Promise<void> {
   await rpcDeleteSaleItem(itemId);
 }
 
-/** Void the whole day → soft-void header + void all its inventory movements (RPC). */
+/** Void the whole day — ONE atomic RPC (0021): inventory movements + header
+ *  in the same transaction, so the books can never end up half-voided. */
 export async function voidSale(saleId: string): Promise<void> {
-  await rpcVoidSaleMovements(saleId);
-  const { error } = await requireEngine().from("sales")
-    .update({ voided_at: new Date().toISOString(), void_reason: "Voided by owner" }).eq("id", saleId);
-  if (error) throw error;
+  await voidSaleAtomic(saleId, "Voided by owner");
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -319,8 +322,9 @@ export async function recordCashCount(accountId: string, counted: number, date: 
 // ════════════════════════════════════════════════════════════════════════════
 // PHASE 4 — CHEQUES / SETTLEMENTS
 // ════════════════════════════════════════════════════════════════════════════
-export async function openSettlementPeriod(locationId: string, month: string): Promise<void> {
-  await ensureMonthlySettlementPeriod(locationId, month); // idempotent RPC; seeds rent + 3%
+/** Idempotent RPC; seeds rent + 3% on first creation. Returns the period id. */
+export async function openSettlementPeriod(locationId: string, month: string): Promise<string> {
+  return await ensureMonthlySettlementPeriod(locationId, month);
 }
 export interface ChequeInput {
   periodId: string; expected: number; received: number | null;
