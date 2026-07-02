@@ -29,6 +29,33 @@ VITE_SUPABASE_ANON_KEY=...
 Then apply the schema in a **non-production** Supabase project first:
 `supabase/schema.sql` (additive, RLS-secured, single-admin). It has not been run for you.
 
+## Deploy (always-live)
+
+Hosted on **Vercel** — the repo already ships `vercel.json` (SPA routing + caching).
+
+1. On [vercel.com](https://vercel.com) → **Add New → Project** → import this repo.
+2. Framework preset **Vite** (auto). Build `npm run build`, output `dist`.
+3. Add the two env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+4. Deploy. Every `git push` to `main` redeploys automatically.
+
+Your data lives in Supabase, so the same live URL shows the same books on every
+device once you sign in.
+
+## Install as an app (PWA)
+
+BostaOS is an installable PWA (`public/manifest.webmanifest` + mascot icons).
+- **iPhone (Safari):** Share → *Add to Home Screen*.
+- **Android (Chrome):** menu → *Install app*.
+- **Desktop (Chrome/Edge):** install icon in the address bar.
+
+It opens full-screen, standalone, with the Bosta mascot icon.
+
+## Portability
+
+Node **≥ 20** (`.nvmrc` pins 20). Copy the folder (or `git clone`) to any machine,
+add `.env`, then `npm install && npm run dev`. `node_modules/` and `dist/` are
+regenerated — you never carry them around.
+
 ## Architecture
 
 ```
@@ -55,6 +82,3 @@ reversible edits) · profit (withdrawals excluded) · expected vs actual cash ·
 cheque/settlement periods · health score · missing-data detection · reports.
 
 See `docs/DECISIONS.md` (why) and `docs/TESTING.md` (how to verify).
-
-The original Claude Design prototype and prior reference live in
-`_archive_old_next_app/`.

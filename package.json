@@ -4,6 +4,7 @@
   "version": "2.0.0",
   "type": "module",
   "description": "BostaOS — the financial brain and operating system of Bosta Bites",
+  "engines": { "node": ">=20" },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
