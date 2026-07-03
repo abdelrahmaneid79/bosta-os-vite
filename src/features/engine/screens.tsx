@@ -26,7 +26,8 @@ import { getPurchases, getInventoryPurchases } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
 import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
 import { ProductDetailScreen } from "./product";
-import { PageHdr, Stat, DeckTile, TileHead, MBars } from "./deck";
+import { PageHdr, Stat, DeckTile, TileHead } from "./deck";
+import { BarChart } from "@/components/charts";
 import { todayCairo } from "@/core/time";
 import { voidSaleItem, voidSale, setProductActive, deleteProduct } from "@/core/db/mutations";
 import { useUI } from "@/store/ui";
@@ -205,8 +206,8 @@ export function SalesScreen() {
 
           <div className="row2">
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <DeckTile><TileHead name="Monthly revenue" right={`${d.monthly.length} months`} /><MBars data={d.monthly} /></DeckTile>
-              <DeckTile><TileHead name="Average revenue by weekday" right="all-time" /><MBars data={d.weekday} height={150} gradient="linear-gradient(180deg,var(--cyan),rgba(157,107,255,.45))" /></DeckTile>
+              <DeckTile><TileHead name="Monthly revenue" right={`${d.monthly.length} months`} /><div style={{ marginTop: 12 }}><BarChart data={d.monthly} height={210} /></div></DeckTile>
+              <DeckTile><TileHead name="Average revenue by weekday" right="all-time" /><div style={{ marginTop: 12 }}><BarChart data={d.weekday} height={170} color="rgb(var(--good))" /></div></DeckTile>
             </div>
             <DeckTile style={{ padding: 0 }}>
               <div style={{ padding: "22px 24px 12px", display: "flex", alignItems: "center", gap: 8 }}>

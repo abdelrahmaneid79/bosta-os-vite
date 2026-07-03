@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
 import { MBars, DeckTile, TileHead } from "./deck";
+import { BarChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
@@ -309,7 +310,7 @@ export function DashboardScreen() {
             {weekDelta != null && <span className={`delta ${weekDelta >= 0 ? "up" : "down"}`}>{weekDelta >= 0 ? "+" : ""}{weekDelta.toFixed(1)}%</span>}
           </div>
           <div style={{ fontSize: 12, color: "var(--dim)", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM")} · vs EGP {money2(priorTotal)} prior 7 days</div>
-          <div style={{ marginTop: 14 }}><MBars data={weekBars} height={120} /></div>
+          <div style={{ marginTop: 14 }}><BarChart data={weekBars} height={150} /></div>
         </div>
 
         {/* spend by category */}

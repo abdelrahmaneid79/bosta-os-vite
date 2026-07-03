@@ -1,10 +1,10 @@
 import { useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Stat, DeckTile, TileHead, MBars } from "./deck";
+import { Stat, DeckTile, TileHead } from "./deck";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
-import { DonutChart, GroupedBarChart } from "@/components/charts";
+import { DonutChart, GroupedBarChart, BarChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { egp, egpShort } from "@/core/utils/format";
@@ -203,7 +203,7 @@ export function ExpensesScreen() {
             </DeckTile>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16, height: 608 }}>
-              <DeckTile><TileHead name="Monthly spend" right="in range" /><MBars data={spendBars} height={150} gradient="linear-gradient(180deg,var(--amber),rgba(255,61,168,.4))" /></DeckTile>
+              <DeckTile><TileHead name="Monthly spend" right="in range" /><div style={{ marginTop: 12 }}><BarChart data={spendBars} height={170} color="rgb(var(--warn))" /></div></DeckTile>
               <DeckTile style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
                 <TileHead name="Top suppliers" />
                 <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
