@@ -8,7 +8,7 @@ import { useId, useState, useRef, useEffect, useLayoutEffect } from "react";
 const PINK = "rgb(var(--pink))";
 const TEAL = "rgb(var(--good))";
 const GRID = "rgb(var(--line2))";
-const AXIS = "rgb(var(--muted))";
+const AXIS = "rgba(255,255,255,0.9)"; // axis labels are white by default; the hovered one turns the series colour
 const SURFACE = "rgb(var(--panel))";
 const SLICE = ["rgb(var(--pink))", "rgb(var(--good))", "rgb(var(--info))", "rgb(var(--warn))", "rgb(var(--violet))", "#FF6B8A", "#34D9C8", "#FFD166"];
 const EASE = "cubic-bezier(.22,1,.36,1)";
@@ -139,7 +139,7 @@ export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "r
   const shown = useEnter();
   const [hover, setHover] = useState<number | null>(null);
   const H = height, PL = 54, PR = 14, PT = 14, PB = 30;
-  const AX = "rgba(255,255,255,0.62)"; // bright, always-legible axis text
+  const AX = "rgba(255,255,255,0.9)"; // white by default; hovered label turns the series colour
   const max = niceMax(Math.max(1, ...data.flatMap((d) => [d.a, d.b])));
   const plotW = Math.max(0, W - PL - PR), plotH = H - PT - PB;
   const n = Math.max(1, data.length);
@@ -186,7 +186,7 @@ export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "r
           })}
           {data.map((_, i) => <rect key={`hit${i}`} x={PL + i * gw} y={PT} width={gw} height={plotH} fill="transparent" onMouseEnter={() => setHover(i)} />)}
           {data.map((d, i) => (
-            <text key={`lb${i}`} x={cx(i)} y={H - 9} textAnchor="middle" fontSize={10.5} fontWeight={600} fill={hover === i ? "rgb(var(--text))" : AX}>{d.label}</text>
+            <text key={`lb${i}`} x={cx(i)} y={H - 9} textAnchor="middle" fontSize={10.5} fontWeight={600} fill={hover === i ? colorA : AX}>{d.label}</text>
           ))}
         </svg>
       )}
@@ -256,7 +256,7 @@ export function LineChart({ data, height = 240, color = TEAL, unit = "EGP", area
           {data.map((d, i) => i % labelEvery === 0 ? (
             <g key={`lb${i}`}>
               <rect x={x(i) - 22} y={H - 18} width={44} height={13} rx={3} fill="rgba(16,19,25,0.72)" />
-              <text x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fontWeight={600} fill={AXIS}>{d.label}</text>
+              <text x={x(i)} y={H - 8} textAnchor="middle" fontSize={11} fontWeight={600} fill={hover === i ? color : AXIS}>{d.label}</text>
             </g>
           ) : null)}
         </svg>

@@ -86,7 +86,7 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
         <path className="ar-fill" fill={`url(#gf_${id})`} d={area} />
         <path className="ln" fill="none" stroke={`url(#gs_${id})`} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" pathLength={1} d={line} />
       </svg>
-      {axis && <div className="chaxis">{d.map((p, i) => (i % xStep === 0 || i === d.length - 1) ? <span key={i} style={{ left: `${(pts[i].x / W) * 100}%` }}>{p.label}</span> : null)}</div>}
+      {axis && <div className="chaxis">{d.map((p, i) => (i % xStep === 0 || i === d.length - 1) ? <span key={i} style={{ left: `${(pts[i].x / W) * 100}%`, color: hover === i ? "var(--mag)" : undefined }}>{p.label}</span> : null)}</div>}
       {hp && (<>
         <div className="cross" style={{ left: `${(pts[hover!].x / W) * 100}%` }} />
         <div className="cdot" style={{ left: `${(pts[hover!].x / W) * 100}%`, top: pts[hover!].y }} />
