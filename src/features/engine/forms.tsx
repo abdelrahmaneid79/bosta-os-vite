@@ -221,9 +221,7 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
   });
 
   const ready = !!loc && !!ch && !!date && (validLines.length > 0 || otherNum > 0);
-  const cellInput = "w-full rounded-lg border border-transparent bg-transparent px-2 py-2 text-right text-sm tnum text-text outline-none transition placeholder:text-faint focus:border-pink/40 focus:bg-white/[0.04]";
-  // Phone: bordered, 44px-tall inputs (clear tap targets) since there's no table grid.
-  const cardInput = "w-full rounded-lg border border-line bg-panel2 px-3 py-2.5 text-right text-sm tnum text-text outline-none transition placeholder:text-faint focus:border-pink/50";
+  const cellInput = "w-full rounded-lg border border-transparent bg-transparent px-1.5 py-2 text-right text-sm tnum text-text outline-none transition placeholder:text-faint focus:border-pink/40 focus:bg-white/[0.04] sm:px-2";
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-4">
       {(!loc || !ch) && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No active location/channel found — set one up in Supabase first.</div>}
@@ -241,48 +239,27 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
 
       <div>
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-dim">Products sold</div>
-        <div className="rounded-2xl border border-line">
-          {/* Phone (< sm): each line is a stacked card — no horizontal scroll,
-              full-width product search, thumb-sized inputs. */}
-          <div className="space-y-3 p-3 sm:hidden">
-            {lines.map((l) => (
-              <div key={l.key} className="space-y-2.5 rounded-xl border border-line bg-white/[0.02] p-3">
-                <div className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1"><ProductPicker bare value={l.productId} onChange={(id) => pickProduct(l.key, id)} /></div>
-                  {lines.length > 1 && <button type="button" onClick={() => removeLine(l.key)} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-line text-dim transition hover:text-bad" title="Remove">✕</button>}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-dim">Qty</span>
-                    <input inputMode="decimal" placeholder="0" value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} className={cardInput} /></label>
-                  <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-dim">Unit price</span>
-                    <input inputMode="decimal" placeholder="0" value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} className={cardInput} /></label>
-                </div>
-                <div className="flex items-center justify-between border-t border-line/60 pt-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Line total</span>
-                  <span className="tnum font-display text-sm font-bold text-text">{lineTotal(l) > 0 ? egp(lineTotal(l)) : <span className="text-faint">—</span>}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          {/* Tablet/desktop (>= sm): the spreadsheet table, unchanged. */}
-          <table className="hidden w-full sm:table">
+        <div className="overflow-hidden rounded-2xl border border-line">
+          {/* ONE editable table at every size — compact columns + short headers on
+              phone so it fits without going back to stacked boxes. */}
+          <table className="w-full table-fixed">
             <thead>
-              <tr className="border-b border-line text-[10.5px] uppercase tracking-wider text-dim">
-                <th className="px-3 py-2.5 text-left font-bold">Product</th>
-                <th className="w-[84px] px-2 py-2.5 text-right font-bold">Qty</th>
-                <th className="w-[110px] px-2 py-2.5 text-right font-bold">Unit price</th>
-                <th className="w-[120px] px-3 py-2.5 text-right font-bold">Line total</th>
-                <th className="w-9" />
+              <tr className="border-b border-line text-[10px] uppercase tracking-wider text-dim sm:text-[10.5px]">
+                <th className="px-2 py-2.5 text-left font-bold sm:px-3">Product</th>
+                <th className="w-[50px] px-1 py-2.5 text-right font-bold sm:w-[84px] sm:px-2">Qty</th>
+                <th className="w-[58px] px-1 py-2.5 text-right font-bold sm:w-[110px] sm:px-2"><span className="sm:hidden">Price</span><span className="hidden sm:inline">Unit price</span></th>
+                <th className="w-[68px] px-2 py-2.5 text-right font-bold sm:w-[120px] sm:px-3"><span className="sm:hidden">Total</span><span className="hidden sm:inline">Line total</span></th>
+                <th className="w-7 sm:w-9" />
               </tr>
             </thead>
             <tbody>
               {lines.map((l) => (
                 <tr key={l.key} className="border-b border-line/50 last:border-0">
-                  <td className="px-1.5 py-1"><ProductPicker bare value={l.productId} onChange={(id) => pickProduct(l.key, id)} /></td>
-                  <td className="px-1 py-1"><input inputMode="decimal" placeholder="0" value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} className={cellInput} /></td>
-                  <td className="px-1 py-1"><input inputMode="decimal" placeholder="0" value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} className={cellInput} /></td>
-                  <td className="px-3 py-1 text-right tnum text-sm font-semibold text-text">{lineTotal(l) > 0 ? egp(lineTotal(l)) : <span className="text-faint">—</span>}</td>
-                  <td className="px-1 py-1 text-center">
+                  <td className="px-1 py-1 sm:px-1.5"><ProductPicker bare value={l.productId} onChange={(id) => pickProduct(l.key, id)} /></td>
+                  <td className="px-0.5 py-1 sm:px-1"><input inputMode="decimal" placeholder="0" value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} className={cellInput} /></td>
+                  <td className="px-0.5 py-1 sm:px-1"><input inputMode="decimal" placeholder="0" value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} className={cellInput} /></td>
+                  <td className="px-1.5 py-1 text-right tnum text-[12.5px] font-semibold text-text sm:px-3 sm:text-sm">{lineTotal(l) > 0 ? egp(lineTotal(l)) : <span className="text-faint">—</span>}</td>
+                  <td className="px-0.5 py-1 text-center sm:px-1">
                     {lines.length > 1 && <button type="button" onClick={() => removeLine(l.key)} className="text-dim transition hover:text-bad" title="Remove row">✕</button>}
                   </td>
                 </tr>
