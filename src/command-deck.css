@@ -235,3 +235,35 @@
 @keyframes cdk-lndraw{from{stroke-dashoffset:1}}
 @keyframes cdk-arfade{from{opacity:0}}
 @keyframes cdk-sweep{from{stroke-dasharray:0 999}}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE (< md / 768px) — phone layout fixes ONLY. Everything here is scoped
+   to max-width:767px, so desktop (>=768px) rendering is untouched.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width:767px){
+  /* #1 The core bug: grid/flex children default to min-width:auto and refuse to
+     shrink below their content, so a wide child (a bar chart, a long number)
+     stretches its tile past the viewport and the whole PAGE scrolls sideways.
+     Letting them shrink keeps every tile within the screen. */
+  .cdk .tile,
+  .cdk .deckgrid>*, .cdk .statgrid>*, .cdk .row2>*, .cdk .bh>*, .cdk .perf>*{ min-width:0; }
+
+  /* #2 A too-wide bar chart scrolls WITHIN its tile instead of the page; bars
+     keep a tap-friendly floor so a busy month stays readable. */
+  .cdk .mbars{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .cdk .mbar{ min-width:30px; }
+
+  /* #3 Roomier-for-thumbs but tighter-for-width tiles + headers on phones. */
+  .cdk .tile{ padding:18px; border-radius:22px; }
+  .cdk .pagehdr h1{ font-size:24px; }
+  .cdk .pagehdr{ gap:8px; margin-bottom:16px; }
+
+  /* #4 Data tables: tighter cells so more columns fit; the .scroll wrapper still
+     gives horizontal scroll within the tile (never the page). */
+  .cdk .tbl th, .cdk .tbl td{ padding-left:11px; padding-right:11px; }
+  .cdk .tbl td{ font-size:13px; }
+  .cdk .etbl th, .cdk .etbl td{ padding-left:10px; padding-right:10px; }
+
+  /* #5 Segmented range/tab controls wrap instead of overflowing. */
+  .cdk .seg, .cdk .subtabs{ flex-wrap:wrap; }
+}
