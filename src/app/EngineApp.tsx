@@ -202,7 +202,7 @@ function TopNav({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="topbar">
       <NavLink to="/dashboard" className="wm">
-        <div className="wmark"><img src="/mascot-96.png" alt="Bosta Bites" /></div>
+        <div className="wmark"><img src="/bosta-peanut.svg" alt="Bosta Bites" /></div>
         <div className="wmtxt"><b>Bosta<span>OS</span></b><small>BOSTA BITES · CAIRO</small></div>
       </NavLink>
       <nav className="navpill">

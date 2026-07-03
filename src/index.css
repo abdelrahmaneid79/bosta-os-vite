@@ -20,8 +20,9 @@
   --line: 42 47 57;         /* hairline stroke       */
   --line2: 32 36 44;        /* subtle stroke / hover */
   /* brand spectrum */
-  --pink: 255 61 168;       /* magenta #ff3da8 (primary accent) */
-  --pink-bright: 255 127 206;/* #ff7fce              */
+  --pink: 255 77 187;       /* Bosta Bites PRIMARY #ff4dbb (pink) */
+  --pink-bright: 255 133 214;/* #ff85d6              */
+  --cream: 255 233 199;     /* Bosta Bites SECONDARY #ffe9c7 (peanut/cream); tertiary = black */
   --berry: 157 107 255;     /* violet — gradient end #9d6bff */
   --ink: 255 255 255;       /* text ON accent        */
   /* text */
@@ -39,9 +40,9 @@
   --cyan: 39 229 204;       /* #27e5cc               */
   /* effects */
   --shadow-card: inset 0 1px 0 rgba(255,255,255,.05), 0 30px 60px -34px rgba(0,0,0,.9);
-  --shadow-pop: 0 46px 90px -34px rgba(0,0,0,.95), 0 18px 54px -26px rgba(255,61,168,.30);
-  --shadow-pink: 0 10px 26px -8px rgba(255,61,168,.55);
-  --glow: rgba(255,61,168,.14);
+  --shadow-pop: 0 46px 90px -34px rgba(0,0,0,.95), 0 18px 54px -26px rgba(255,77,187,.30);
+  --shadow-pink: 0 10px 26px -8px rgba(255,77,187,.55);
+  --glow: rgba(255,77,187,.14);
   color-scheme: dark;
 }
 
@@ -57,7 +58,7 @@
   body {
     @apply bg-bg text-text font-sans antialiased;
     background-image:
-      radial-gradient(46% 38% at 82% 2%, rgba(255,61,168,.18), transparent 60%),
+      radial-gradient(46% 38% at 82% 2%, rgba(255,77,187,.18), transparent 60%),
       radial-gradient(42% 40% at 6% 2%, rgba(157,107,255,.13), transparent 62%),
       radial-gradient(52% 46% at 98% 78%, rgba(39,229,204,.09), transparent 60%);
     background-attachment: fixed;

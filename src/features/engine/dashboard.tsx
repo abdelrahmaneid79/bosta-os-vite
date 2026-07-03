@@ -2,7 +2,7 @@ import { useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
-import { MBars, DeckTile, TileHead } from "./deck";
+import { DeckTile, TileHead } from "./deck";
 import { BarChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
@@ -220,7 +220,7 @@ export function DashboardScreen() {
       {/* ── ticker ─────────────────────────────────────────────────────── */}
       <div className="ticker">
         <div className="tk">
-          <div className="tkic" style={{ background: "rgba(255,61,168,.14)", color: "var(--mag)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.rev}</svg></div>
+          <div className="tkic" style={{ background: "rgba(255,77,187,.14)", color: "var(--mag)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.rev}</svg></div>
           <div><div className="tkl">Revenue · {monthShort}</div><div className="tkv tnum">{money2(d.monthRev)}{revDelta != null && <em style={{ color: revDelta >= 0 ? "var(--green)" : "var(--red)", fontStyle: "normal", fontSize: 11, fontWeight: 700 }}> {revDelta >= 0 ? "▲" : "▼"}{Math.abs(revDelta).toFixed(1)}%</em>}</div></div>
         </div>
         <div className="tk">
@@ -462,7 +462,9 @@ export function HealthScreen() {
           <div style={{ textAlign: "center", fontSize: 13, color: "var(--muted)", marginTop: 16, lineHeight: 1.55 }}>{summary}</div>
           <div style={{ marginTop: 22, width: "100%" }}>
             <div className="eyebrow" style={{ color: "var(--dim)", marginBottom: 10 }}>Net cash · last 6 months</div>
-            <MBars data={net6} height={74} gradient={`linear-gradient(180deg,${col},rgba(157,107,255,.4))`} />
+            {/* AreaChart: y-axis + a date·amount tooltip (hover or swipe), and it
+                handles negative net-cash months — the old sparkline had neither. */}
+            <AreaChart data={net6} id="net6" height={150} axis />
           </div>
         </DeckTile>
         <DeckTile>
