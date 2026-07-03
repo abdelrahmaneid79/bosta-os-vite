@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Stat, DeckTile, TileHead, MBars } from "./deck";
@@ -12,9 +12,9 @@ import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getCashLedger, getCashSummary, getMoneyAccounts } from "@/core/read/money";
-import { getChequeCycle } from "@/core/read/settlements";
+import { getChequeCycle, getSettlementStatements } from "@/core/read/settlements";
 import { getExpenses } from "@/core/read/expenses";
-import { voidMovement, voidCheque, voidExpense } from "@/core/db/mutations";
+import { voidMovement, voidCheque, voidExpense, setSettlementStatus } from "@/core/db/mutations";
 import { CashForm, ChequeForm, ExpenseForm } from "./forms";
 import { useUI } from "@/store/ui";
 
@@ -298,6 +298,93 @@ export function ChequesScreen() {
       <Confirm open={!!voidId} title="Void this cheque?" danger busy={del.isPending}
         message="Removed from cheque totals and cash in; kept for audit." confirmLabel="Void"
         onConfirm={() => voidId && del.mutate(voidId)} onClose={() => setVoidId(null)} />
+    </div>
+  );
+}
+
+const MINI_BTN: CSSProperties = {
+  padding: "3px 9px", borderRadius: 8, border: "1px solid var(--stroke)",
+  background: "rgba(255,255,255,.04)", color: "var(--muted)", fontSize: 11.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+};
+
+// ── Settlements — monthly statement (READ-ONLY over the engine caches) ───────
+/** Per month: revenue − flat rent − 3% charge = net expected, vs cheque
+ *  received. Every figure is read from the trigger-maintained caches; the only
+ *  write is an admin-triggered period status transition (never auto-reconcile). */
+export function SettlementsScreen() {
+  const { reportSuccess, reportError } = useUI();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["settlement-statements"], queryFn: getSettlementStatements, enabled: en });
+  const setStatus = useMutation({
+    mutationFn: (v: { id: string; status: "received" | "reconciled" | "open" }) => setSettlementStatus(v.id, v.status),
+    onSuccess: (_d, v) => { reportSuccess("Settlement status", `Period marked ${v.status}`); qc.invalidateQueries(); },
+    onError: (e) => reportError("Settlement status", e),
+  });
+  if (!en) return <EmptyState title="Sign in to load settlements" />;
+  const rows = q.data ?? [];
+  const tol = (r: { revenue: number }) => Math.max(5, 0.005 * r.revenue); // reconciliation tolerance
+  const totNet = rows.reduce((s, r) => s + r.netExpected, 0);
+  const totRecv = rows.reduce((s, r) => s + (r.chequeReceived ?? 0), 0);
+  const outstanding = rows.filter((r) => r.chequeReceived == null && r.netExpected > 0).reduce((s, r) => s + r.netExpected, 0);
+
+  const STATUS_COLOR: Record<string, string> = { open: "var(--dim)", expected: "var(--amber)", received: "var(--cyan)", reconciled: "var(--green)" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 600 }}>Revenue − flat rent − 3% charge = net expected, vs the cheque received</div>
+      </div>
+      {q.isLoading ? <SkeletonRows /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : (
+        <>
+          <div className="statgrid">
+            <Stat label="Months" color="var(--cyan)" value={rows.length} />
+            <Stat label="Net expected · all" color="var(--mag)" value={egp(totNet)} />
+            <Stat label="Cheques received · all" color="var(--green)" value={egp(totRecv)} />
+            <Stat label="Outstanding (no cheque)" color="var(--amber)" value={egp(outstanding)} />
+          </div>
+          <DeckTile style={{ padding: 0 }}>
+            <div style={{ padding: "22px 24px 8px" }}><span className="tname">Monthly settlement statement</span></div>
+            <div className="scroll">
+              <table className="tbl">
+                <thead><tr>
+                  <th>Month</th><th className="r">Revenue</th><th className="r">Rent</th><th className="r">3% charge</th>
+                  <th className="r">Net expected</th><th className="r">Cheque received</th><th className="r">Difference</th><th>Status</th>
+                </tr></thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const ok = r.difference != null && Math.abs(r.difference) <= tol(r);
+                    return (
+                      <tr key={r.id}>
+                        <td style={{ whiteSpace: "nowrap" }}>{fmtDate(r.month, "MMM yyyy")}</td>
+                        <td className="r">{egp(r.revenue)}</td>
+                        <td className="r" style={{ color: "var(--dim)" }}>−{egp(r.rent)}</td>
+                        <td className="r" style={{ color: "var(--dim)" }}>−{egp(r.charge)}{r.other ? ` −${egp(r.other)}` : ""}</td>
+                        <td className="r" style={{ fontWeight: 700 }}>{egp(r.netExpected)}</td>
+                        <td className="r">{r.chequeReceived != null ? egp(r.chequeReceived) : <span style={{ color: "var(--faint)" }}>— none —</span>}</td>
+                        <td className="r" style={{ color: r.difference == null ? "var(--faint)" : ok ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
+                          {r.difference == null ? "—" : `${r.difference >= 0 ? "+" : "−"}${egp(Math.abs(r.difference))}`}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ textTransform: "capitalize", color: STATUS_COLOR[r.status] ?? "var(--dim)", fontWeight: 600, fontSize: 12.5 }}>{r.status}</span>
+                            {r.status !== "reconciled" && r.chequeReceived != null && (
+                              <>
+                                {r.status === "open" && <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatus.mutate({ id: r.id, status: "received" })}>Mark received</button>}
+                                <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatus.mutate({ id: r.id, status: "reconciled" })}>Reconcile</button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {rows.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--faint)", padding: 28 }}>No settlement periods yet.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </DeckTile>
+        </>
+      )}
     </div>
   );
 }

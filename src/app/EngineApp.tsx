@@ -45,6 +45,7 @@ const MissingScreen = L(dash, "MissingScreen");
 const ActivityScreen = L(dash, "ActivityScreen");
 const MoneyScreen = L(money, "MoneyScreen");
 const ChequesScreen = L(money, "ChequesScreen");
+const SettlementsScreen = L(money, "SettlementsScreen");
 const ExpensesScreen = L(money, "ExpensesScreen");
 const ReportsScreen = L(more, "ReportsScreen");
 const SystemCheckScreen = L(more, "SystemCheckScreen");
@@ -86,7 +87,7 @@ const EL: Record<string, React.ReactNode> = {
   "/dashboard": <DashboardScreen />,
   "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <ProductLineImportScreen />,
   "/stock": <StockScreen />, "/purchases": <PurchasesScreen />, "/costs": <ProductCostImportScreen />,
-  "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
+  "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/settlements": <SettlementsScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
   "/health": <HealthScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
   "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/settings/opening": <OpeningBalancesScreen />, "/settings/history": <HistoryImportScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
