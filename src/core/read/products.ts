@@ -35,6 +35,15 @@ export async function getSearchableProducts(): Promise<(SearchableProduct & { ac
   return (pRes.data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, aliases: aliasByP.get(p.id) ?? [], active: p.active }));
 }
 
+/** Products with their POS item code, for the vision-direct day-sales importer's
+ *  exact code matching. name_ar/name_en come along for the review display. */
+export async function getCodedProducts(): Promise<{ id: string; nameEn: string; nameAr: string | null; posCode: string | null }[]> {
+  const { data, error } = await requireEngine()
+    .from("products").select("id,name_en,name_ar,pos_code").order("name_en");
+  if (error) throw error;
+  return (data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, posCode: p.pos_code }));
+}
+
 export interface ProductProfit {
   productId: string;
   name: string;
