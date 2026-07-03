@@ -334,6 +334,14 @@ export async function recordCashCount(accountId: string, counted: number, date: 
 export async function openSettlementPeriod(locationId: string, month: string): Promise<string> {
   return await ensureMonthlySettlementPeriod(locationId, month);
 }
+/** Admin-triggered settlement period status transition (open → received →
+ *  reconciled). Status-only update — no trigger recomputes revenue/deductions/
+ *  net_expected on it, so the cached financial totals are untouched. */
+export async function setSettlementStatus(periodId: string, status: Enums<"settlement_status">): Promise<void> {
+  const { error } = await requireEngine().from("settlement_periods")
+    .update({ status }).eq("id", periodId).is("voided_at", null);
+  if (error) throw error;
+}
 export interface ChequeInput {
   periodId: string; expected: number; received: number | null;
   receivedDate: string | null; status: ChequeStatus; notes: string | null;
