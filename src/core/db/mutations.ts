@@ -208,12 +208,20 @@ export async function createSale(input: SaleInput): Promise<string> {
 
 export interface SaleItemInput { saleId: string; productId: string; qty: number; unitPrice: number; lineTotal: number; notes: string | null; }
 
-/** Add a product line → deducts stock + snapshots COGS + reconciles the day (RPC). */
-export async function addSaleItem(i: SaleItemInput): Promise<void> {
-  await rpcCreateSaleItem({
+/** Add a product line → deducts stock + snapshots COGS + reconciles the day (RPC).
+ *  Optional `verification` records provenance/confidence (photo-derived lines are
+ *  'unverified'/'estimated' until confirmed). It's a provenance-only column update
+ *  on THIS new row — no trigger recomputes on it, so the money math is untouched;
+ *  the RPC's default 'verified' is preserved when nothing is passed. */
+export async function addSaleItem(i: SaleItemInput, verification?: Enums<"verification_status">): Promise<void> {
+  const id = await rpcCreateSaleItem({
     p_sale_id: i.saleId, p_product_id: i.productId, p_raw_product_name: "",
     p_quantity: i.qty, p_unit_price: i.unitPrice, p_line_total: i.lineTotal, p_notes: i.notes ?? "",
   });
+  if (verification && verification !== "verified" && typeof id === "string") {
+    const { error } = await requireEngine().from("sale_items").update({ verification }).eq("id", id);
+    if (error) throw error;
+  }
 }
 
 /** Edit a line → reverses old movement, reapplies new at current weighted cost (RPC). */

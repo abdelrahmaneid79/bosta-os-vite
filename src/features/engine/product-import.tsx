@@ -23,7 +23,7 @@ import {
   type ProductLineMap, type ClassifiedLine,
 } from "@/core/import/product-lines";
 import { parseOcrProductLines } from "@/core/import/ocr-lines";
-import { readDayReportPhoto } from "@/core/import/day-report-ai";
+import { readDayReportPhoto, DayReportAuthError } from "@/core/import/day-report-ai";
 import { detectCostMap, parseCosts, classifyCosts, summarizeCosts, type CostMap } from "@/core/import/product-costs";
 import { applyProductCosts } from "@/core/db/mutations";
 import type { Row } from "@/core/import/csv";
@@ -34,6 +34,23 @@ const FIELDS: { key: keyof ProductLineMap; label: string }[] = [
   { key: "barcode", label: "Barcode" }, { key: "product", label: "Product name" }, { key: "qty", label: "Quantity sold" },
   { key: "unitPrice", label: "Unit price" }, { key: "lineTotal", label: "Line total (net value)" }, { key: "date", label: "Date column (optional)" },
 ];
+
+/** Line confidence, persisted to sale_items.verification. Structured import
+ *  (CSV/Excel) or a user-assigned product = verified; photo-derived auto-matches
+ *  are unverified until confirmed; lines whose price/total don't reconcile are
+ *  estimated. Minimal by design (charter): enum + badge + this default, no rule engine. */
+type Conf = "verified" | "unverified" | "estimated";
+function confidenceOf(l: { qty: number | null; unitPrice: number | null; lineTotal: number | null }, fromPhoto: boolean, userAssigned: boolean): Conf {
+  if (!fromPhoto || userAssigned) return "verified";
+  const { qty: q, unitPrice: p, lineTotal: t } = l;
+  const reconciles = q != null && p != null && t != null && Math.abs(q * p - t) <= Math.max(1, 0.02 * Math.abs(t));
+  return reconciles ? "unverified" : "estimated";
+}
+const CONF_STYLE: Record<Conf, string> = {
+  verified: "bg-good/15 text-good",
+  unverified: "bg-white/[0.06] text-muted",
+  estimated: "bg-warn/15 text-warn",
+};
 
 /** Read any sheet to a raw 2-D array (rows × cells), so the parser can locate the
  *  real header row beneath the POS metadata. */
@@ -59,10 +76,28 @@ export function ProductLineImportScreen() {
   const [ocrStatus, setOcrStatus] = useState("");            // OCR progress text
   const [ocrText, setOcrText] = useState("");                // what the reader saw
   const [photoTotal, setPhotoTotal] = useState<number | null>(null); // day total printed on the photo
+  const [fromPhoto, setFromPhoto] = useState(false);         // photo/AI-derived → confidence applies
 
   const prods = useQuery({ queryKey: ["searchable-products"], queryFn: getSearchableProducts, enabled: en });
   const index = useMemo(() => buildIndex(prods.data ?? []), [prods.data]);
   const nameById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.nameEn])), [prods.data]);
+
+  // The most recent sale day that has NO product lines yet — the one to capture
+  // next. Prefills the date and headlines the upload card (daily habit = one tap).
+  const missingDay = useQuery({
+    queryKey: ["recent-day-missing-lines"], enabled: en,
+    queryFn: async (): Promise<string | null> => {
+      const sb = requireEngine();
+      const days = await sb.from("sales").select("id,sale_date").is("voided_at", null).order("sale_date", { ascending: false }).limit(90);
+      if (days.error) throw days.error;
+      const ids = (days.data ?? []).map((d) => d.id);
+      if (!ids.length) return null;
+      const items = await sb.from("sale_items").select("sale_id").is("voided_at", null).in("sale_id", ids);
+      if (items.error) throw items.error;
+      const withLines = new Set((items.data ?? []).map((i) => i.sale_id));
+      return (days.data ?? []).find((d) => !withLines.has(d.id))?.sale_date ?? null;
+    },
+  });
 
   const classified = useMemo(() => {
     if (!rows || !map) return [];
@@ -71,8 +106,12 @@ export function ProductLineImportScreen() {
     return classifyLines(parsed, (raw, barcode) => {
       const m = (barcode && autoMatch(barcode, index)) || (raw && autoMatch(raw, index)) || null;
       return m ? { id: m.id, name: m.nameEn } : null;
-    }).map((l, i) => assign[i] ? { ...l, productId: assign[i], matchedName: nameById.get(assign[i]) ?? "", status: "ready" as const } : l);
-  }, [rows, map, dayDate, index, assign, nameById]);
+    }).map((l, i) => {
+      const userAssigned = !!assign[i];
+      const base = userAssigned ? { ...l, productId: assign[i], matchedName: nameById.get(assign[i]) ?? "", status: "ready" as const } : l;
+      return { ...base, confidence: confidenceOf(base, fromPhoto, userAssigned) };
+    });
+  }, [rows, map, dayDate, index, assign, nameById, fromPhoto]);
   const sum = summarize(classified);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -80,6 +119,7 @@ export function ProductLineImportScreen() {
     e.target.value = "";
     setFileName(f.name); setResult(null); setAssign({}); setImgUrl(null); setOcrText(""); setPhotoTotal(null);
     const done = (grid: unknown[][]) => {
+      setFromPhoto(false); // structured file → lines are verified provenance
       const sheet = parseSheet(grid);
       setRows(sheet.rows); setHeaders(sheet.headers); setMap(detectLineMap(sheet.headers));
       setDayDate(sheet.date ?? "");
@@ -87,7 +127,7 @@ export function ProductLineImportScreen() {
     // Photo of the POS daily report → AI vision reader (accurate) → editable rows;
     // falls back to on-device OCR if the vision function isn't available.
     if (/\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(f.name) || f.type.startsWith("image/")) {
-      setImgUrl(URL.createObjectURL(f));
+      setImgUrl(URL.createObjectURL(f)); setFromPhoto(true); // AI/OCR-derived → confidence applies
       // load each row into the editable preview; returns how many lines it built
       const apply = (lines: { name: string; barcode: string; qty: number | null; price: number | null; total: number | null }[], date: string | null, dayTotal: number | null) => {
         const built: Row[] = lines.map((l) => ({
@@ -97,7 +137,7 @@ export function ProductLineImportScreen() {
         setRows(built);
         setHeaders(["product", "barcode", "qty", "price", "total"]);
         setMap({ date: "", barcode: "barcode", product: "product", qty: "qty", unitPrice: "price", lineTotal: "total" });
-        setDayDate(date ?? "");
+        setDayDate(date ?? missingDay.data ?? ""); // fall back to the day that needs lines
         setPhotoTotal(dayTotal);
         return built.length;
       };
@@ -108,7 +148,13 @@ export function ProductLineImportScreen() {
         setOcrStatus("");
         setOcrText(`AI reader · ${ai.lines.length} line(s) detected`);
         if (apply(ai.lines, ai.date, ai.dayTotal) > 0) return;
-      } catch { /* vision unavailable — fall through to on-device OCR */ }
+      } catch (err) {
+        // Surface WHY the AI reader failed instead of silently degrading — an
+        // auth/config error is a real problem the owner must see, not hide behind
+        // the weaker on-device reader.
+        const msg = err instanceof DayReportAuthError ? err.message : `AI reader unavailable (${(err as Error)?.message ?? "error"})`;
+        setOcrText(`⚠ ${msg} — falling back to the on-device reader.`);
+      }
       // 2) Fallback: on-device OCR (Arabic + English)
       try {
         setOcrStatus("Reading photo (on-device)…");
@@ -133,7 +179,7 @@ export function ProductLineImportScreen() {
   const approve = useMutation({
     mutationFn: async () => {
       const sb = requireEngine();
-      const ready = classified.filter((l) => l.status === "ready") as (ClassifiedLine & { date: string; productId: string })[];
+      const ready = classified.filter((l) => l.status === "ready") as (ClassifiedLine & { date: string; productId: string; confidence: Conf })[];
       if (!ready.length) throw new Error("Nothing ready to import.");
       const dates = [...new Set(ready.map((l) => l.date))];
       const [locs, chans, existing] = await Promise.all([
@@ -162,7 +208,10 @@ export function ProductLineImportScreen() {
         const key = `${saleId}|${l.productId}|${l.qty}|${l.lineTotal}`;
         if (seen.has(key)) { skipped++; continue; }
         try {
-          await addSaleItem({ saleId, productId: l.productId, qty: l.qty ?? 0, unitPrice: l.unitPrice ?? (l.qty ? (l.lineTotal ?? 0) / l.qty : 0), lineTotal: l.lineTotal ?? 0, notes: null });
+          await addSaleItem(
+            { saleId, productId: l.productId, qty: l.qty ?? 0, unitPrice: l.unitPrice ?? (l.qty ? (l.lineTotal ?? 0) / l.qty : 0), lineTotal: l.lineTotal ?? 0, notes: null },
+            l.confidence, // provenance: verified / unverified / estimated
+          );
           seen.add(key); created++;
         } catch { failed++; }
       }
@@ -186,7 +235,8 @@ export function ProductLineImportScreen() {
               Choose photo or file<input type="file" accept=".csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,image/*" className="hidden" onChange={onFile} />
             </label>
             {ocrStatus && <p className="text-[12px] font-medium text-pink">{ocrStatus}</p>}
-            <p className="max-w-md text-[12px] text-dim">One report = one day. It reads each product line (name/barcode → product, quantity, price, line total) and the day's grand total, then queues anything unmatched for you to map. Photos are read on-device; nothing saves until you approve.</p>
+            {missingDay.data && <p className="text-[12px] font-semibold text-pink">Next up: {fmtDate(missingDay.data)} has no product lines yet — snap that day's report.</p>}
+            <p className="max-w-md text-[12px] text-dim">One report = one day. It reads each product line (name/barcode → product, quantity, price, line total) and the day's grand total, then queues anything unmatched for you to map. Nothing saves until you approve.</p>
           </div>
         </Card>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
@@ -264,6 +314,7 @@ export function ProductLineImportScreen() {
                   <span dir="auto" className="min-w-0 flex-1 truncate text-text">{l.rawName || "—"}{l.matchedName && l.matchedName !== l.rawName ? <span className="text-dim"> → {l.matchedName}</span> : ""}</span>
                   <span className="tnum w-24 flex-shrink-0 text-right text-dim">{l.qty ?? "—"} × {l.unitPrice != null ? egp(l.unitPrice) : "—"}</span>
                   <span className="tnum w-20 flex-shrink-0 text-right font-display font-bold text-text">{l.lineTotal != null ? egp(l.lineTotal) : "—"}</span>
+                  {l.status === "ready" && <span className={`flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${CONF_STYLE[l.confidence]}`}>{l.confidence}</span>}
                   {l.status === "unmapped" && (
                     <div className="w-full sm:w-64">
                       <ProductPicker value={assign[i] ?? ""} onChange={(id) => setAssign((a) => ({ ...a, [i]: id }))} />
