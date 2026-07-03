@@ -67,12 +67,12 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
     const rel = ((clientX - r.left) / r.width - padL / W) / (plotW / W);
     setHover(Math.max(0, Math.min(vals.length - 1, Math.round(rel * (vals.length - 1)))));
   };
-  const onMove = (e: React.MouseEvent) => setFromX(e.clientX);
-  const onTouch = (e: React.TouchEvent) => { const t = e.touches[0]; if (t) setFromX(t.clientX); };
+  // ONE pointer handler = smooth mouse hover AND touch-drag scrubbing.
+  const onPoint = (e: React.PointerEvent) => setFromX(e.clientX);
   const hp = hover != null ? d[hover] : null;
   const xStep = Math.max(1, Math.ceil(vals.length / 6));
   const chart = (
-    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair", touchAction: "pan-y" }} onMouseMove={onMove} onMouseLeave={() => setHover(null)} onTouchStart={onTouch} onTouchMove={onTouch} onTouchEnd={() => setHover(null)}>
+    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair", touchAction: "pan-y" }} onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
       <svg className="chsvg" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
         <defs>
           <linearGradient id={`gf_${id}`} x1="0" y1="0" x2="0" y2="1">

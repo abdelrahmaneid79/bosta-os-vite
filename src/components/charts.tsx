@@ -80,16 +80,16 @@ export function BarChart({ data, height = 240, color = PINK, unit = "EGP", maxLa
   const ticks = 4;
   const labelEvery = Math.ceil(n / maxLabels);
   const cx = (i: number) => PL + i * bw + bw / 2;
-  // Touch swipe = hover: drag a finger across to scrub the tooltip like a mouse.
-  const onTouch = (e: React.TouchEvent) => {
-    const t = e.touches[0], r = ref.current?.getBoundingClientRect();
-    if (!t || !r || plotW <= 0) return;
-    setHover(Math.max(0, Math.min(n - 1, Math.floor((t.clientX - r.left - PL) / bw))));
+  // ONE pointer handler = smooth mouse hover AND touch-drag scrubbing.
+  const onPoint = (e: React.PointerEvent) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r || plotW <= 0) return;
+    setHover(Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left - PL) / bw))));
   };
 
   return (
-    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }} onMouseLeave={() => setHover(null)}
-      onTouchStart={onTouch} onTouchMove={onTouch} onTouchEnd={() => setHover(null)}>
+    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }}
+      onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
       {W > 0 && (
         <svg width={W} height={H} className="block">
           <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={1} /><stop offset="100%" stopColor={color} stopOpacity={0.5} /></linearGradient></defs>
@@ -148,16 +148,16 @@ export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "r
   const gap = Math.max(2, gw * 0.06);
   const ticks = 4;
   const cx = (i: number) => PL + i * gw + gw / 2;
-  // Touch swipe = hover: drag a finger across to scrub the tooltip like a mouse.
-  const onTouch = (e: React.TouchEvent) => {
-    const t = e.touches[0], r = ref.current?.getBoundingClientRect();
-    if (!t || !r || plotW <= 0) return;
-    setHover(Math.max(0, Math.min(n - 1, Math.floor((t.clientX - r.left - PL) / gw))));
+  // ONE pointer handler = smooth mouse hover AND touch-drag scrubbing.
+  const onPoint = (e: React.PointerEvent) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r || plotW <= 0) return;
+    setHover(Math.max(0, Math.min(n - 1, Math.floor((e.clientX - r.left - PL) / gw))));
   };
 
   return (
-    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }} onMouseLeave={() => setHover(null)}
-      onTouchStart={onTouch} onTouchMove={onTouch} onTouchEnd={() => setHover(null)}>
+    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }}
+      onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
       {W > 0 && (
         <svg width={W} height={H} className="block">
           <defs>
@@ -225,14 +225,13 @@ export function LineChart({ data, height = 240, color = TEAL, unit = "EGP", area
     const r = ref.current?.getBoundingClientRect(); if (!r || plotW <= 0) return;
     setHover(Math.max(0, Math.min(n - 1, Math.round(((clientX - r.left - PL) / plotW) * (n - 1)))));
   };
-  const onMove = (e: React.MouseEvent) => setFromX(e.clientX);
-  // Touch swipe = hover: drag a finger across to scrub the crosshair like a mouse.
-  const onTouch = (e: React.TouchEvent) => { const t = e.touches[0]; if (t) setFromX(t.clientX); };
+  // ONE pointer handler = smooth mouse hover AND touch-drag scrubbing.
+  const onPoint = (e: React.PointerEvent) => setFromX(e.clientX);
   const hp = hover != null ? data[hover] : null;
 
   return (
-    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}
-      onTouchStart={onTouch} onTouchMove={onTouch} onTouchEnd={() => setHover(null)}>
+    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }}
+      onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
       {W > 0 && (
         <svg width={W} height={H} className="block">
           <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={0.3} /><stop offset="100%" stopColor={color} stopOpacity={0} /></linearGradient></defs>
@@ -297,7 +296,7 @@ export function DonutChart({ data, size = 230, unit = "EGP" }: {
               transform={`translate(${Math.cos(a.mid) * push} ${Math.sin(a.mid) * push})`}
               opacity={hover == null || hover === i ? 1 : 0.4}
               style={{ transition: `transform .2s ${EASE}, opacity .15s linear`, cursor: "default" }}
-              onMouseEnter={() => setHover(i)} />;
+              onMouseEnter={() => setHover(i)} onPointerDown={() => setHover(i)} />;
           })}
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
@@ -331,7 +330,7 @@ export function HBars({ data, color = PINK, format }: {
   return (
     <div className="space-y-2">
       {data.map((d, i) => (
-        <div key={i} className="flex items-center gap-3" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
+        <div key={i} className="flex items-center gap-3" style={{ touchAction: "pan-y" }} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onPointerDown={() => setHover(i)}>
           <span dir="auto" className="w-28 flex-shrink-0 truncate text-right text-[12.5px] font-medium text-muted">{d.label}</span>
           <div className="h-6 flex-1 overflow-hidden rounded-lg bg-panel2">
             <div className="h-full rounded-lg" style={{ width: shown ? `${Math.max(2, (d.value / max) * 100)}%` : "0%", background: color, opacity: hover == null || hover === i ? 1 : 0.5, transition: `width .6s ${EASE} ${i * 30}ms, opacity .15s linear` }} />
