@@ -38,7 +38,17 @@
 .cdk .qadd{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--mag),var(--violet));color:#fff;border:none;border-radius:13px;height:44px;padding:0 16px;font-family:'Satoshi',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 10px 24px -8px rgba(255,61,168,.7);transition:transform .15s,filter .15s}
 .cdk .qadd:hover{filter:brightness(1.08)} .cdk .qadd:active{transform:scale(.97)} .cdk .qadd svg{width:16px;height:16px}
 @media (max-width:860px){ .cdk .navpill{display:none} .cdk .wmtxt small{display:none} }
-@media (max-width:520px){ .cdk .qadd span,.cdk .qadd{font-size:0} .cdk .qadd svg{font-size:16px} }
+/* Below md (767px): the nav pills are gone, so push the topbar actions to the
+   RIGHT edge — logo left, Quick-add + bell as a balanced cluster right. Scoped
+   under 768px so desktop is untouched. */
+@media (max-width:767px){ .cdk .topbar .qadd{ margin-left:auto } }
+/* On phones the TOPBAR Quick-add becomes a clean 44×44 icon button that matches
+   the bell (its label is a text node, so font-size:0 hides it, icon stays).
+   Page-level .qadd buttons KEEP their labels — no more pink icon-blobs. */
+@media (max-width:520px){
+  .cdk .topbar .qadd{ width:44px; padding:0; gap:0; font-size:0 }
+  .cdk .topbar .qadd svg{ width:18px; height:18px }
+}
 
 /* ticker */
 .cdk .ticker{display:flex;align-items:stretch;background:rgba(255,255,255,.03);border:1px solid var(--stroke2);border-radius:18px;padding:4px;margin-bottom:20px;overflow:hidden;flex-wrap:wrap}
