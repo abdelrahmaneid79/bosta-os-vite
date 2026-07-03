@@ -203,9 +203,13 @@ export async function runSeedImport(
       onProgress?.({ phase: "products", done: ++done, total: bundle.products.length });
       if (seen.has(p.nameAr.toLowerCase())) { report.products.skipped++; continue; }
       try {
+        // Bosta Bites sells by weight: seed weight/kg (stock + sale unit = kg,
+        // factor 1), NOT count/piece. A few genuinely per-piece items are
+        // re-tagged afterwards in the catalog. The name carries "قطعه" for the
+        // rare piece items — but that's an owner review call, not an import guess.
         const id = await createProduct({
-          nameEn: p.nameAr, nameAr: p.nameAr, unitType: "count", baseUnit: "piece",
-          saleUnit: null, sellingPrice: p.avgPrice, lowStock: null, active: true,
+          nameEn: p.nameAr, nameAr: p.nameAr, unitType: "weight", baseUnit: "kg",
+          saleUnit: "kg", sellingPrice: p.avgPrice, lowStock: null, active: true,
         });
         if (p.barcode) { try { await addAlias(id, p.barcode, "barcode", "seed"); } catch { /* alias is best-effort */ } }
         seen.add(p.nameAr.toLowerCase()); report.products.created++;
