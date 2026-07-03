@@ -60,15 +60,19 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
   const line = smoothPath(pts);
   const baseY = padT + plotH;
   const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${baseY.toFixed(1)} L${pts[0].x.toFixed(1)},${baseY.toFixed(1)} Z`;
-  const onMove = (e: React.MouseEvent) => {
+  // Map a client X to the nearest data point — shared by mouse hover and touch
+  // swipe so dragging a finger across the chart scrubs exactly like hovering.
+  const setFromX = (clientX: number) => {
     const r = ref.current?.getBoundingClientRect(); if (!r) return;
-    const rel = ((e.clientX - r.left) / r.width - padL / W) / (plotW / W);
+    const rel = ((clientX - r.left) / r.width - padL / W) / (plotW / W);
     setHover(Math.max(0, Math.min(vals.length - 1, Math.round(rel * (vals.length - 1)))));
   };
+  const onMove = (e: React.MouseEvent) => setFromX(e.clientX);
+  const onTouch = (e: React.TouchEvent) => { const t = e.touches[0]; if (t) setFromX(t.clientX); };
   const hp = hover != null ? d[hover] : null;
   const xStep = Math.max(1, Math.ceil(vals.length / 6));
   const chart = (
-    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair" }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair", touchAction: "pan-y" }} onMouseMove={onMove} onMouseLeave={() => setHover(null)} onTouchStart={onTouch} onTouchMove={onTouch} onTouchEnd={() => setHover(null)}>
       <svg className="chsvg" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
         <defs>
           <linearGradient id={`gf_${id}`} x1="0" y1="0" x2="0" y2="1">
