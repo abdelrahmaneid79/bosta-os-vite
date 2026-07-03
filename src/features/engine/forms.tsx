@@ -47,7 +47,10 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
   const [nameEn, setNameEn] = useState(product?.name_en ?? "");
   const [nameAr, setNameAr] = useState(product?.name_ar ?? "");
   const [unitType, setUnitType] = useState<"weight" | "count">((product?.unit_type as "weight" | "count") ?? "weight");
-  const [baseUnit, setBaseUnit] = useState(product?.base_unit ?? "g");
+  // Weight business: default new products to kg for BOTH stock and sale units
+  // (matches the POS, which reports kg like 1.115; numeric(14,3) keeps gram
+  // precision). Count products override to piece.
+  const [baseUnit, setBaseUnit] = useState(product?.base_unit ?? "kg");
   const [saleUnit, setSaleUnit] = useState(product?.sale_unit ?? "kg");
   const [price, setPrice] = useState(product?.selling_price != null ? String(product.selling_price) : "");
   const [low, setLow] = useState(product?.low_stock_threshold != null ? String(product.low_stock_threshold) : "");
@@ -88,7 +91,7 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
         <Field label="Sale unit"><Input value={saleUnit} onChange={(e) => setSaleUnit(e.target.value)} placeholder={unitType === "weight" ? "kg" : "piece"} /></Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Base unit"><Input value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} placeholder={unitType === "weight" ? "g" : "piece"} /></Field>
+        <Field label="Base unit"><Input value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} placeholder={unitType === "weight" ? "kg" : "piece"} /></Field>
         <Field label="Sale price (EGP)"><Input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -146,6 +149,8 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
   });
 
   const ready = productId && (num(qty) ?? 0) > 0 && (num(unitCost) ?? 0) >= 0 && loc;
+  // Stock is kept in the product's base unit (kg for weight goods, piece for count).
+  const bu = (products.data ?? []).find((p) => p.id === productId)?.base_unit || "unit";
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-3">
       {!loc && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No active location found — set one up in Supabase first.</div>}
@@ -153,14 +158,14 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
         <ProductPicker value={productId} onChange={setProductId} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Quantity (base units)"><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g. 5000 g" /></Field>
-        <Field label="Unit cost (EGP / base unit)"><Input type="number" step="any" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} /></Field>
+        <Field label={`Quantity (${bu})`}><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} placeholder={bu === "kg" ? "e.g. 5" : "e.g. 20"} /></Field>
+        <Field label={`Unit cost (EGP / ${bu})`}><Input type="number" step="any" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} /></Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Supplier / note"><Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Bebeto" /></Field>
         <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       </div>
-      <p className="text-[11px] text-dim">Quantity is in base units ({(products.data ?? []).find((p) => p.id === productId)?.base_unit ?? "g"}). This increases stock and recomputes weighted-average cost.</p>
+      <p className="text-[11px] text-dim">Quantity is in {bu} (the product's stock unit). This increases stock and recomputes weighted-average cost.</p>
       {date < todayCairo() && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Backdated purchase — sales recorded <b>after</b> this date already captured their cost at the time and won't change. Going forward, weighted-average cost reflects this batch.</p>}
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Add purchase"}</Button>
     </form>
