@@ -46,8 +46,8 @@
    the bell (its label is a text node, so font-size:0 hides it, icon stays).
    Page-level .qadd buttons KEEP their labels — no more pink icon-blobs. */
 @media (max-width:520px){
-  .cdk .topbar .qadd{ width:44px; padding:0; gap:0; font-size:0 }
-  .cdk .topbar .qadd svg{ width:18px; height:18px }
+  .cdk .topbar .qadd{ width:44px; padding:0; gap:0; font-size:0; justify-content:center; align-items:center }
+  .cdk .topbar .qadd svg{ width:20px; height:20px }
 }
 
 /* ticker */
