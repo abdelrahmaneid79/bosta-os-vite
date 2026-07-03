@@ -38,7 +38,17 @@
 .cdk .qadd{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--mag),var(--violet));color:#fff;border:none;border-radius:13px;height:44px;padding:0 16px;font-family:'Satoshi',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 10px 24px -8px rgba(255,61,168,.7);transition:transform .15s,filter .15s}
 .cdk .qadd:hover{filter:brightness(1.08)} .cdk .qadd:active{transform:scale(.97)} .cdk .qadd svg{width:16px;height:16px}
 @media (max-width:860px){ .cdk .navpill{display:none} .cdk .wmtxt small{display:none} }
-@media (max-width:520px){ .cdk .qadd span,.cdk .qadd{font-size:0} .cdk .qadd svg{font-size:16px} }
+/* Below md (767px): the nav pills are gone, so push the topbar actions to the
+   RIGHT edge — logo left, Quick-add + bell as a balanced cluster right. Scoped
+   under 768px so desktop is untouched. */
+@media (max-width:767px){ .cdk .topbar .qadd{ margin-left:auto } }
+/* On phones the TOPBAR Quick-add becomes a clean 44×44 icon button that matches
+   the bell (its label is a text node, so font-size:0 hides it, icon stays).
+   Page-level .qadd buttons KEEP their labels — no more pink icon-blobs. */
+@media (max-width:520px){
+  .cdk .topbar .qadd{ width:44px; padding:0; gap:0; font-size:0; justify-content:center; align-items:center }
+  .cdk .topbar .qadd svg{ width:20px; height:20px }
+}
 
 /* ticker */
 .cdk .ticker{display:flex;align-items:stretch;background:rgba(255,255,255,.03);border:1px solid var(--stroke2);border-radius:18px;padding:4px;margin-bottom:20px;overflow:hidden;flex-wrap:wrap}
@@ -235,3 +245,35 @@
 @keyframes cdk-lndraw{from{stroke-dashoffset:1}}
 @keyframes cdk-arfade{from{opacity:0}}
 @keyframes cdk-sweep{from{stroke-dasharray:0 999}}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE (< md / 768px) — phone layout fixes ONLY. Everything here is scoped
+   to max-width:767px, so desktop (>=768px) rendering is untouched.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media (max-width:767px){
+  /* #1 The core bug: grid/flex children default to min-width:auto and refuse to
+     shrink below their content, so a wide child (a bar chart, a long number)
+     stretches its tile past the viewport and the whole PAGE scrolls sideways.
+     Letting them shrink keeps every tile within the screen. */
+  .cdk .tile,
+  .cdk .deckgrid>*, .cdk .statgrid>*, .cdk .row2>*, .cdk .bh>*, .cdk .perf>*{ min-width:0; }
+
+  /* #2 A too-wide bar chart scrolls WITHIN its tile instead of the page; bars
+     keep a tap-friendly floor so a busy month stays readable. */
+  .cdk .mbars{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .cdk .mbar{ min-width:30px; }
+
+  /* #3 Roomier-for-thumbs but tighter-for-width tiles + headers on phones. */
+  .cdk .tile{ padding:18px; border-radius:22px; }
+  .cdk .pagehdr h1{ font-size:24px; }
+  .cdk .pagehdr{ gap:8px; margin-bottom:16px; }
+
+  /* #4 Data tables: tighter cells so more columns fit; the .scroll wrapper still
+     gives horizontal scroll within the tile (never the page). */
+  .cdk .tbl th, .cdk .tbl td{ padding-left:11px; padding-right:11px; }
+  .cdk .tbl td{ font-size:13px; }
+  .cdk .etbl th, .cdk .etbl td{ padding-left:10px; padding-right:10px; }
+
+  /* #5 Segmented range/tab controls wrap instead of overflowing. */
+  .cdk .seg, .cdk .subtabs{ flex-wrap:wrap; }
+}

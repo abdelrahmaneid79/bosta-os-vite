@@ -86,15 +86,15 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
     <form onSubmit={(e) => { e.preventDefault(); if (!nameEn.trim()) return; m.mutate(); }} className="space-y-3">
       <Field label="Name (English)"><Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="Mixed nuts" required /></Field>
       <Field label="Name (Arabic / POS)"><Input dir="rtl" value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مكسرات مشكلة" /></Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Sold by"><Select value={unitType} onChange={(e) => setUnitType(e.target.value as "weight" | "count")}><option value="weight">Weight</option><option value="count">Count</option></Select></Field>
         <Field label="Sale unit"><Input value={saleUnit} onChange={(e) => setSaleUnit(e.target.value)} placeholder={unitType === "weight" ? "kg" : "piece"} /></Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Base unit"><Input value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} placeholder={unitType === "weight" ? "kg" : "piece"} /></Field>
         <Field label="Sale price (EGP)"><Input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Low-stock alert (base units)"><Input type="number" step="any" value={low} onChange={(e) => setLow(e.target.value)} /></Field>
         <Field label="Unit cost (EGP, COGS)"><Input type="number" step="any" value={refCost} onChange={(e) => setRefCost(e.target.value)} placeholder="cost / unit" /></Field>
       </div>
@@ -157,11 +157,11 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
       <Field label="Product">
         <ProductPicker value={productId} onChange={setProductId} />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label={`Quantity (${bu})`}><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} placeholder={bu === "kg" ? "e.g. 5" : "e.g. 20"} /></Field>
         <Field label={`Unit cost (EGP / ${bu})`}><Input type="number" step="any" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} /></Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Supplier / note"><Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Bebeto" /></Field>
         <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       </div>
@@ -222,6 +222,8 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
 
   const ready = !!loc && !!ch && !!date && (validLines.length > 0 || otherNum > 0);
   const cellInput = "w-full rounded-lg border border-transparent bg-transparent px-2 py-2 text-right text-sm tnum text-text outline-none transition placeholder:text-faint focus:border-pink/40 focus:bg-white/[0.04]";
+  // Phone: bordered, 44px-tall inputs (clear tap targets) since there's no table grid.
+  const cardInput = "w-full rounded-lg border border-line bg-panel2 px-3 py-2.5 text-right text-sm tnum text-text outline-none transition placeholder:text-faint focus:border-pink/50";
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (ready) m.mutate(); }} className="space-y-4">
       {(!loc || !ch) && <div className="rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">No active location/channel found — set one up in Supabase first.</div>}
@@ -240,7 +242,30 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
       <div>
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-dim">Products sold</div>
         <div className="rounded-2xl border border-line">
-          <table className="w-full">
+          {/* Phone (< sm): each line is a stacked card — no horizontal scroll,
+              full-width product search, thumb-sized inputs. */}
+          <div className="space-y-3 p-3 sm:hidden">
+            {lines.map((l) => (
+              <div key={l.key} className="space-y-2.5 rounded-xl border border-line bg-white/[0.02] p-3">
+                <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1"><ProductPicker bare value={l.productId} onChange={(id) => pickProduct(l.key, id)} /></div>
+                  {lines.length > 1 && <button type="button" onClick={() => removeLine(l.key)} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-line text-dim transition hover:text-bad" title="Remove">✕</button>}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-dim">Qty</span>
+                    <input inputMode="decimal" placeholder="0" value={l.qty} onChange={(e) => setLine(l.key, { qty: e.target.value })} className={cardInput} /></label>
+                  <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-dim">Unit price</span>
+                    <input inputMode="decimal" placeholder="0" value={l.price} onChange={(e) => setLine(l.key, { price: e.target.value })} className={cardInput} /></label>
+                </div>
+                <div className="flex items-center justify-between border-t border-line/60 pt-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">Line total</span>
+                  <span className="tnum font-display text-sm font-bold text-text">{lineTotal(l) > 0 ? egp(lineTotal(l)) : <span className="text-faint">—</span>}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {/* Tablet/desktop (>= sm): the spreadsheet table, unchanged. */}
+          <table className="hidden w-full sm:table">
             <thead>
               <tr className="border-b border-line text-[10.5px] uppercase tracking-wider text-dim">
                 <th className="px-3 py-2.5 text-left font-bold">Product</th>
@@ -313,7 +338,7 @@ export function SaleItemForm({ saleId, item, onDone }: { saleId: string; item?: 
       <Field label="Product">
         <ProductPicker value={productId} onChange={onPickProduct} />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label={`Quantity (${qtyUnit})`}><Input type="number" step="any" value={qty} onChange={(e) => setQty(e.target.value)} /></Field>
         <Field label={`Unit price (EGP / ${qtyUnit})`}><Input type="number" step="any" value={price} onChange={(e) => setPrice(e.target.value)} /></Field>
       </div>
@@ -359,12 +384,12 @@ export function ExpenseForm({ onDone }: { onDone?: () => void }) {
         </Select>
       </Field>
       {!categoryId && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="…or new category"><Input value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="Rent" /></Field>
           <Field label="Type"><Select value={newCatOperating ? "op" : "inv"} onChange={(e) => setNewCatOperating(e.target.value === "op")}><option value="op">Operating cost</option><option value="inv">Inventory (cost of goods)</option></Select></Field>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Amount (EGP)"><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
         <Field label="Payment"><Select value={pay} onChange={(e) => setPay(e.target.value as Enums<"payment_method">)}>{PAYMENTS.map((p) => <option key={p} value={p}>{p}</option>)}</Select></Field>
       </div>

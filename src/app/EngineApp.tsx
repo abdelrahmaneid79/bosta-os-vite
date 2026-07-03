@@ -301,7 +301,8 @@ function MobileNav() {
   const primary = useVisibleGroups().slice(0, 5);
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line bg-rail px-1 py-2 md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line bg-rail px-1 pt-2 md:hidden"
+        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
         {primary.map((g) => (
           <NavLink key={g.id} to={g.tabs[0].to} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active?.id === g.id ? "text-pink" : "text-faint")}>
             <Icon d={g.icon} className="h-5 w-5" /><span className="text-[9px] font-semibold">{g.label}</span>
@@ -347,7 +348,11 @@ function Shell() {
   useEffect(() => { useFilters.getState().setRangeKey(defaultRange); }, [defaultRange]);
   return (
     <div className="cdk min-h-screen text-text">
-      <div className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-5 sm:px-7 md:pb-12">
+      {/* Top padding clears the iOS status bar / notch when installed as a PWA
+          (translucent status bar + viewport-fit=cover). env() is 0 on desktop,
+          so max() keeps the desktop pt-5 (20px) pixel-identical. */}
+      <div className="mx-auto w-full max-w-[1400px] px-4 pb-28 sm:px-7 md:pb-12"
+        style={{ paddingTop: "max(1.25rem, calc(env(safe-area-inset-top) + 0.5rem))" }}>
         <TopNav onAdd={() => setAdd(true)} />
         <main>
           <Suspense fallback={<SkeletonRows rows={6} />}>
