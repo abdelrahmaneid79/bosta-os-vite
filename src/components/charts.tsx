@@ -88,7 +88,7 @@ export function BarChart({ data, height = 240, color = PINK, unit = "EGP", maxLa
   };
 
   return (
-    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }}
+    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "none" }}
       onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
       {W > 0 && (
         <svg width={W} height={H} className="block">
@@ -147,6 +147,9 @@ export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "r
   const bw = Math.max(4, Math.min(15, gw * 0.34)); // each bar
   const gap = Math.max(2, gw * 0.06);
   const ticks = 4;
+  // Thin x-labels to what actually fits — a "Apr '25" label needs ~52px, so on a
+  // narrow chart show every 2nd/3rd instead of overlapping them into a smear.
+  const labelEvery = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(plotW / 52))));
   const cx = (i: number) => PL + i * gw + gw / 2;
   // ONE pointer handler = smooth mouse hover AND touch-drag scrubbing.
   const onPoint = (e: React.PointerEvent) => {
@@ -156,7 +159,7 @@ export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "r
   };
 
   return (
-    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }}
+    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "none" }}
       onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
       {W > 0 && (
         <svg width={W} height={H} className="block">
@@ -185,9 +188,9 @@ export function GroupedBarChart({ data, height = 300, colorA = TEAL, colorB = "r
             );
           })}
           {data.map((_, i) => <rect key={`hit${i}`} x={PL + i * gw} y={PT} width={gw} height={plotH} fill="transparent" onMouseEnter={() => setHover(i)} />)}
-          {data.map((d, i) => (
+          {data.map((d, i) => (i % labelEvery === 0 || i === hover) ? (
             <text key={`lb${i}`} x={cx(i)} y={H - 9} textAnchor="middle" fontSize={10.5} fontWeight={600} fill={hover === i ? colorA : AX}>{d.label}</text>
-          ))}
+          ) : null)}
         </svg>
       )}
       {hover != null && data[hover] && (
@@ -230,7 +233,7 @@ export function LineChart({ data, height = 240, color = TEAL, unit = "EGP", area
   const hp = hover != null ? data[hover] : null;
 
   return (
-    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "pan-y" }}
+    <div ref={ref} className="relative w-full select-none" style={{ height, touchAction: "none" }}
       onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
       {W > 0 && (
         <svg width={W} height={H} className="block">

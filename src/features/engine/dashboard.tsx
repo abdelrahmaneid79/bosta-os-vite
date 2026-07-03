@@ -72,7 +72,7 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
   const hp = hover != null ? d[hover] : null;
   const xStep = Math.max(1, Math.ceil(vals.length / 6));
   const chart = (
-    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair", touchAction: "pan-y" }} onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
+    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair", touchAction: "none" }} onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
       <svg className="chsvg" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
         <defs>
           <linearGradient id={`gf_${id}`} x1="0" y1="0" x2="0" y2="1">
