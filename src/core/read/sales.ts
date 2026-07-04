@@ -37,23 +37,41 @@ export interface SaleRow {
   payment: Tables<"sales">["payment_method"];
   source: Tables<"sales">["source_type"];
   reconciled: boolean;
+  hasLines: boolean; // day has at least one product line item
 }
+
+/** Completeness signal for a sale day:
+ *   green  = total AND product lines that reconcile to it (full detail)
+ *   yellow = day total only, no product lines captured yet
+ *   red    = has product lines that DON'T reconcile to the total (needs a look) */
+export type DaySignal = "green" | "yellow" | "red";
+export function daySignal(r: { reconciled: boolean; hasLines: boolean }): DaySignal {
+  if (!r.reconciled) return "red";        // lines present but they don't sum to the total
+  return r.hasLines ? "green" : "yellow"; // reconciled: green with lines, yellow (total only) without
+}
+export const DAY_SIGNAL_LABEL: Record<DaySignal, string> = {
+  green: "Complete — total + product lines",
+  yellow: "Day total only — no product breakdown yet",
+  red: "Product lines don't reconcile to the total",
+};
 
 export async function getRecentSales(limit = 60, range?: DateRange): Promise<SaleRow[]> {
   let q = requireEngine()
     .from("sales")
-    .select("id,sale_date,total_amount,payment_method,source_type,reconciled")
+    // sale_items(count) is an aggregate embed — one extra count per day, no row-cap issues
+    .select("id,sale_date,total_amount,payment_method,source_type,reconciled,sale_items(count)")
     .is("voided_at", null);
   if (range) q = q.gte("sale_date", range.from).lte("sale_date", range.to);
   const { data, error } = await q.order("sale_date", { ascending: false }).limit(limit);
   if (error) throw error;
-  return data.map((r) => ({
-    id: r.id,
-    date: r.sale_date,
-    total: r.total_amount,
-    payment: r.payment_method,
-    source: r.source_type,
-    reconciled: r.reconciled,
+  return (data as unknown as (Record<string, unknown> & { sale_items?: { count: number }[] })[]).map((r) => ({
+    id: r.id as string,
+    date: r.sale_date as string,
+    total: r.total_amount as number,
+    payment: r.payment_method as SaleRow["payment"],
+    source: r.source_type as SaleRow["source"],
+    reconciled: r.reconciled as boolean,
+    hasLines: (r.sale_items?.[0]?.count ?? 0) > 0,
   }));
 }
 

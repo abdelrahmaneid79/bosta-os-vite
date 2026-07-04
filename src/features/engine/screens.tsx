@@ -21,7 +21,7 @@ import { rangeLabel } from "@/core/range";
 import { useFilters } from "@/store/filters";
 import { getStockSummary } from "@/core/read/stock";
 import { getProducts } from "@/core/read/common";
-import { getRecentSales, getSaleItems, type SaleRow as SaleRowVM, type SaleLine } from "@/core/read/sales";
+import { getRecentSales, getSaleItems, daySignal, DAY_SIGNAL_LABEL, type DaySignal, type SaleRow as SaleRowVM, type SaleLine } from "@/core/read/sales";
 import { getPurchases, getInventoryPurchases } from "@/core/read/purchases";
 import { getProfitReadout } from "@/core/read/profit";
 import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
@@ -167,6 +167,11 @@ const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const mName = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 
+const SIGCOLOR: Record<DaySignal, string> = { green: "var(--green)", yellow: "var(--amber)", red: "var(--red)" };
+function DayDot({ sig }: { sig: DaySignal }) {
+  return <span title={DAY_SIGNAL_LABEL[sig]} style={{ display: "inline-block", width: 8, height: 8, borderRadius: 99, marginRight: 9, verticalAlign: "middle", background: SIGCOLOR[sig], flexShrink: 0 }} />;
+}
+
 export function SalesScreen() {
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
@@ -210,17 +215,22 @@ export function SalesScreen() {
               <DeckTile><TileHead name="Average revenue by weekday" right="all-time" /><div style={{ marginTop: 12 }}><BarChart data={d.weekday} height={170} color="rgb(var(--good))" /></div></DeckTile>
             </div>
             <DeckTile style={{ padding: 0 }}>
-              <div style={{ padding: "22px 24px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ padding: "22px 24px 6px", display: "flex", alignItems: "center", gap: 8 }}>
                 <span className="tname">Daily sales</span>
                 <button className="addbtn" style={{ marginLeft: "auto" }} onClick={() => setAddOpen(true)}>+ New sale</button>
               </div>
-              <div className="scroll" style={{ maxHeight: 628 }}>
+              <div style={{ padding: "0 24px 12px", display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: "var(--dim)" }}>
+                <span><DayDot sig="green" />complete</span>
+                <span><DayDot sig="yellow" />total only</span>
+                <span><DayDot sig="red" />doesn’t reconcile</span>
+              </div>
+              <div className="scroll" style={{ maxHeight: 590 }}>
                 <table className="tbl">
                   <thead><tr><th>Date</th><th className="r">Revenue</th></tr></thead>
                   <tbody>
                     {rows.map((r) => (
                       <tr key={r.id} className="daycell" onClick={() => setDetail(r)}>
-                        <td>{fmtDate(r.date, "EEE d MMM yyyy")}</td>
+                        <td><DayDot sig={daySignal(r)} />{fmtDate(r.date, "EEE d MMM yyyy")}</td>
                         <td className="r">{egp(r.total)}</td>
                       </tr>
                     ))}
