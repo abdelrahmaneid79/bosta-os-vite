@@ -136,6 +136,19 @@ export async function applyProductCosts(updates: ProductCostUpdate[]): Promise<{
   return { products, lifetime };
 }
 
+/** Persist a product's POS codes when it gets coded during import: the hidden
+ *  8-digit pos_code (the document's item code, used only for matching) and the
+ *  owner-facing 4-digit market_code (derived from the barcode). Additive column
+ *  writes only — no engine side-effects, money math untouched. */
+export async function setProductCodes(productId: string, posCode: string | null, marketCode: string | null): Promise<void> {
+  const patch: ProductUpdate = {};
+  if (posCode) patch.pos_code = posCode;
+  if (marketCode) patch.market_code = marketCode;
+  if (Object.keys(patch).length === 0) return;
+  const { error } = await requireEngine().from("products").update(patch).eq("id", productId);
+  if (error) throw error;
+}
+
 export async function setProductActive(id: string, active: boolean): Promise<void> {
   const { error } = await requireEngine().from("products").update({ active }).eq("id", id);
   if (error) throw error;

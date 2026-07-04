@@ -46,16 +46,16 @@ export type Database = {
       }
       alert_dismissals: {
         Row: {
-          key: string
           dismissed_at: string
+          key: string
         }
         Insert: {
-          key: string
           dismissed_at?: string
+          key: string
         }
         Update: {
-          key?: string
           dismissed_at?: string
+          key?: string
         }
         Relationships: []
       }
@@ -521,6 +521,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      expenses_backup_20260629: {
+        Row: {
+          amount: number | null
+          category_id: string | null
+          created_at: string | null
+          edited_at: string | null
+          employee_id: string | null
+          expense_date: string | null
+          id: string | null
+          is_estimated: boolean | null
+          location_id: string | null
+          notes: string | null
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          receipt_url: string | null
+          source_type: Database["public"]["Enums"]["source_type"] | null
+          supplier_id: string | null
+          tax_amount: number | null
+          updated_at: string | null
+          verification:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+          void_reason: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          amount?: number | null
+          category_id?: string | null
+          created_at?: string | null
+          edited_at?: string | null
+          employee_id?: string | null
+          expense_date?: string | null
+          id?: string | null
+          is_estimated?: boolean | null
+          location_id?: string | null
+          notes?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          receipt_url?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"] | null
+          supplier_id?: string | null
+          tax_amount?: number | null
+          updated_at?: string | null
+          verification?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          amount?: number | null
+          category_id?: string | null
+          created_at?: string | null
+          edited_at?: string | null
+          employee_id?: string | null
+          expense_date?: string | null
+          id?: string | null
+          is_estimated?: boolean | null
+          location_id?: string | null
+          notes?: string | null
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          receipt_url?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"] | null
+          supplier_id?: string | null
+          tax_amount?: number | null
+          updated_at?: string | null
+          verification?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Relationships: []
       }
       gl_accounts: {
         Row: {
@@ -1101,6 +1173,24 @@ export type Database = {
           },
         ]
       }
+      private_config: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       product_aliases: {
         Row: {
           alias: string | null
@@ -1183,9 +1273,11 @@ export type Database = {
           current_stock: number
           id: string
           low_stock_threshold: number | null
+          market_code: string | null
           name_ar: string | null
           name_en: string
           notes: string | null
+          pos_code: string | null
           reference_cost: number | null
           sale_unit: string | null
           selling_price: number | null
@@ -1195,7 +1287,6 @@ export type Database = {
         Insert: {
           active?: boolean
           avg_cost?: number
-          reference_cost?: number | null
           base_unit?: string
           base_units_per_sale_unit?: number
           category_id?: string | null
@@ -1203,9 +1294,12 @@ export type Database = {
           current_stock?: number
           id?: string
           low_stock_threshold?: number | null
+          market_code?: string | null
           name_ar?: string | null
           name_en: string
           notes?: string | null
+          pos_code?: string | null
+          reference_cost?: number | null
           sale_unit?: string | null
           selling_price?: number | null
           unit_type?: Database["public"]["Enums"]["product_unit_type"]
@@ -1214,7 +1308,6 @@ export type Database = {
         Update: {
           active?: boolean
           avg_cost?: number
-          reference_cost?: number | null
           base_unit?: string
           base_units_per_sale_unit?: number
           category_id?: string | null
@@ -1222,9 +1315,12 @@ export type Database = {
           current_stock?: number
           id?: string
           low_stock_threshold?: number | null
+          market_code?: string | null
           name_ar?: string | null
           name_en?: string
           notes?: string | null
+          pos_code?: string | null
+          reference_cost?: number | null
           sale_unit?: string | null
           selling_price?: number | null
           unit_type?: Database["public"]["Enums"]["product_unit_type"]
@@ -1897,6 +1993,7 @@ export type Database = {
           p_counted_qty: number
           p_location_id: string
           p_notes: string
+          p_opening_unit_cost?: number
           p_product_id: string
         }
         Returns: Json
@@ -1930,6 +2027,10 @@ export type Database = {
       void_purchase_batch: {
         Args: { p_batch_id: string; p_reason: string }
         Returns: string
+      }
+      void_sale: {
+        Args: { p_reason?: string; p_sale_id: string }
+        Returns: undefined
       }
       void_sale_movements: { Args: { p_sale_id: string }; Returns: undefined }
     }

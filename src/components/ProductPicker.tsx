@@ -44,7 +44,7 @@ export function ProductPicker({ value, onChange, autoFocus, bare }: { value: str
             <button key={p.id} type="button" onMouseDown={(e) => { e.preventDefault(); pick(p.id); }}
               className={cn("flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm hover:bg-panel2", p.id === value && "bg-pink/10")}>
               <span dir="auto" className="min-w-0 flex-1 truncate text-text">{label(p)}</span>
-              {p.aliases[0] && <span className="tnum text-[11px] text-faint">{p.aliases[0]}</span>}
+              {p.marketCode ? <span className="tnum text-[11px] text-faint">#{p.marketCode}</span> : p.aliases[0] && <span className="tnum text-[11px] text-faint">{p.aliases[0]}</span>}
             </button>
           ))}
         </div>

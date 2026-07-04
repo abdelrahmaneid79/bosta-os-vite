@@ -16,6 +16,8 @@ vite.config.d.ts
 _archive_nextjs/
 _archive_old_next_app/
 chats/
+# owner's raw POS day-report photos (source for the sales importer) — local only
+Daily product sales nov2024-jan2025/
 **/uploads/
 *.xlsx
 *.xls
@@ -24,3 +26,6 @@ chats/
 # importer fetches and turns into editable entries.
 !public/seed/
 !public/seed/*.csv
+
+# supabase CLI scratch state
+supabase/.temp/

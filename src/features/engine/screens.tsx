@@ -89,7 +89,7 @@ export function StockScreen() {
               <tbody>
                 {positions.map((p) => (
                   <tr key={p.id} className="prodcell" onClick={() => setDetailId(p.id)}>
-                    <td style={{ fontSize: 14 }}>{p.nameEn}{!p.active && <span style={{ color: "var(--faint)" }}> · inactive</span>}</td>
+                    <td style={{ fontSize: 14 }}>{p.marketCode && <span className="tnum" style={{ color: "var(--faint)", fontSize: 12, marginRight: 6 }}>#{p.marketCode}</span>}{p.nameEn}{!p.active && <span style={{ color: "var(--faint)" }}> · inactive</span>}</td>
                     <td className="r" style={{ color: p.isNegative ? "var(--red)" : p.onHand === 0 ? "var(--faint)" : undefined }}>
                       {p.onHand === 0 ? "—" : num(p.onHand)} <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span>
                     </td>

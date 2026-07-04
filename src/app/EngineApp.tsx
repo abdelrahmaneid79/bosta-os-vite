@@ -29,6 +29,7 @@ const more = () => import("@/features/engine/more");
 const product = () => import("@/features/engine/product");
 const receipts = () => import("@/features/engine/receipts");
 const productImport = () => import("@/features/engine/product-import");
+const daySalesImport = () => import("@/features/engine/day-sales-import");
 const opening = () => import("@/features/engine/opening");
 const analytics = () => import("@/features/engine/analytics");
 const qa = () => import("@/features/qa/QAScreen");
@@ -57,6 +58,7 @@ const QAScreen = L(qa, "QAScreen");
 const PreferencesScreen = L(more, "PreferencesScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
 const ProductLineImportScreen = L(productImport, "ProductLineImportScreen");
+const DaySalesPhotoImport = L(daySalesImport, "DaySalesPhotoImport");
 const ProductCostImportScreen = L(productImport, "ProductCostImportScreen");
 const OpeningBalancesScreen = L(opening, "OpeningBalancesScreen");
 
@@ -85,7 +87,7 @@ interface Group { id: string; label: string; icon: string; accent: string; tabs:
 // Map each route to its screen; nav structure/labels/icons come from core/nav.
 const EL: Record<string, React.ReactNode> = {
   "/dashboard": <DashboardScreen />,
-  "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <ProductLineImportScreen />,
+  "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <DaySalesPhotoImport />, "/sales/product-lines/file": <ProductLineImportScreen />,
   "/stock": <StockScreen />, "/purchases": <PurchasesScreen />, "/costs": <ProductCostImportScreen />,
   "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/settlements": <SettlementsScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
@@ -363,6 +365,7 @@ function Shell() {
               )))}
               <Route path="/imports" element={<Navigate to="/sales/import" replace />} />
               <Route path="/expenses/import" element={<Page group={ALL_GROUPS.find((g) => g.id === "money")!}>{EL["/expenses/import"]}</Page>} />
+              <Route path="/sales/product-lines/file" element={<Page group={ALL_GROUPS.find((g) => g.id === "sales")!}>{EL["/sales/product-lines/file"]}</Page>} />
               <Route path="/product/:id" element={<ProductDetailScreen />} />
               <Route path="*" element={<Navigate to={landing} replace />} />
             </Routes>

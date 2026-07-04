@@ -1,14 +1,13 @@
 /**
  * AI day-report reader — uploads a photo of the POS daily product report to the
- * `read-day-report` Supabase Edge Function (which calls Claude vision server-side)
- * and returns structured lines. The importer tries this first for accuracy and
- * falls back to on-device OCR (core/import/ocr-lines) if the function isn't
- * deployed / keyed or errors. No API key ever touches the browser.
+ * `read-day-report` Supabase Edge Function (Claude vision, server-side key) and
+ * returns the strict `RawDayReport` the day-sales pipeline validates. VISION-
+ * DIRECT: the model returns item-code-keyed lines + the branch net total; there
+ * is no OCR fallback (the old on-device reader couldn't read the item code, which
+ * is the whole matching key). No API key ever touches the browser.
  */
 import { requireEngine } from "@/core/db/engine";
-
-export interface AiDayLine { name: string; barcode: string; qty: number | null; price: number | null; total: number | null }
-export interface AiDayReport { date: string | null; lines: AiDayLine[]; dayTotal: number | null }
+import type { RawDayReport, RawDayLine } from "@/core/import/day-sales";
 
 async function fileToBase64(file: File): Promise<{ data: string; mediaType: string }> {
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -21,17 +20,16 @@ async function fileToBase64(file: File): Promise<{ data: string; mediaType: stri
 const numOrNull = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 
 /** Signals the reader was called without a usable auth session — the caller
- *  surfaces this (don't silently fall back, or the user never knows why AI failed). */
+ *  surfaces this (don't hide it, or the owner never learns why AI failed). */
 export class DayReportAuthError extends Error {}
 
-/** Invoke the vision edge function. Throws if unavailable so the caller can fall
- *  back to local OCR. */
-export async function readDayReportPhoto(file: File): Promise<AiDayReport> {
+/** Invoke the vision edge function and normalise its JSON into a RawDayReport.
+ *  Throws DayReportAuthError when not signed in, or the function's error. */
+export async function readDayReportPhoto(file: File): Promise<RawDayReport> {
   const sb = requireEngine();
-  // The function is hardened to reject non-authenticated callers. supabase-js
-  // does NOT reliably attach the user token to functions.invoke, so send it
-  // EXPLICITLY from the live session — otherwise the call goes out as the anon
-  // key and 401s (the real cause of "AI reader never works").
+  // supabase-js does NOT reliably attach the user token to functions.invoke, so
+  // send it EXPLICITLY from the live session — otherwise the call goes out as the
+  // anon key and 401s (the real cause of "the AI reader never works").
   const { data: { session } } = await sb.auth.getSession();
   if (!session?.access_token) throw new DayReportAuthError("Sign in to use the AI photo reader.");
   const { data: image, mediaType } = await fileToBase64(file);
@@ -44,11 +42,25 @@ export async function readDayReportPhoto(file: File): Promise<AiDayReport> {
     if (status === 401) throw new DayReportAuthError("The reader rejected the session — sign in again.");
     throw error;
   }
-  const payload = data as { error?: string; date?: string | null; lines?: unknown[]; dayTotal?: unknown };
+  const payload = data as { error?: string; sale_date?: string | null; branch_total_net?: unknown; line_items?: unknown[] };
   if (payload?.error) throw new Error(payload.error);
-  const lines: AiDayLine[] = (payload?.lines ?? []).map((l) => {
+
+  const line_items: RawDayLine[] = (payload?.line_items ?? []).map((l) => {
     const o = l as Record<string, unknown>;
-    return { name: String(o.name ?? "").trim(), barcode: String(o.barcode ?? "").trim(), qty: numOrNull(o.qty), price: numOrNull(o.price), total: numOrNull(o.total) };
+    return {
+      item_code: String(o.item_code ?? "").trim(),
+      barcode: String(o.barcode ?? "").trim(),
+      name_ar: String(o.name_ar ?? "").trim(),
+      avg_unit_price: numOrNull(o.avg_unit_price),
+      qty_sold: numOrNull(o.qty_sold),
+      qty_returned: numOrNull(o.qty_returned) ?? 0,
+      net_qty: numOrNull(o.net_qty),
+      net_value: numOrNull(o.net_value),
+    };
   });
-  return { date: payload?.date ?? null, lines, dayTotal: numOrNull(payload?.dayTotal) };
+  return {
+    sale_date: payload?.sale_date ?? null,
+    branch_total_net: numOrNull(payload?.branch_total_net),
+    line_items,
+  };
 }

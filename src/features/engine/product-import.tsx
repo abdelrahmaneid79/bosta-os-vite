@@ -1,11 +1,15 @@
-/** Product-line import — upload a daily POS product-sales sheet (CSV/Excel),
- *  map columns, auto-match products (Arabic + alias), queue unmapped rows for
- *  assignment, preview, then approve. On approve each ready line is attached to
- *  its day's sale (existing day reused; missing day created) via the verified
+/** Product-line import (CSV/Excel) — upload a daily POS product-sales SHEET,
+ *  map columns, auto-match products (barcode + Arabic/alias), queue unmapped rows
+ *  for assignment, preview, then approve. On approve each ready line is attached
+ *  to its day's sale (existing day reused; missing day created) via the verified
  *  create_sale_item RPC (COGS snapshot + stock deduction). Never auto-saves;
  *  in-file + against-existing dedupe. Pure parsing/classification lives in
- *  core/import/product-lines.ts (unit-tested). */
+ *  core/import/product-lines.ts (unit-tested).
+ *
+ *  The PHOTO path is a separate, code-matched pipeline — see
+ *  features/engine/day-sales-import.tsx (the primary daily flow). */
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Papa from "papaparse";
 import { Card, CardHead, Eyebrow, Button, Badge, Select } from "@/components/ui";
@@ -22,8 +26,6 @@ import {
   detectLineMap, parseSheet, parseProductLines, dedupeLines, classifyLines, summarize,
   type ProductLineMap, type ClassifiedLine,
 } from "@/core/import/product-lines";
-import { parseOcrProductLines } from "@/core/import/ocr-lines";
-import { readDayReportPhoto, DayReportAuthError } from "@/core/import/day-report-ai";
 import { detectCostMap, parseCosts, classifyCosts, summarizeCosts, type CostMap } from "@/core/import/product-costs";
 import { applyProductCosts } from "@/core/db/mutations";
 import type { Row } from "@/core/import/csv";
@@ -72,11 +74,6 @@ export function ProductLineImportScreen() {
   const [dayDate, setDayDate] = useState("");                       // the single day this file covers
   const [assign, setAssign] = useState<Record<number, string>>({}); // row index → productId override
   const [result, setResult] = useState<{ created: number; skipped: number; failed: number; days: number } | null>(null);
-  const [imgUrl, setImgUrl] = useState<string | null>(null); // photo preview
-  const [ocrStatus, setOcrStatus] = useState("");            // OCR progress text
-  const [ocrText, setOcrText] = useState("");                // what the reader saw
-  const [photoTotal, setPhotoTotal] = useState<number | null>(null); // day total printed on the photo
-  const [fromPhoto, setFromPhoto] = useState(false);         // photo/AI-derived → confidence applies
 
   const prods = useQuery({ queryKey: ["searchable-products"], queryFn: getSearchableProducts, enabled: en });
   const index = useMemo(() => buildIndex(prods.data ?? []), [prods.data]);
@@ -109,69 +106,20 @@ export function ProductLineImportScreen() {
     }).map((l, i) => {
       const userAssigned = !!assign[i];
       const base = userAssigned ? { ...l, productId: assign[i], matchedName: nameById.get(assign[i]) ?? "", status: "ready" as const } : l;
-      return { ...base, confidence: confidenceOf(base, fromPhoto, userAssigned) };
+      return { ...base, confidence: confidenceOf(base, false, userAssigned) };
     });
-  }, [rows, map, dayDate, index, assign, nameById, fromPhoto]);
+  }, [rows, map, dayDate, index, assign, nameById]);
   const sum = summarize(classified);
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     e.target.value = "";
-    setFileName(f.name); setResult(null); setAssign({}); setImgUrl(null); setOcrText(""); setPhotoTotal(null);
+    setFileName(f.name); setResult(null); setAssign({});
     const done = (grid: unknown[][]) => {
-      setFromPhoto(false); // structured file → lines are verified provenance
       const sheet = parseSheet(grid);
       setRows(sheet.rows); setHeaders(sheet.headers); setMap(detectLineMap(sheet.headers));
       setDayDate(sheet.date ?? "");
     };
-    // Photo of the POS daily report → AI vision reader (accurate) → editable rows;
-    // falls back to on-device OCR if the vision function isn't available.
-    if (/\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(f.name) || f.type.startsWith("image/")) {
-      setImgUrl(URL.createObjectURL(f)); setFromPhoto(true); // AI/OCR-derived → confidence applies
-      // load each row into the editable preview; returns how many lines it built
-      const apply = (lines: { name: string; barcode: string; qty: number | null; price: number | null; total: number | null }[], date: string | null, dayTotal: number | null) => {
-        const built: Row[] = lines.map((l) => ({
-          product: l.name, barcode: l.barcode,
-          qty: l.qty != null ? String(l.qty) : "", price: l.price != null ? String(l.price) : "", total: l.total != null ? String(l.total) : "",
-        }));
-        setRows(built);
-        setHeaders(["product", "barcode", "qty", "price", "total"]);
-        setMap({ date: "", barcode: "barcode", product: "product", qty: "qty", unitPrice: "price", lineTotal: "total" });
-        setDayDate(date ?? missingDay.data ?? ""); // fall back to the day that needs lines
-        setPhotoTotal(dayTotal);
-        return built.length;
-      };
-      // 1) AI vision reader (server-side key)
-      try {
-        setOcrStatus("Reading photo with AI…");
-        const ai = await readDayReportPhoto(f);
-        setOcrStatus("");
-        setOcrText(`AI reader · ${ai.lines.length} line(s) detected`);
-        if (apply(ai.lines, ai.date, ai.dayTotal) > 0) return;
-      } catch (err) {
-        // Surface WHY the AI reader failed instead of silently degrading — an
-        // auth/config error is a real problem the owner must see, not hide behind
-        // the weaker on-device reader.
-        const msg = err instanceof DayReportAuthError ? err.message : `AI reader unavailable (${(err as Error)?.message ?? "error"})`;
-        setOcrText(`⚠ ${msg} — falling back to the on-device reader.`);
-      }
-      // 2) Fallback: on-device OCR (Arabic + English)
-      try {
-        setOcrStatus("Reading photo (on-device)…");
-        const Tesseract = (await import("tesseract.js")).default;
-        const { data } = await Tesseract.recognize(f, "ara+eng", {
-          logger: (m: { status?: string; progress?: number }) => {
-            if (m.status === "recognizing text" && typeof m.progress === "number") setOcrStatus(`Reading photo… ${Math.round(m.progress * 100)}%`);
-          },
-        } as Parameters<typeof Tesseract.recognize>[2]);
-        setOcrStatus("");
-        setOcrText(data.text || "");
-        const parsed = parseOcrProductLines(data.text || "");
-        const n = apply(parsed.lines.map((l) => ({ name: l.rawName, barcode: l.barcode, qty: l.qty, price: l.unitPrice, total: l.lineTotal })), parsed.date, parsed.dayTotal);
-        if (!n) reportError("Read photo", new Error("Couldn't read product rows — try a sharper, straight-on photo, or upload the Excel export."));
-      } catch (err) { setOcrStatus(""); reportError("Read photo", err); }
-      return;
-    }
     if (/\.(xlsx|xls)$/i.test(f.name)) readExcel(f).then(done).catch(() => reportError("Import", new Error("Couldn't read the Excel file")));
     else Papa.parse<string[]>(f, { skipEmptyLines: true, complete: (r) => done(r.data as unknown[][]), error: () => reportError("Import", new Error("Couldn't parse the CSV")) });
   }
@@ -230,41 +178,17 @@ export function ProductLineImportScreen() {
       {!rows ? (
         <Card>
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <CardHead title="Add a daily product-sales report" sub="Snap a photo of the POS day report, or upload the CSV/Excel export. Arabic names, barcodes and totals are read automatically." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            <CardHead title="Upload a CSV/Excel day export" sub="For the POS daily product-sales export as a spreadsheet. Columns (barcode, name, qty, price, net value) are auto-detected; matched by barcode/name." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             <label className="lift cursor-pointer rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">
-              Choose photo or file<input type="file" accept=".csv,.xlsx,.xls,.png,.jpg,.jpeg,.webp,image/*" className="hidden" onChange={onFile} />
+              Choose file<input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onFile} />
             </label>
-            {ocrStatus && <p className="text-[12px] font-medium text-pink">{ocrStatus}</p>}
-            {missingDay.data && <p className="text-[12px] font-semibold text-pink">Next up: {fmtDate(missingDay.data)} has no product lines yet — snap that day's report.</p>}
-            <p className="max-w-md text-[12px] text-dim">One report = one day. It reads each product line (name/barcode → product, quantity, price, line total) and the day's grand total, then queues anything unmatched for you to map. Nothing saves until you approve.</p>
+            {missingDay.data && <p className="text-[12px] font-semibold text-pink">Next up: {fmtDate(missingDay.data)} has no product lines yet.</p>}
+            <p className="max-w-md text-[12px] text-dim">One export = one day. It reads each product line and the day's grand total, then queues anything unmatched for you to map. Nothing saves until you approve.</p>
+            <p className="text-[12px] text-faint">Have a photo of the report instead? <Link to="/sales/product-lines" className="text-pink underline">Use the photo importer</Link> — it matches by POS code.</p>
           </div>
         </Card>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
         <>
-          {/* Photo preview + what the reader saw (only for image uploads) */}
-          {imgUrl && (
-            <Card className="!p-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                <img src={imgUrl} alt="day report" className="max-h-56 rounded-lg border border-line object-contain" />
-                <div className="min-w-0 flex-1 text-[12px] text-dim">
-                  <div className="font-display text-sm font-semibold text-text">{fileName}</div>
-                  {ocrStatus ? <div className="mt-1 text-pink">{ocrStatus}</div> : <div className="mt-1">Read {rows?.length ?? 0} line(s). Check each below — fix any the reader misread, then approve.</div>}
-                  {photoTotal != null && (
-                    <div className={`mt-1 ${Math.abs(photoTotal - sum.total) <= 1 ? "text-good" : "text-warn"}`}>
-                      Photo day total {egp(photoTotal)} · lines add to {egp(sum.total)}{Math.abs(photoTotal - sum.total) <= 1 ? " ✓ matches" : " — review the difference"}
-                    </div>
-                  )}
-                  {ocrText && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-pink">What the reader saw</summary>
-                      <pre dir="auto" className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded-lg bg-panel p-2 font-mono text-[10px] text-muted">{ocrText.slice(0, 1500)}</pre>
-                    </details>
-                  )}
-                </div>
-              </div>
-            </Card>
-          )}
-
           {/* Sale date for the whole file (POS report = one day) */}
           <Card>
             <CardHead title="Sale day" sub="This report covers one day — auto-detected from the file, confirm or change it." accent="pink" icon="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" />
@@ -296,7 +220,7 @@ export function ProductLineImportScreen() {
             {sum.invalid > 0 && <Badge tone="bad">{sum.invalid} invalid</Badge>}
             <Badge tone="pink">day total {egp(sum.total)}</Badge>
             <div className="flex-1" />
-            <Button variant="ghost" onClick={() => { setRows(null); setMap(null); setDayDate(""); setResult(null); setImgUrl(null); setOcrText(""); setPhotoTotal(null); setFileName(""); }}>Cancel</Button>
+            <Button variant="ghost" onClick={() => { setRows(null); setMap(null); setDayDate(""); setResult(null); setFileName(""); }}>Cancel</Button>
             <Button disabled={approve.isPending || sum.ready === 0} onClick={() => approve.mutate()}>{approve.isPending ? "Importing…" : `Approve ${sum.ready}`}</Button>
           </div>
 

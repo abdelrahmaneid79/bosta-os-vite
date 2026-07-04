@@ -1,11 +1,13 @@
 /**
- * read-day-report — vision reader for the POS daily product report.
+ * read-day-report — VISION-DIRECT reader for the POS daily product report.
  * Receives a base64 photo, asks Claude (vision) to extract the day's product
- * lines + grand total as strict JSON.
+ * lines + the branch net total as STRICT JSON keyed on the POS item code
+ * (كود الصنف). No OCR stage: the model reads the photo and returns the shape the
+ * importer's deterministic pipeline (core/import/day-sales) validates and matches.
  *
- * Key resolution: prefers the ANTHROPIC_API_KEY edge secret; if that isn't set
- * it falls back to the private_config table (read with the service role — never
- * exposed to the browser). Set the secret later and remove the row to migrate.
+ * Key resolution: prefers the ANTHROPIC_API_KEY edge secret; else the
+ * private_config table (read with the service role — never exposed to the
+ * browser). Set the secret later and remove the row to migrate.
  */
 const MODEL = Deno.env.get("OCR_MODEL") ?? "claude-opus-4-8";
 
@@ -25,24 +27,59 @@ async function getKey(): Promise<string | null> {
   } catch { return null; }
 }
 
-const SYSTEM = `You read a photo of a point-of-sale DAILY PRODUCT SALES report for a snacks/nuts retail stand. The report is Arabic (right-to-left); each row is one product's sales for a single day.
+const SYSTEM = `You read a photo of a point-of-sale DAILY PRODUCT SALES report for a snacks/nuts retail stand (brand "Bosta Bites"). The report is Arabic (right-to-left). One report = ONE trading day. Each product row is that product's sales for the day.
 
-Return ONLY a JSON object (no markdown, no prose) of exactly this shape:
+Return ONLY a JSON object (no markdown, no prose, no code fences) of EXACTLY this shape:
 {
-  "date": "YYYY-MM-DD" | null,
-  "lines": [
-    { "name": string, "barcode": string, "qty": number, "price": number, "total": number }
-  ],
-  "dayTotal": number | null
+  "sale_date": "YYYY-MM-DD" | null,
+  "branch_total_net": number | null,
+  "line_items": [
+    {
+      "item_code": string,          // كود الصنف, digits exactly as printed (keep leading zeros, e.g. "00021296")
+      "barcode": string,            // الباركود, the 13-digit barcode exactly as printed ("" if absent)
+      "name_ar": string,            // اسم الصنف / الصنف, the Arabic product name as printed
+      "avg_unit_price": number|null,// متوسط سعر البيع
+      "qty_sold": number|null,      // الكمية المباعة (a weight like 1.115 or a count; keep decimals)
+      "qty_returned": number|null,  // الكمية المرتجعة / المرتجع (0 when absent/blank)
+      "net_qty": number|null,       // صافى الكمية  (= qty_sold − qty_returned)
+      "net_value": number|null      // صافى القيمة  (the line's net money value)
+    }
+  ]
 }
 
-Column meanings (right-to-left in the report): كود الصنف = item code, الباركود = barcode (13 digits), اسم الصنف = product name, متوسط سعر البيع = unit price, صافى الكمية = net quantity (often a weight like 1.115 or 0.820 — keep the decimal), صافى القيمة = net value (the line total).
+FIELD SPEC (columns, right-to-left):
+- كود الصنف = item code (8-digit, zero-padded). PUT IT IN item_code EXACTLY as printed.
+- الباركود = barcode (13 digits) → the barcode field, EXACTLY as printed. Do NOT use it for matching or as any numeric value; just record it (use "" when the report has no barcode column).
+- اسم الصنف (or الصنف) = Arabic product name.
+- متوسط سعر البيع = average unit price → avg_unit_price.
+- الكمية المباعة (or كمية المبيعات) = quantity sold → qty_sold.
+- المبيعات = gross sales value (informational; do not output).
+- الكمية المرتجعة / المرتجع = returned quantity → qty_returned (usually 0).
+- صافى الكمية = net quantity → net_qty. صافى القيمة = net value → net_value.
+- اجمالى الفرع = the BRANCH NET TOTAL → branch_total_net. This is the reconciliation anchor: the net_value of the product rows must sum to it.
 
-Rules:
-- One report = one day. Read the trading day from the header (e.g. "الفترة من YYYY/MM/DD").
-- "name" = the Arabic product name as printed. "barcode" = the 13-digit barcode. "qty" = صافى الكمية (net qty, keep decimals). "price" = متوسط سعر البيع. "total" = صافى القيمة.
-- Do NOT treat the barcode or item-code as qty/price/total. Do NOT output header, subtotal (اجمالى المورد / اجمالى الفرع) rows as products.
-- Output numbers in plain Western digits. Each line's total must ≈ qty × price, and the line totals should sum to dayTotal (the printed اجمالى). Never invent products.`;
+DATE: read sale_date from the header "خلال الفترة من YYYY/MM/DD الى YYYY/MM/DD" — use the "من" (from) date. Do NOT use "تاريخ الطباعة" (the print date, which is a different, later day).
+
+REPORT VARIANTS: some days use a simpler layout with columns (كود · الصنف · متوسط سعر البيع · كمية المبيعات) and NO barcode and NO returns column. There, set qty_returned = 0, net_qty = qty_sold, and net_value = the value column.
+
+RULES:
+- Output plain Western digits. Never invent products, codes, or numbers.
+- Do NOT output header rows or the totals rows (اجمالى المورد / اجمالى الفرع) as line_items — put اجمالى الفرع only in branch_total_net.
+- If a value is genuinely unreadable, use null for THAT field rather than guessing.
+
+WORKED EXAMPLE (a real day — 25/12/2024, branch net 4537.94; 3 of its rows shown):
+{
+  "sale_date": "2024-12-25",
+  "branch_total_net": 4537.94,
+  "line_items": [
+    { "item_code": "00021043", "barcode": "2301606000004", "name_ar": "جامى طوفى فواكه وزن", "avg_unit_price": 149.99, "qty_sold": 0.615, "qty_returned": 0, "net_qty": 0.615, "net_value": 92.24 },
+    { "item_code": "00021045", "barcode": "2301608000002", "name_ar": "جامى جيلى كاندى وزن", "avg_unit_price": 275.00, "qty_sold": 4.605, "qty_returned": 0, "net_qty": 4.605, "net_value": 1266.38 },
+    { "item_code": "00021296", "barcode": "2301626000008", "name_ar": "كاجو محمص", "avg_unit_price": 1100.00, "qty_sold": 0.110, "qty_returned": 0, "net_qty": 0.110, "net_value": 121.00 }
+  ]
+}
+
+RETURNS EXAMPLE (how a row with a non-zero return looks — sold 1.000, returned 0.200 at 100.00):
+{ "item_code": "00021289", "barcode": "2301619000008", "name_ar": "بريتزل ملح", "avg_unit_price": 100.00, "qty_sold": 1.000, "qty_returned": 0.200, "net_qty": 0.800, "net_value": 80.00 }`;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
