@@ -1273,6 +1273,7 @@ export type Database = {
           current_stock: number
           id: string
           low_stock_threshold: number | null
+          market_code: string | null
           name_ar: string | null
           name_en: string
           notes: string | null
@@ -1293,6 +1294,7 @@ export type Database = {
           current_stock?: number
           id?: string
           low_stock_threshold?: number | null
+          market_code?: string | null
           name_ar?: string | null
           name_en: string
           notes?: string | null
@@ -1313,6 +1315,7 @@ export type Database = {
           current_stock?: number
           id?: string
           low_stock_threshold?: number | null
+          market_code?: string | null
           name_ar?: string | null
           name_en?: string
           notes?: string | null

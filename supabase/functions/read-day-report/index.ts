@@ -36,6 +36,7 @@ Return ONLY a JSON object (no markdown, no prose, no code fences) of EXACTLY thi
   "line_items": [
     {
       "item_code": string,          // كود الصنف, digits exactly as printed (keep leading zeros, e.g. "00021296")
+      "barcode": string,            // الباركود, the 13-digit barcode exactly as printed ("" if absent)
       "name_ar": string,            // اسم الصنف / الصنف, the Arabic product name as printed
       "avg_unit_price": number|null,// متوسط سعر البيع
       "qty_sold": number|null,      // الكمية المباعة (a weight like 1.115 or a count; keep decimals)
@@ -48,7 +49,7 @@ Return ONLY a JSON object (no markdown, no prose, no code fences) of EXACTLY thi
 
 FIELD SPEC (columns, right-to-left):
 - كود الصنف = item code (8-digit, zero-padded). PUT IT IN item_code EXACTLY as printed.
-- الباركود = barcode (13 digits). IGNORE it — never place it in any field.
+- الباركود = barcode (13 digits) → the barcode field, EXACTLY as printed. Do NOT use it for matching or as any numeric value; just record it (use "" when the report has no barcode column).
 - اسم الصنف (or الصنف) = Arabic product name.
 - متوسط سعر البيع = average unit price → avg_unit_price.
 - الكمية المباعة (or كمية المبيعات) = quantity sold → qty_sold.
@@ -71,14 +72,14 @@ WORKED EXAMPLE (a real day — 25/12/2024, branch net 4537.94; 3 of its rows sho
   "sale_date": "2024-12-25",
   "branch_total_net": 4537.94,
   "line_items": [
-    { "item_code": "00021043", "name_ar": "جامى طوفى فواكه وزن", "avg_unit_price": 149.99, "qty_sold": 0.615, "qty_returned": 0, "net_qty": 0.615, "net_value": 92.24 },
-    { "item_code": "00021045", "name_ar": "جامى جيلى كاندى وزن", "avg_unit_price": 275.00, "qty_sold": 4.605, "qty_returned": 0, "net_qty": 4.605, "net_value": 1266.38 },
-    { "item_code": "00021296", "name_ar": "كاجو محمص", "avg_unit_price": 1100.00, "qty_sold": 0.110, "qty_returned": 0, "net_qty": 0.110, "net_value": 121.00 }
+    { "item_code": "00021043", "barcode": "2301606000004", "name_ar": "جامى طوفى فواكه وزن", "avg_unit_price": 149.99, "qty_sold": 0.615, "qty_returned": 0, "net_qty": 0.615, "net_value": 92.24 },
+    { "item_code": "00021045", "barcode": "2301608000002", "name_ar": "جامى جيلى كاندى وزن", "avg_unit_price": 275.00, "qty_sold": 4.605, "qty_returned": 0, "net_qty": 4.605, "net_value": 1266.38 },
+    { "item_code": "00021296", "barcode": "2301626000008", "name_ar": "كاجو محمص", "avg_unit_price": 1100.00, "qty_sold": 0.110, "qty_returned": 0, "net_qty": 0.110, "net_value": 121.00 }
   ]
 }
 
 RETURNS EXAMPLE (how a row with a non-zero return looks — sold 1.000, returned 0.200 at 100.00):
-{ "item_code": "00021289", "name_ar": "بريتزل ملح", "avg_unit_price": 100.00, "qty_sold": 1.000, "qty_returned": 0.200, "net_qty": 0.800, "net_value": 80.00 }`;
+{ "item_code": "00021289", "barcode": "2301619000008", "name_ar": "بريتزل ملح", "avg_unit_price": 100.00, "qty_sold": 1.000, "qty_returned": 0.200, "net_qty": 0.800, "net_value": 80.00 }`;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",

@@ -77,6 +77,7 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-display text-2xl font-semibold text-text">{p.nameEn}</span>
               {p.nameAr && <span dir="rtl" className="text-sm text-dim">{p.nameAr}</span>}
+              {p.marketCode && <span className="tnum rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[12px] font-semibold text-muted" title="Product code">#{p.marketCode}</span>}
               {!p.active && <Badge>inactive</Badge>}
               {p.isNegative && <Badge tone="bad">negative</Badge>}
               {!p.isNegative && p.isLow && <Badge tone="warn">low</Badge>}

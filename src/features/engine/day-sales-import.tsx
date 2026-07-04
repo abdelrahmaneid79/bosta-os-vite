@@ -16,10 +16,11 @@ import { egp } from "@/core/utils/format";
 import { isEngineConfigured, requireEngine } from "@/core/db/engine";
 import { getCodedProducts } from "@/core/read/products";
 import { getLocations, getChannels } from "@/core/read/common";
-import { createSale, addSaleItem } from "@/core/db/mutations";
+import { createSale, addSaleItem, setProductCodes } from "@/core/db/mutations";
 import { readDayReportPhoto, DayReportAuthError } from "@/core/import/day-report-ai";
 import {
   buildCodeIndex, analyzeDayReport, lineConfidence, decideDayAction, actionCanSave,
+  marketCodeFromBarcode,
   type RawDayReport, type ExistingDay, type Verification,
 } from "@/core/import/day-sales";
 import { useUI } from "@/store/ui";
@@ -62,11 +63,13 @@ export function DaySalesPhotoImport() {
   const [report, setReport] = useState<RawDayReport | null>(null);
   const [dayDate, setDayDate] = useState("");
   const [assign, setAssign] = useState<Record<number, string>>({}); // line index → product override
-  const [result, setResult] = useState<{ created: number; failed: number; action: string } | null>(null);
+  const [result, setResult] = useState<{ created: number; failed: number; coded: number; action: string } | null>(null);
 
   const prods = useQuery({ queryKey: ["coded-products"], queryFn: getCodedProducts, enabled: en });
   const index = useMemo(() => buildCodeIndex(prods.data ?? []), [prods.data]);
   const nameById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.nameEn])), [prods.data]);
+  const marketById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.marketCode])), [prods.data]);
+  const posCodeById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.posCode])), [prods.data]);
 
   const locs = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
   const locationId = locs.data?.[0]?.id ?? "";
@@ -86,15 +89,20 @@ export function DaySalesPhotoImport() {
       const userAssigned = !!assignedId;
       const productId = l.productId ?? assignedId ?? null;
       const productName = l.productName ?? (assignedId ? nameById.get(assignedId) ?? "" : null);
+      // owner-facing 4-digit code: from the matched/assigned product, else derived
+      // from this line's barcode. The hidden 8-digit pos code is never shown.
+      const marketCode = l.productMarketCode
+        ?? (assignedId ? marketById.get(assignedId) ?? null : null)
+        ?? marketCodeFromBarcode(l.barcode);
       const conf: Verification = !productId
         ? "unverified"
         : userAssigned
           ? (analysis.totalReconciles ? "partially_verified" : "unverified") // matched by hand, not by code
           : lineConfidence(l, analysis.totalReconciles);
       const saveable = !!productId && l.netValue != null && l.net_qty != null;
-      return { ...l, i, productId, productName, userAssigned, conf, saveable };
+      return { ...l, i, productId, productName, marketCode, userAssigned, conf, saveable };
     });
-  }, [analysis, assign, nameById]);
+  }, [analysis, assign, nameById, marketById]);
 
   const decision = useMemo(() => {
     if (!analysis) return null;
@@ -145,7 +153,7 @@ export function DaySalesPhotoImport() {
         saleId = existing.data.id;
       }
 
-      let created = 0, failed = 0;
+      let created = 0, failed = 0, coded = 0;
       for (const l of rows) {
         const qty = l.net_qty as number;
         const lineTotal = l.netValue as number;
@@ -153,13 +161,22 @@ export function DaySalesPhotoImport() {
         try {
           await addSaleItem({ saleId, productId: l.productId!, qty, unitPrice, lineTotal, notes: null }, l.conf);
           created++;
+          // Going forward: a manually-assigned line whose product isn't coded yet
+          // gets coded now — hidden pos_code from the document, market_code from the
+          // barcode. Best-effort: never let it fail the import.
+          if (l.userAssigned && !posCodeById.get(l.productId!) && l.item_code) {
+            try {
+              await setProductCodes(l.productId!, l.item_code, marketCodeFromBarcode(l.barcode));
+              coded++;
+            } catch { /* code may collide with another product — skip silently */ }
+          }
         } catch { failed++; }
       }
-      return { created, failed, action: decision.action };
+      return { created, failed, coded, action: decision.action };
     },
     onSuccess: (res) => {
       setResult(res);
-      reportSuccess("Import day sales", `${res.created} product line(s) ${res.action === "create" ? "on a new day" : "attached"}${res.failed ? ` · ${res.failed} failed` : ""}`);
+      reportSuccess("Import day sales", `${res.created} product line(s) ${res.action === "create" ? "on a new day" : "attached"}${res.coded ? ` · ${res.coded} product(s) coded` : ""}${res.failed ? ` · ${res.failed} failed` : ""}`);
       qc.invalidateQueries();
     },
     onError: (e) => reportError("Import day sales", e),
@@ -167,7 +184,7 @@ export function DaySalesPhotoImport() {
 
   if (!en) return <EmptyState title="Sign in to import" />;
 
-  const codedCount = (prods.data ?? []).filter((p) => p.posCode).length;
+  const codedCount = (prods.data ?? []).filter((p) => p.marketCode).length;
 
   return (
     <div className="space-y-4">
@@ -182,7 +199,7 @@ export function DaySalesPhotoImport() {
             </label>
             {status && <p className="text-[12px] font-medium text-pink">{status}</p>}
             <p className="max-w-md text-[12px] text-dim">
-              {codedCount} product(s) have a POS code. Anything the code can't match is queued for you to assign — nothing is saved until you approve.
+              {codedCount} product(s) have a 4-digit code. Anything the code can't match is queued for you to assign — nothing is saved until you approve.
             </p>
             <p className="text-[12px] text-faint">Have a CSV/Excel export instead? <Link to="/sales/product-lines/file" className="text-pink underline">Use the file importer</Link>.</p>
           </div>
@@ -259,7 +276,7 @@ export function DaySalesPhotoImport() {
               {viewLines.map((l) => (
                 <div key={l.i} className="flex flex-wrap items-center gap-3 px-4 py-2.5 text-sm">
                   <span className={`h-2 w-2 flex-shrink-0 rounded-full ${l.productId ? "bg-good" : "bg-warn"}`} />
-                  <span className="tnum w-16 flex-shrink-0 text-[11px] text-faint">{l.item_code || "—"}</span>
+                  <span className="tnum w-14 flex-shrink-0 text-[11px] text-faint" title="4-digit product code">{l.marketCode ? `#${l.marketCode}` : "—"}</span>
                   <span dir="auto" className="min-w-0 flex-1 truncate text-text">
                     {l.name_ar || "—"}{l.productName && l.productName !== l.name_ar ? <span className="text-dim"> → {l.productName}</span> : ""}
                   </span>

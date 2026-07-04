@@ -13,6 +13,7 @@ export interface ProductDetail {
   id: string;
   nameEn: string;
   nameAr: string | null;
+  marketCode: string | null; // owner-facing 4-digit code
   baseUnit: string;
   saleUnit: string | null;
   sellingPrice: number | null;
@@ -45,7 +46,7 @@ export interface ProductDetail {
 export async function getProductDetail(productId: string, range: DateRange): Promise<ProductDetail> {
   const sb = requireEngine();
   const prod = await sb.from("products")
-    .select("id,name_en,name_ar,base_unit,sale_unit,selling_price,active,low_stock_threshold,current_stock,avg_cost")
+    .select("id,name_en,name_ar,market_code,base_unit,sale_unit,selling_price,active,low_stock_threshold,current_stock,avg_cost")
     .eq("id", productId).single();
   if (prod.error) throw prod.error;
   const p = prod.data;
@@ -98,7 +99,7 @@ export async function getProductDetail(productId: string, range: DateRange): Pro
   }
 
   return {
-    id: p.id, nameEn: p.name_en, nameAr: p.name_ar, baseUnit: p.base_unit, saleUnit: p.sale_unit,
+    id: p.id, nameEn: p.name_en, nameAr: p.name_ar, marketCode: p.market_code, baseUnit: p.base_unit, saleUnit: p.sale_unit,
     sellingPrice: p.selling_price, active: p.active, lowStockThreshold: p.low_stock_threshold,
     onHand, avgCost, stockValue: onHand * avgCost, hasCost: avgCost > 0,
     isLow: p.low_stock_threshold != null && onHand <= p.low_stock_threshold, isNegative: onHand < 0,

@@ -27,12 +27,22 @@ export type Verification = Enums<"verification_status">; // verified | partially
 // ── Vision output shape (the reader returns exactly this) ───────────────────
 export interface RawDayLine {
   item_code: string;
+  barcode: string;            // الباركود (13-digit) — NOT used for matching; kept only
+                              // so a newly-assigned product can be auto-coded (market_code)
   name_ar: string;
   avg_unit_price: number | null;
   qty_sold: number | null;
   qty_returned: number | null;
   net_qty: number | null;
   net_value: number | null;
+}
+
+/** The owner-facing 4-digit code = the 4 digits after the "230" barcode prefix
+ *  (2301606000004 → "1606"). Returns null when the barcode doesn't fit. Slicing
+ *  is done here in code — the 4 digits are never eyeballed off the document. */
+export function marketCodeFromBarcode(barcode: string | null | undefined): string | null {
+  const m = /^230(\d{4})\d+$/.exec((barcode ?? "").replace(/\D/g, ""));
+  return m ? m[1] : null;
 }
 export interface RawDayReport {
   sale_date: string | null;        // the "من" (from) date, ISO
@@ -41,7 +51,7 @@ export interface RawDayReport {
 }
 
 // ── Product code index ──────────────────────────────────────────────────────
-export interface CodedProduct { id: string; nameEn: string; nameAr: string | null; posCode: string | null }
+export interface CodedProduct { id: string; nameEn: string; nameAr: string | null; posCode: string | null; marketCode: string | null }
 
 /** Canonical form of an item code: digits only, leading zeros folded, so a code
  *  read as "00021043", "21043" or "0021043" all resolve to the same key. */
@@ -49,13 +59,18 @@ export function canonCode(code: string | null | undefined): string {
   return (code ?? "").replace(/\D/g, "").replace(/^0+/, "");
 }
 
-/** Map canonical code → product, for exact code matching. Products without a
- *  code are skipped (they can never be code-matched). */
+/** Index products for line matching. Keys are namespaced so the two code spaces
+ *  never collide: "p:<canon pos_code>" (primary, hidden 8-digit key the document
+ *  prints) and "m:<market_code>" (the 4-digit code, derived from the same
+ *  barcode the document also prints). The market key is the fallback used when a
+ *  vision misread mangles the item code but the barcode reads clean. Products
+ *  without a code are skipped (they can never be code-matched). */
 export function buildCodeIndex(products: CodedProduct[]): Map<string, CodedProduct> {
   const m = new Map<string, CodedProduct>();
   for (const p of products) {
     const c = canonCode(p.posCode);
-    if (c && !m.has(c)) m.set(c, p);
+    if (c && !m.has(`p:${c}`)) m.set(`p:${c}`, p);
+    if (p.marketCode && !m.has(`m:${p.marketCode}`)) m.set(`m:${p.marketCode}`, p);
   }
   return m;
 }
@@ -70,12 +85,14 @@ const qtyTol = (v: number) => Math.max(0.01, Math.abs(v) * 0.01);
 
 // ── Per-line analysis ───────────────────────────────────────────────────────
 export interface AnalyzedLine extends RawDayLine {
-  canon: string;               // canonical code
-  productId: string | null;    // matched product (by code)
-  productName: string | null;  // matched product's English name
-  netValue: number | null;     // net_value, or inferred from qty×price
-  inferred: boolean;           // netValue was computed, not read
-  issues: string[];            // deterministic validation problems
+  canon: string;                    // canonical (hidden) pos code, for matching only
+  productId: string | null;         // matched product (by code)
+  productName: string | null;       // matched product's English name
+  productMarketCode: string | null; // matched product's owner-facing 4-digit code (shown)
+  matchedByBarcode: boolean;        // pos code misread → matched via the barcode instead
+  netValue: number | null;          // net_value, or inferred from qty×price
+  inferred: boolean;                // netValue was computed, not read
+  issues: string[];                 // deterministic validation problems
 }
 
 /** Validate + code-match ONE line. Returns the enriched line; the arithmetic
@@ -83,7 +100,13 @@ export interface AnalyzedLine extends RawDayLine {
 export function analyzeLine(l: RawDayLine, index: Map<string, CodedProduct>): AnalyzedLine {
   const issues: string[] = [];
   const canon = canonCode(l.item_code);
-  const product = canon ? index.get(canon) ?? null : null;
+  // Match on the hidden pos code first (the document's item code); if that misread
+  // and left no match, fall back to the market code derived from the barcode.
+  const mkt = marketCodeFromBarcode(l.barcode);
+  const product = (canon ? index.get(`p:${canon}`) : null)
+    ?? (mkt ? index.get(`m:${mkt}`) : null)
+    ?? null;
+  const matchedByBarcode = !!product && !(canon && index.get(`p:${canon}`));
 
   // net_qty = qty_sold − qty_returned
   if (l.qty_sold != null && l.net_qty != null) {
@@ -117,6 +140,8 @@ export function analyzeLine(l: RawDayLine, index: Map<string, CodedProduct>): An
     canon,
     productId: product?.id ?? null,
     productName: product?.nameEn ?? null,
+    productMarketCode: product?.marketCode ?? null,
+    matchedByBarcode,
     netValue: netValue != null ? r2(netValue) : null,
     inferred,
     issues,

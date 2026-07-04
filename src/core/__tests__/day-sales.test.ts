@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   canonCode, buildCodeIndex, analyzeLine, analyzeDayReport, lineConfidence,
-  decideDayAction, actionCanSave,
+  decideDayAction, actionCanSave, marketCodeFromBarcode,
   type CodedProduct, type RawDayLine, type RawDayReport,
 } from "@/core/import/day-sales";
 
 const products: CodedProduct[] = [
-  { id: "p-cashew", nameEn: "Roasted cashew", nameAr: "كاجو محمص", posCode: "00021296" },
-  { id: "p-fool", nameEn: "Aswan fava", nameAr: "فول اسوانى", posCode: "00021749" },
-  { id: "p-uncoded", nameEn: "No code", nameAr: "بدون كود", posCode: null },
+  { id: "p-cashew", nameEn: "Roasted cashew", nameAr: "كاجو محمص", posCode: "00021296", marketCode: "1626" },
+  { id: "p-fool", nameEn: "Aswan fava", nameAr: "فول اسوانى", posCode: "00021749", marketCode: "1669" },
+  { id: "p-uncoded", nameEn: "No code", nameAr: "بدون كود", posCode: null, marketCode: null },
 ];
 const index = buildCodeIndex(products);
 
@@ -26,21 +26,35 @@ describe("canonCode folds leading zeros / non-digits", () => {
 });
 
 describe("buildCodeIndex skips uncoded products", () => {
-  it("indexes only coded products, by canonical code", () => {
-    expect(index.size).toBe(2);
-    expect(index.get("21296")?.id).toBe("p-cashew");
+  it("indexes coded products under namespaced pos + market keys", () => {
+    expect(index.size).toBe(4); // 2 coded products × (pos key + market key)
+    expect(index.get("p:21296")?.id).toBe("p-cashew");
+    expect(index.get("m:1626")?.id).toBe("p-cashew");
   });
 });
 
 const line = (o: Partial<RawDayLine>): RawDayLine => ({
-  item_code: "00021296", name_ar: "كاجو محمص", avg_unit_price: 1100, qty_sold: 0.11,
+  item_code: "00021296", barcode: "2301626000008", name_ar: "كاجو محمص", avg_unit_price: 1100, qty_sold: 0.11,
   qty_returned: 0, net_qty: 0.11, net_value: 121, ...o,
+});
+
+describe("marketCodeFromBarcode — 230(XXXX) slice, programmatic", () => {
+  it("slices the 4 digits after the 230 prefix", () => {
+    expect(marketCodeFromBarcode("2301606000004")).toBe("1606");
+    expect(marketCodeFromBarcode("2301718000008")).toBe("1718");
+  });
+  it("returns null for a barcode that doesn't fit the pattern", () => {
+    expect(marketCodeFromBarcode("")).toBeNull();
+    expect(marketCodeFromBarcode(null)).toBeNull();
+    expect(marketCodeFromBarcode("12345")).toBeNull();
+  });
 });
 
 describe("analyzeLine — code match + arithmetic", () => {
   it("matches a padded code even when read bare, clean line has no issues", () => {
     const a = analyzeLine(line({ item_code: "21296" }), index);
     expect(a.productId).toBe("p-cashew");
+    expect(a.productMarketCode).toBe("1626"); // matched product's owner-facing code
     expect(a.issues).toEqual([]);
   });
   it("flags net qty ≠ sold − returned", () => {
@@ -62,9 +76,16 @@ describe("analyzeLine — code match + arithmetic", () => {
     expect(a.issues).toContain("value inferred from qty × price");
   });
   it("unmatched code is surfaced, never matched", () => {
-    const a = analyzeLine(line({ item_code: "00099999" }), index);
+    const a = analyzeLine(line({ item_code: "00099999", barcode: "" }), index);
     expect(a.productId).toBeNull();
     expect(a.issues).toContain("code not matched");
+  });
+  it("falls back to the barcode's market code when the item code misreads", () => {
+    // item code misread (00021751) but barcode reads clean (→ market 1626 = cashew)
+    const a = analyzeLine(line({ item_code: "00021751", barcode: "2301626000008" }), index);
+    expect(a.productId).toBe("p-cashew");
+    expect(a.matchedByBarcode).toBe(true);
+    expect(a.issues).not.toContain("code not matched");
   });
 });
 
@@ -90,7 +111,7 @@ describe("analyzeDayReport — totals + reconciliation", () => {
     expect(a.issues.some((i) => i.includes("300"))).toBe(true);
   });
   it("collects unmatched codes for the review queue", () => {
-    const a = analyzeDayReport(report([line({ item_code: "00088888", net_value: 50, net_qty: 0.5, avg_unit_price: 100 })], 50), index);
+    const a = analyzeDayReport(report([line({ item_code: "00088888", barcode: "", net_value: 50, net_qty: 0.5, avg_unit_price: 100 })], 50), index);
     expect(a.unmatchedCodes).toEqual(["88888"]);
     expect(a.matchedCount).toBe(0);
   });
@@ -111,7 +132,7 @@ describe("lineConfidence — enum, gated by doc reconciliation", () => {
     expect(lineConfidence(analyzeLine(line({ net_value: 999 }), index), true)).toBe("partially_verified");
   });
   it("unverified when the line has no matched product", () => {
-    expect(lineConfidence(analyzeLine(line({ item_code: "00077777" }), index), true)).toBe("unverified");
+    expect(lineConfidence(analyzeLine(line({ item_code: "00077777", barcode: "" }), index), true)).toBe("unverified");
   });
 });
 

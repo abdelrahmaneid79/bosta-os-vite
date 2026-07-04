@@ -22,7 +22,7 @@ export async function getCostUpliftPct(): Promise<number> {
 export async function getSearchableProducts(): Promise<(SearchableProduct & { active: boolean })[]> {
   const sb = requireEngine();
   const [pRes, aRes] = await Promise.all([
-    sb.from("products").select("id,name_en,name_ar,active").order("name_en"),
+    sb.from("products").select("id,name_en,name_ar,active,market_code").order("name_en"),
     sb.from("product_aliases").select("product_id,alias"),
   ]);
   if (pRes.error) throw pRes.error;
@@ -32,16 +32,16 @@ export async function getSearchableProducts(): Promise<(SearchableProduct & { ac
     if (!a.product_id || !a.alias) continue;
     const arr = aliasByP.get(a.product_id) ?? []; arr.push(a.alias); aliasByP.set(a.product_id, arr);
   }
-  return (pRes.data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, aliases: aliasByP.get(p.id) ?? [], active: p.active }));
+  return (pRes.data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, aliases: aliasByP.get(p.id) ?? [], marketCode: p.market_code, active: p.active }));
 }
 
 /** Products with their POS item code, for the vision-direct day-sales importer's
  *  exact code matching. name_ar/name_en come along for the review display. */
-export async function getCodedProducts(): Promise<{ id: string; nameEn: string; nameAr: string | null; posCode: string | null }[]> {
+export async function getCodedProducts(): Promise<{ id: string; nameEn: string; nameAr: string | null; posCode: string | null; marketCode: string | null }[]> {
   const { data, error } = await requireEngine()
-    .from("products").select("id,name_en,name_ar,pos_code").order("name_en");
+    .from("products").select("id,name_en,name_ar,pos_code,market_code").order("name_en");
   if (error) throw error;
-  return (data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, posCode: p.pos_code }));
+  return (data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, posCode: p.pos_code, marketCode: p.market_code }));
 }
 
 export interface ProductProfit {

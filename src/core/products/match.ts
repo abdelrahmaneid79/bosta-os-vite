@@ -12,6 +12,7 @@ export interface SearchableProduct {
   nameEn: string;
   nameAr: string | null;
   aliases: string[];
+  marketCode?: string | null; // owner-facing 4-digit code (shown in pickers/lists)
 }
 
 /** Lowercase, collapse whitespace, and fold common Arabic variants. */

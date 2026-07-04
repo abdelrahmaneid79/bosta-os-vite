@@ -49,6 +49,7 @@ export async function readDayReportPhoto(file: File): Promise<RawDayReport> {
     const o = l as Record<string, unknown>;
     return {
       item_code: String(o.item_code ?? "").trim(),
+      barcode: String(o.barcode ?? "").trim(),
       name_ar: String(o.name_ar ?? "").trim(),
       avg_unit_price: numOrNull(o.avg_unit_price),
       qty_sold: numOrNull(o.qty_sold),

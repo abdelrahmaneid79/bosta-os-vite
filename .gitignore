@@ -26,3 +26,6 @@ Daily product sales nov2024-jan2025/
 # importer fetches and turns into editable entries.
 !public/seed/
 !public/seed/*.csv
+
+# supabase CLI scratch state
+supabase/.temp/
