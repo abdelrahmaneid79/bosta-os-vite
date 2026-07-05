@@ -17,3 +17,18 @@ export async function getStrategistConfig(): Promise<StrategistConfig> {
 
 export const saveObjective = (v: string): Promise<void> => setAppSetting("strategist_objective", v);
 export const saveContext = (v: string): Promise<void> => setAppSetting("strategist_context", v);
+
+/** Cached daily briefing (a saved insight — allowed write). Regenerated per day
+ *  or on demand, so opening the dashboard doesn't re-bill the model every visit. */
+export interface StrategistBriefing { date: string; reply: string; generatedAt: string }
+
+export async function getStrategistBriefing(): Promise<StrategistBriefing | null> {
+  const { data, error } = await requireEngine().from("app_settings").select("value").eq("key", "strategist_briefing").maybeSingle();
+  if (error) throw error;
+  const v = data?.value as Partial<StrategistBriefing> | null;
+  return v && typeof v.reply === "string" && typeof v.date === "string"
+    ? { date: v.date, reply: v.reply, generatedAt: typeof v.generatedAt === "string" ? v.generatedAt : v.date }
+    : null;
+}
+
+export const saveStrategistBriefing = (b: StrategistBriefing): Promise<void> => setAppSetting("strategist_briefing", b);
