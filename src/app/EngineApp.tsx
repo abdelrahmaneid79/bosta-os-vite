@@ -24,6 +24,7 @@ import { partitionAlerts, bellCount, type Alert, type AlertSeverity } from "@/co
 // Lazy route chunks — split out of the initial bundle.
 const screens = () => import("@/features/engine/screens");
 const dash = () => import("@/features/engine/dashboard");
+const strategist = () => import("@/features/engine/strategist");
 const money = () => import("@/features/engine/money");
 const more = () => import("@/features/engine/more");
 const product = () => import("@/features/engine/product");
@@ -41,7 +42,7 @@ const SalesScreen = L(screens, "SalesScreen");
 const PurchasesScreen = L(screens, "PurchasesScreen");
 const ReconcileScreen = L(screens, "ReconcileScreen");
 const DashboardScreen = L(dash, "DashboardScreen");
-const HealthScreen = L(dash, "HealthScreen");
+const StrategistScreen = L(strategist, "StrategistScreen");
 const MissingScreen = L(dash, "MissingScreen");
 const ActivityScreen = L(dash, "ActivityScreen");
 const MoneyScreen = L(money, "MoneyScreen");
@@ -91,7 +92,7 @@ const EL: Record<string, React.ReactNode> = {
   "/stock": <StockScreen />, "/purchases": <PurchasesScreen />, "/costs": <ProductCostImportScreen />,
   "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/settlements": <SettlementsScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
-  "/health": <HealthScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
+  "/health": <StrategistScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
   "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/settings/opening": <OpeningBalancesScreen />, "/settings/history": <HistoryImportScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
 };
 const build = (s: { id: string; label: string; icon: string; accent: string; tabs: { to: string; label: string }[] }): Group =>
