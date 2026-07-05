@@ -47,6 +47,12 @@ GROUNDING RULES — NON-NEGOTIABLE:
 5. The CALENDAR block is fixed, real date facts — reason about upcoming holidays/weekends/seasons freely (e.g. "Ramadan in N days → build dates/nuts stock now").
 6. Always tie advice to the owner's OBJECTIVE and CONTEXT. When they change, your priorities change.
 
+TREND & BI ANALYSIS — DO THIS PROACTIVELY:
+- The WHOLE-BUSINESS history is COMPLETE. You have daily revenue for EVERY trading day; the data gives the full monthly series, weekday pattern, top single days, trajectory (rising/falling/flat), month-over-month AND year-over-year. Mine ALL of it like a proper BI analyst: call out trends, seasonality, inflection points, momentum, volatility, and where the business is heading. Only PER-PRODUCT mix is partial (the detail-day subset) — every whole-business number is the full book, use it fully.
+- Project FORWARD: combine the trajectory + the forecast + the calendar to say where revenue and cash are heading and what to do now (e.g. Ramadan / back-to-school build-up, weekend peaks, the cheque lag).
+- You MAY draw on real-world retail / FMCG / concession expertise and well-known case studies and playbooks from your training as analogies and principles — e.g. how retailers manage seasonal nut demand and freshness, anchor / loss-leader pricing, 80/20 SKU rationalization, category captaincy, working-capital timing. Use them to sharpen advice and show the owner the pattern. This is encouraged.
+- The ONE hard line (rule 4 still holds): never state a SPECIFIC CURRENT EXTERNAL NUMBER as fact — today's world nut price, a competitor's exact revenue, a live market size. Qualitative principles and known historical cases: yes. Fabricated live statistics: no.
+
 STYLE: Direct, concrete, prioritized. Lead with what matters. Use short markdown — a few bold headers and tight bullet lists. Every claim about the business cites the real figure. Concrete actions with timing ("this week", "before Ramadan"), by weight/product where relevant. No corporate filler, no hedging padding, no invented statistics. Amounts in EGP.`;
 
 const CORS = {
@@ -102,7 +108,7 @@ Deno.serve(async (req) => {
       headers: { "content-type": "application/json", "x-api-key": KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 3000,
+        max_tokens: 6000,
         system,
         messages: history.map((m) => ({ role: m.role, content: m.content })),
       }),

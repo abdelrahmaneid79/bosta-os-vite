@@ -24,6 +24,29 @@ import { getAnalytics } from "@/core/read/analytics";
 const r0 = (n: number | null | undefined) => (n == null ? null : Math.round(n));
 const r1 = (n: number | null | undefined) => (n == null ? null : Math.round(n * 10) / 10);
 
+/** Trend/BI signals over the FULL monthly revenue history (all trading days) —
+ *  trajectory, MoM, YoY, best/worst. Computed, never invented. */
+function computeTrends(monthly: { label: string; value: number }[]) {
+  const ms = [...monthly].filter((m) => m.value > 0).sort((a, b) => a.label.localeCompare(b.label));
+  const n = ms.length;
+  const avg = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null);
+  const last = ms[n - 1], prev = ms[n - 2];
+  const momPct = last && prev && prev.value ? ((last.value - prev.value) / prev.value) * 100 : null;
+  const last3 = avg(ms.slice(-3).map((m) => m.value));
+  const prior3 = avg(ms.slice(-6, -3).map((m) => m.value));
+  const traj = last3 != null && prior3 != null && prior3 > 0 ? (last3 - prior3) / prior3 : null;
+  const trajectory = traj == null ? "unknown" : traj > 0.05 ? "rising" : traj < -0.05 ? "falling" : "flat";
+  const best = ms.reduce<{ label: string; value: number } | null>((a, b) => (b.value > (a?.value ?? -1) ? b : a), null);
+  const worst = ms.reduce<{ label: string; value: number } | null>((a, b) => (b.value < (a?.value ?? Infinity) ? b : a), null);
+  let yoy: number | null = null;
+  if (last) {
+    const [y, m] = last.label.split("-");
+    const py = ms.find((x) => x.label === `${+y - 1}-${m}`);
+    if (py && py.value) yoy = ((last.value - py.value) / py.value) * 100;
+  }
+  return { monthsOfData: n, trajectory, momPct, yoy, last3, prior3, best, worst };
+}
+
 export interface BusinessSnapshot {
   generatedFor: string;
   coverage: {
@@ -43,6 +66,16 @@ export interface BusinessSnapshot {
     topByRevenue: { name: string; revenue: number | null }[];
   };
   series: { monthlyRevenue: { month: string; revenue: number | null }[]; dayOfWeek: { day: string; avg: number | null }[] };
+  trends: {
+    monthsOfData: number;
+    trajectory: string; // rising | falling | flat | unknown (last 3 mo vs prior 3)
+    momPct: number | null; // latest full month vs previous
+    yoyLatestPct: number | null; // latest month vs same month a year earlier
+    last3Avg: number | null; prior3Avg: number | null;
+    best: { month: string; revenue: number } | null;
+    worst: { month: string; revenue: number } | null;
+    topRevenueDays: { date: string; revenue: number | null }[];
+  };
   forecast: { next7: number | null; next30: number | null; confidence: string; basis: string };
   heuristics: {
     health: { overall: number | null; status: string; categories: { label: string; score: number | null; reason: string }[] };
@@ -118,6 +151,16 @@ export async function assembleSnapshot(): Promise<BusinessSnapshot> {
       monthlyRevenue: analytics.monthlyRevenue.map((s) => ({ month: s.label, revenue: r0(s.value) })),
       dayOfWeek: analytics.dayOfWeek.map((s) => ({ day: s.label, avg: r0(s.value) })),
     },
+    trends: (() => {
+      const t = computeTrends(analytics.monthlyRevenue);
+      return {
+        monthsOfData: t.monthsOfData, trajectory: t.trajectory, momPct: r1(t.momPct), yoyLatestPct: r1(t.yoy),
+        last3Avg: r0(t.last3), prior3Avg: r0(t.prior3),
+        best: t.best ? { month: t.best.label, revenue: r0(t.best.value)! } : null,
+        worst: t.worst ? { month: t.worst.label, revenue: r0(t.worst.value)! } : null,
+        topRevenueDays: analytics.topRevenueDays.slice(0, 8).map((d) => ({ date: d.date, revenue: r0(d.total) })),
+      };
+    })(),
     forecast: { next7: r0(forecast.next7), next30: r0(forecast.next30), confidence: forecast.confidence, basis: forecast.basis },
     heuristics: {
       health: {

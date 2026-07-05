@@ -173,6 +173,8 @@ export function StrategistScreen() {
                   <span>forecast next 30d: {s.forecast.next30 == null ? "—" : egp(s.forecast.next30)} ({s.forecast.confidence})</span>
                 </div>
               </div>
+              <TrendRow label="Trajectory · last 3mo vs prior 3" value={s.trends.trajectory} />
+              <TrendRow label="Year-over-year · latest month" value={s.trends.yoyLatestPct == null ? "—" : `${s.trends.yoyLatestPct > 0 ? "+" : ""}${s.trends.yoyLatestPct}%`} />
               <TrendRow label="Best weekday" value={bestDay(s.series.dayOfWeek)} />
               <TrendRow label="Awaiting cheque (open tab)" value={s.settlement.openTabRevenue == null ? "—" : `${egp(s.settlement.openTabRevenue)} · ${s.settlement.openTabDays ?? 0}d`} />
               <TrendRow label="Blended mall deduction" value={s.settlement.blendedDeductionPct == null ? "—" : `${s.settlement.blendedDeductionPct}%`} />
