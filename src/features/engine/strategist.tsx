@@ -1,25 +1,25 @@
-/** Business Strategist — the rebuilt Insights › Health screen. A proactive DAILY
- *  TIPS DASHBOARD (not a chat): on open it generates today's briefing from the
- *  audited snapshot + the owner's objective/context + the real calendar, and
- *  reasons ON TOP of the heuristic engines. TRENDS and DATA-CONFIDENCE panels are
- *  rendered deterministically from the snapshot. The briefing is cached per day
- *  (a saved insight) so opening the tab doesn't re-bill the model every visit.
- *  The ONLY writes are the objective/context text + the cached briefing. */
+/** Business Strategist — the rebuilt Insights › Health screen. A proactive HEALTH
+ *  DASHBOARD (not a chat, not a form): it leads with live KPIs + an auto-generated
+ *  daily strategy built from everything the app knows, reasoning ON TOP of the
+ *  heuristic engines. Objective/context are optional tuning, tucked away. TRENDS
+ *  and DATA-CONFIDENCE are rendered deterministically from the snapshot. The
+ *  briefing is cached per day. The ONLY writes are objective/context + the cached
+ *  briefing (rule 9). */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DeckTile, TileHead } from "./deck";
+import { DeckTile, TileHead, Stat } from "./deck";
 import { Button, Sparkline } from "@/components/ui";
 import { SkeletonRows, ErrorState, EmptyState } from "@/components/feedback";
 import { isEngineConfigured } from "@/core/db/engine";
 import { todayCairo } from "@/core/time";
-import { egp, num } from "@/core/utils/format";
+import { egp, egpShort, num } from "@/core/utils/format";
 import { useUI } from "@/store/ui";
 import { assembleSnapshot } from "@/core/strategist/snapshot";
 import { computeCalendar, type CalendarContext } from "@/core/strategist/calendar";
 import { askStrategist, StrategistAuthError } from "@/core/strategist/client";
 import { getStrategistConfig, saveObjective, saveContext, getStrategistBriefing, saveStrategistBriefing, type StrategistBriefing } from "@/core/strategist/config";
 
-const dailyPrompt = (cal: CalendarContext) => `It's ${cal.dayOfWeek}, ${cal.today}. Give me my daily briefing as a dashboard — no preamble, no sign-off.
+const dailyPrompt = (cal: CalendarContext) => `It's ${cal.dayOfWeek}, ${cal.today}. Give me my strategy dashboard for today — no preamble, no sign-off.
 
 **Today's focus** — one sharp line: the single most important thing to do today.
 
@@ -61,6 +61,7 @@ export function StrategistScreen() {
 
   const [objective, setObjective] = useState<string | null>(null);
   const [context, setContext] = useState<string | null>(null);
+  const [tune, setTune] = useState(false);
   const obj = objective ?? cfg.data?.objective ?? "";
   const ctx = context ?? cfg.data?.context ?? "";
 
@@ -92,37 +93,56 @@ export function StrategistScreen() {
 
   const s = snap.data;
   const busy = gen.isPending;
+  const monthly = s?.series.monthlyRevenue ?? [];
+  const latest = monthly.length ? monthly[monthly.length - 1] : null;
+  const overall = s?.heuristics.health.overall ?? null;
+  const hcol = overall == null ? "var(--faint)" : overall >= 75 ? "var(--green)" : overall >= 55 ? "var(--amber)" : "var(--red)";
+  const pctLabel = (p: number | null | undefined) => (p == null ? "—" : `${p > 0 ? "+" : ""}${p}%`);
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      {/* Objective + Context */}
-      <div className="row2">
-        <DeckTile>
-          <TileHead name="Your objective" right="steers today's tips" />
-          <textarea className="input" style={{ minHeight: 62, resize: "vertical", width: "100%" }} placeholder="e.g. grow monthly profit 20% without adding cash risk; prep for Ramadan"
-            value={obj} onChange={(e) => setObjective(e.target.value)} onBlur={() => saveObjective(obj)} />
-        </DeckTile>
-        <DeckTile>
-          <TileHead name="Situational context" right="real-world facts you know" />
-          <textarea className="input" style={{ minHeight: 62, resize: "vertical", width: "100%" }} placeholder="e.g. cashew supplier raised prices 12%; running a weekend promo"
-            value={ctx} onChange={(e) => setContext(e.target.value)} onBlur={() => saveContext(ctx)} />
-        </DeckTile>
-      </div>
+      {/* KPI hero — instant, deterministic, always populated */}
+      {snap.isLoading && <SkeletonRows rows={2} />}
+      {snap.isError && <ErrorState message={String((snap.error as Error)?.message)} onRetry={() => snap.refetch()} />}
+      {s && (
+        <div className="statgrid">
+          <Stat label="Business health" color={hcol} value={overall == null ? "—" : `${overall}`} sub={<span style={{ color: hcol, fontSize: 11, fontWeight: 700 }}>{s.heuristics.health.status}</span>} />
+          <Stat label="Revenue · all-time" color="var(--violet)" value={s.revenue.allTime == null ? "—" : egpShort(s.revenue.allTime)} sub={`${num(s.coverage.daysTraded)} days traded`} />
+          <Stat label={`Latest month${latest ? ` · ${latest.month}` : ""}`} color="var(--mag)" value={latest?.revenue == null ? "—" : egp(latest.revenue)} sub={`MoM ${pctLabel(s.trends.momPct)} · YoY ${pctLabel(s.trends.yoyLatestPct)}`} />
+          <Stat label="Cheque income" color="var(--cyan)" value={s.settlement.totalReceived == null ? "—" : egpShort(s.settlement.totalReceived)} sub={`mall takes ${s.settlement.blendedDeductionPct ?? "—"}%`} />
+        </div>
+      )}
 
-      {/* Daily briefing — the dashboard */}
+      {/* Today's strategy — the hero AI briefing */}
       <DeckTile>
         <TileHead
-          name={`Today's briefing · ${calendar.dayOfWeek}${calendar.isWeekend ? " (weekend)" : ""}`}
-          right={s ? <Button size="sm" variant="outline" onClick={() => gen.mutate()} disabled={busy}>{busy ? "Thinking…" : briefing ? "Refresh" : "Generate"}</Button> : "loading data…"}
+          name={`Today's strategy · ${calendar.dayOfWeek}${calendar.isWeekend ? " (weekend)" : ""}`}
+          right={
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setTune((t) => !t)} style={{ fontSize: 12, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line)", background: tune ? "var(--panel2)" : "transparent", color: "var(--muted)", cursor: "pointer" }}>⚙ Tune</button>
+              {s && <Button size="sm" variant="outline" onClick={() => gen.mutate()} disabled={busy}>{busy ? "Thinking…" : briefing ? "Refresh" : "Generate"}</Button>}
+            </div>
+          }
         />
-        {snap.isLoading && <SkeletonRows rows={4} />}
-        {snap.isError && <ErrorState message={String((snap.error as Error)?.message)} onRetry={() => snap.refetch()} />}
-        {s && !briefing && busy && <div style={{ fontSize: 13, color: "var(--dim)", padding: "8px 0" }}>Reading your numbers and the calendar to build today's tips…</div>}
-        {s && !briefing && !busy && <div style={{ fontSize: 13, color: "var(--dim)", padding: "8px 0" }}>No briefing yet — tap Generate for today's tips.</div>}
+        {tune && (
+          <div style={{ display: "grid", gap: 10, marginBottom: 14, padding: 12, border: "1px dashed var(--line)", borderRadius: 12 }}>
+            <div>
+              <div className="eyebrow" style={{ color: "var(--dim)", marginBottom: 4 }}>Your objective — steers the strategy (optional)</div>
+              <textarea className="input" style={{ minHeight: 48, resize: "vertical", width: "100%" }} placeholder="e.g. grow monthly profit 20% without adding cash risk; prep for Ramadan" value={obj} onChange={(e) => setObjective(e.target.value)} onBlur={() => saveObjective(obj)} />
+            </div>
+            <div>
+              <div className="eyebrow" style={{ color: "var(--dim)", marginBottom: 4 }}>Situational context — real-world facts only you know (optional)</div>
+              <textarea className="input" style={{ minHeight: 48, resize: "vertical", width: "100%" }} placeholder="e.g. cashew supplier raised prices 12%; running a weekend promo" value={ctx} onChange={(e) => setContext(e.target.value)} onBlur={() => saveContext(ctx)} />
+            </div>
+            <div style={{ fontSize: 11, color: "var(--faint)" }}>Tap Refresh after editing to fold these into today's strategy.</div>
+          </div>
+        )}
+        {s && !briefing && busy && <div style={{ fontSize: 13, color: "var(--dim)", padding: "8px 0" }}>Reading your numbers, trends and the calendar to build today's strategy…</div>}
+        {s && !briefing && !busy && <div style={{ fontSize: 13, color: "var(--dim)", padding: "8px 0" }}>No strategy yet — tap Generate.</div>}
         {briefing && (
           <>
             <Markdown text={briefing.reply} />
-            <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 6 }}>Generated {briefing.generatedAt.slice(0, 16).replace("T", " ")} · grounded in your live data · Refresh after changing objective/context.</div>
+            <div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 6 }}>Generated {briefing.generatedAt.slice(0, 16).replace("T", " ")} · grounded in your live data{latest ? ` · freshest data ${latest.month}` : ""}.</div>
           </>
         )}
       </DeckTile>
@@ -152,13 +172,12 @@ export function StrategistScreen() {
             <div style={{ display: "grid", gap: 14 }}>
               <div>
                 <div className="eyebrow" style={{ color: "var(--dim)", marginBottom: 6 }}>Monthly revenue</div>
-                <Sparkline data={s.series.monthlyRevenue.map((m) => m.revenue ?? 0)} height={54} />
+                <Sparkline data={monthly.map((m) => m.revenue ?? 0)} height={54} />
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--dim)", marginTop: 4 }}>
                   <span>{s.trends.monthsOfData} months · {s.trends.trajectory}</span>
-                  <span>MoM {s.revenue.momGrowthPct == null ? "—" : `${s.revenue.momGrowthPct > 0 ? "+" : ""}${s.revenue.momGrowthPct}%`}</span>
+                  <span>YoY {pctLabel(s.trends.yoyLatestPct)}</span>
                 </div>
               </div>
-              <TrendRow label="Year-over-year · latest month" value={s.trends.yoyLatestPct == null ? "—" : `${s.trends.yoyLatestPct > 0 ? "+" : ""}${s.trends.yoyLatestPct}%`} />
               <TrendRow label="Best month" value={s.trends.best ? `${s.trends.best.month} · ${egp(s.trends.best.revenue)}` : "—"} />
               <TrendRow label="Best weekday" value={bestDay(s.series.dayOfWeek)} />
               <TrendRow label="Awaiting cheque (open tab)" value={s.settlement.openTabRevenue == null ? "—" : `${egp(s.settlement.openTabRevenue)} · ${s.settlement.openTabDays ?? 0}d`} />
@@ -173,7 +192,7 @@ export function StrategistScreen() {
           <DeckTile>
             <TileHead name="Data confidence" right="what's solid vs thin" />
             <div style={{ display: "grid", gap: 6 }}>
-              <TrendRow label="Business health" value={`${s.heuristics.health.overall ?? "—"}/100 · ${s.heuristics.health.status}`} />
+              <TrendRow label="Business health" value={`${overall ?? "—"}/100 · ${s.heuristics.health.status}`} />
               <TrendRow label="This-month profit" value={s.profit.complete ? `${egp(s.profit.thisMonthNet ?? 0)} (complete)` : `withheld · ${s.profit.missingCostLines} lines lack cost`} />
               <TrendRow label="Days traded" value={num(s.coverage.daysTraded)} />
               <div style={{ fontSize: 11.5, color: "var(--dim)", lineHeight: 1.45, margin: "2px 0 6px" }}>{s.coverage.productDetail}</div>
