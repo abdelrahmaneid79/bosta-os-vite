@@ -31,7 +31,7 @@ export const NAV_SECTIONS: NavSection[] = [
     { to: "/reports/tables", label: "Tables & export" },
   ] },
   { id: "insights", label: "Insights", icon: "M22 12h-4l-3 8L9 4l-3 8H2", accent: "#54D69A", tabs: [
-    { to: "/health", label: "Health" },
+    { to: "/health", label: "Strategist" },
     { to: "/missing", label: "Gaps" },
     { to: "/activity", label: "Activity" },
   ] },
