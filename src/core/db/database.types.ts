@@ -1283,6 +1283,7 @@ export type Database = {
           selling_price: number | null
           unit_type: Database["public"]["Enums"]["product_unit_type"]
           updated_at: string
+          vendor: string | null
         }
         Insert: {
           active?: boolean
@@ -1304,6 +1305,7 @@ export type Database = {
           selling_price?: number | null
           unit_type?: Database["public"]["Enums"]["product_unit_type"]
           updated_at?: string
+          vendor?: string | null
         }
         Update: {
           active?: boolean
@@ -1325,6 +1327,7 @@ export type Database = {
           selling_price?: number | null
           unit_type?: Database["public"]["Enums"]["product_unit_type"]
           updated_at?: string
+          vendor?: string | null
         }
         Relationships: [
           {

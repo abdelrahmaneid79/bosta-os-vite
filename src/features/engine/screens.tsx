@@ -60,13 +60,19 @@ export function StockScreen() {
   const q = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: isEngineConfigured });
   const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
   const [search, setSearch] = useState("");
+  const [vendor, setVendor] = useState<string>("All");
   const [modal, setModal] = useState<null | { mode: "add" } | { mode: "edit"; product: Tables<"products"> }>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
   const s = q.data;
   const byId = new Map((prods.data ?? []).map((p) => [p.id, p]));
   const term = search.trim().toLowerCase();
-  const positions = (s?.positions ?? []).filter((p) => !term || p.nameEn.toLowerCase().includes(term) || (byId.get(p.id)?.name_ar ?? "").toLowerCase().includes(term));
+  const vendors = useMemo(() => Array.from(new Set((s?.positions ?? []).map((p) => p.vendor).filter((v): v is string => !!v))).sort(), [s]);
+  const hasUnassigned = (s?.positions ?? []).some((p) => !p.vendor);
+  const positions = (s?.positions ?? []).filter((p) =>
+    (!term || p.nameEn.toLowerCase().includes(term) || (byId.get(p.id)?.name_ar ?? "").toLowerCase().includes(term))
+    && (vendor === "All" || (vendor === "Unassigned" ? !p.vendor : p.vendor === vendor)),
+  );
   const counted = (s?.positions ?? []).filter((p) => p.onHand !== 0).length;
   return (
     <div>
@@ -81,6 +87,21 @@ export function StockScreen() {
         <button className="addbtn" onClick={() => setManageOpen(true)}>Products</button>
         <button className="qadd" style={{ height: "auto" }} onClick={() => setModal({ mode: "add" })}><span>+ Add product</span></button>
       </div>
+      {vendors.length > 0 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+          {["All", ...vendors, ...(hasUnassigned ? ["Unassigned"] : [])].map((v) => {
+            const on = vendor === v;
+            const count = v === "All" ? (s?.positions ?? []).length : v === "Unassigned" ? (s?.positions ?? []).filter((p) => !p.vendor).length : (s?.positions ?? []).filter((p) => p.vendor === v).length;
+            return (
+              <button key={v} onClick={() => setVendor(v)} style={{
+                padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer",
+                border: on ? "1px solid var(--mag)" : "1px solid var(--line)",
+                background: on ? "var(--mag)" : "transparent", color: on ? "#fff" : "var(--muted)",
+              }}>{v} <span style={{ opacity: 0.7 }}>· {count}</span></button>
+            );
+          })}
+        </div>
+      )}
       <Guarded q={q} empty={!!s && s.positions.length === 0}>
         <DeckTile style={{ padding: 0 }}>
           <div className="scroll">
@@ -89,7 +110,7 @@ export function StockScreen() {
               <tbody>
                 {positions.map((p) => (
                   <tr key={p.id} className="prodcell" onClick={() => setDetailId(p.id)}>
-                    <td style={{ fontSize: 14 }}>{p.marketCode && <span className="tnum" style={{ color: "var(--faint)", fontSize: 12, marginRight: 6 }}>#{p.marketCode}</span>}{p.nameEn}{!p.active && <span style={{ color: "var(--faint)" }}> · inactive</span>}</td>
+                    <td style={{ fontSize: 14 }}>{p.marketCode && <span className="tnum" style={{ color: "var(--faint)", fontSize: 12, marginRight: 6 }}>#{p.marketCode}</span>}{p.nameEn}{p.vendor && <span style={{ marginLeft: 6, fontSize: 11, color: "var(--dim)", border: "1px solid var(--line)", borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>{p.vendor}</span>}{!p.active && <span style={{ color: "var(--faint)" }}> · inactive</span>}</td>
                     <td className="r" style={{ color: p.isNegative ? "var(--red)" : p.onHand === 0 ? "var(--faint)" : undefined }}>
                       {p.onHand === 0 ? "—" : num(p.onHand)} <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span>
                     </td>

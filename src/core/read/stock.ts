@@ -7,6 +7,7 @@ export interface StockPosition {
   nameEn: string;
   nameAr: string | null;
   marketCode: string | null; // owner-facing 4-digit code
+  vendor: string | null;     // supplier the product is bought from
   baseUnit: string;
   saleUnit: string | null;
   onHand: number;        // base units (current_stock cache)
@@ -39,6 +40,7 @@ export async function getStockSummary(): Promise<StockSummary> {
       nameEn: p.name_en,
       nameAr: p.name_ar,
       marketCode: p.market_code,
+      vendor: p.vendor,
       baseUnit: p.base_unit,
       saleUnit: p.sale_unit,
       onHand,
