@@ -2,7 +2,7 @@ import { useMemo, useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
-import { DeckTile, TileHead } from "./deck";
+import { DeckTile } from "./deck";
 import { BarChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp, egpShort } from "@/core/utils/format";
@@ -11,7 +11,7 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { getMissingData } from "@/core/read/missing";
 import { getRiskInsights } from "@/core/read/insights";
 import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
-import { getHealthReport, type HealthCategory } from "@/core/read/health";
+import { getHealthReport } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getExpenses } from "@/core/read/expenses";
 import { getChequeCycle } from "@/core/read/settlements";
@@ -408,85 +408,6 @@ export function InsightRow({ i }: { i: Insight }) {
 
 function Note({ children }: { children: React.ReactNode }) {
   return <div className="py-1 text-sm" style={{ color: "var(--dim)" }}>{children}</div>;
-}
-
-/* ─ Business Health — Command Deck layout (identical to the design) ───────── */
-export function HealthScreen() {
-  const today = todayCairo();
-  const q = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
-  const daily = useQuery({ queryKey: ["dailyHist", "2024-01-01"], queryFn: () => getDailyRevenue({ from: "2024-01-01", to: today }), enabled: en });
-  const exp = useQuery({ queryKey: ["dash-spend", "2024-01-01"], queryFn: () => getExpenses({ from: "2024-01-01", to: today }), enabled: en });
-  if (!en) return <EmptyState title="Sign in to compute health" hint="Built from your real data only — never faked." />;
-  if (q.isLoading) return <SkeletonRows rows={5} />;
-  if (q.isError) return <ErrorState message={String((q.error as Error)?.message)} />;
-  const h = q.data!;
-  const score = h.overall ?? 0;
-  const col = score >= 75 ? "var(--green)" : score >= 55 ? "var(--amber)" : "var(--red)";
-  const R = 80, C = 2 * Math.PI * R;
-
-  const rev = new Map<string, number>(); for (const r of daily.data ?? []) rev.set(r.date.slice(0, 7), (rev.get(r.date.slice(0, 7)) ?? 0) + r.total);
-  const spend = new Map<string, number>(); for (const e of exp.data ?? []) spend.set(e.date.slice(0, 7), (spend.get(e.date.slice(0, 7)) ?? 0) + e.amount);
-  const months = [...rev.keys()].sort().slice(-6);
-  const net6 = months.map((m) => ({ label: MON[+m.slice(5, 7) - 1], full: `${MON[+m.slice(5, 7) - 1]} ${m.slice(0, 4)}`, value: (rev.get(m) ?? 0) - (spend.get(m) ?? 0) }));
-
-  const scored = h.categories.filter((c): c is HealthCategory & { score: number } => c.score != null);
-  const strengths = scored.filter((c) => c.score >= 65);
-  const risks = scored.filter((c) => c.score < 65);
-  const cc = (s: number) => (s >= 70 ? "var(--green)" : s >= 45 ? "var(--amber)" : "var(--red)");
-  const summary = `Overall health is ${h.status.toLowerCase()} at ${score}/100${strengths[0] ? `, led by ${strengths[0].label.toLowerCase()}` : ""}${risks[0] ? ` and held back by ${risks[0].label.toLowerCase()}` : ""}.`;
-  const li = (c: HealthCategory, good: boolean) => (
-    <div className="bhitem" key={c.key}>
-      <svg viewBox="0 0 24 24" fill="none" stroke={good ? "var(--green)" : "var(--amber)"} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        {good ? <path d="M20 6 9 17l-5-5" /> : <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />}
-      </svg>
-      <div><b style={{ color: "var(--text)", fontWeight: 600 }}>{c.label}</b> — {c.reason}</div>
-    </div>
-  );
-
-  return (
-    <div>
-      <div className="bh">
-        <DeckTile>
-          <div className="bhscore">
-            <div className="pulse" style={{ borderColor: col }} />
-            <div className="pulse" style={{ borderColor: col, animationDelay: "1.6s" }} />
-            <svg width={200} height={200} viewBox="0 0 200 200">
-              <circle cx={100} cy={100} r={80} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth={14} />
-              <circle cx={100} cy={100} r={80} fill="none" stroke={col} strokeWidth={14} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - score / 100)} transform="rotate(-90 100 100)" style={{ filter: `drop-shadow(0 0 9px ${col})` }} />
-            </svg>
-            <div style={{ position: "absolute", textAlign: "center" }}>
-              <div className="bhbig" style={{ color: col }}>{score}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".09em", textTransform: "uppercase", color: col }}>{h.status}</div>
-            </div>
-          </div>
-          <div style={{ textAlign: "center", fontSize: 13, color: "var(--muted)", marginTop: 16, lineHeight: 1.55 }}>{summary}</div>
-          <div style={{ marginTop: 22, width: "100%" }}>
-            <div className="eyebrow" style={{ color: "var(--dim)", marginBottom: 10 }}>Net cash · last 6 months</div>
-            {/* AreaChart: y-axis + a date·amount tooltip (hover or swipe), and it
-                handles negative net-cash months — the old sparkline had neither. */}
-            <AreaChart data={net6} id="net6" height={150} axis />
-          </div>
-        </DeckTile>
-        <DeckTile>
-          <TileHead name="Health by dimension" right="weighted score" />
-          {h.categories.map((c) => {
-            const col2 = c.score == null ? "var(--faint)" : cc(c.score);
-            return (
-              <div className="meter" key={c.key}>
-                <div className="mh"><span className="mn">{c.label}</span><span className="ms" style={{ color: col2 }}>{c.score == null ? "—" : Math.round(c.score)}<span style={{ color: "var(--faint)", fontSize: 11 }}>/100</span></span></div>
-                <div className="track"><i style={{ width: `${c.score == null ? 0 : Math.round(c.score)}%`, background: col2 }} /></div>
-                <div className="mt">{c.reason}</div>
-              </div>
-            );
-          })}
-        </DeckTile>
-      </div>
-      <div className="row2" style={{ marginTop: 16 }}>
-        <DeckTile><TileHead name={<span style={{ color: "var(--green)" }}>Working well</span>} />{strengths.length ? strengths.map((c) => li(c, true)) : <div className="bhitem"><div>Nothing is clearly strong yet — keep logging records.</div></div>}</DeckTile>
-        <DeckTile><TileHead name={<span style={{ color: "var(--amber)" }}>Watch closely</span>} />{risks.length ? risks.map((c) => li(c, false)) : <div className="bhitem"><div>Nothing flashing red — keep it up.</div></div>}</DeckTile>
-      </div>
-    </div>
-  );
 }
 
 /* ─ Gaps: risks & signals + data gaps ──────────────────────────────────── */
