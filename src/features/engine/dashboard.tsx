@@ -15,7 +15,7 @@ import { getHealthReport } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getExpenses } from "@/core/read/expenses";
 import { getChequeCycle } from "@/core/read/settlements";
-import { todayCairo, monthBoundsCairo } from "@/core/time";
+import { todayCairo, monthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
 import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
@@ -79,7 +79,7 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
             <stop offset="0" stopColor="var(--mag)" stopOpacity={strong ? 0.42 : 0.26} /><stop offset="1" stopColor="var(--mag)" stopOpacity="0" />
           </linearGradient>
           <linearGradient id={`gs_${id}`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="var(--violet)" /><stop offset="0.55" stopColor="var(--mag)" /><stop offset="1" stopColor="var(--cyan)" />
+            <stop offset="0" stopColor="rgb(var(--violet))" /><stop offset="0.55" stopColor="var(--mag)" /><stop offset="1" stopColor="rgb(var(--cyan))" />
           </linearGradient>
         </defs>
         {axis && [0, 0.5, 1].map((g, i) => <line key={i} x1={padL} y1={padT + plotH * g} x2={W - padR} y2={padT + plotH * g} className="grid-line" />)}
@@ -114,7 +114,7 @@ function HealthGauge({ score, label, suffix = "%", color }: { score: number; lab
       <svg viewBox="0 0 200 122" width="200" height="122">
         <defs>
           <linearGradient id="gauge-grad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="var(--cyan)" /><stop offset="1" stopColor="var(--green)" />
+            <stop offset="0" stopColor="rgb(var(--cyan))" /><stop offset="1" stopColor="var(--green)" />
           </linearGradient>
         </defs>
         <path d={path} fill="none" stroke="rgba(255,255,255,.06)" strokeWidth={15} strokeLinecap="round" />
@@ -173,7 +173,7 @@ export function DashboardScreen() {
   const monthLabel = `${MON[monthNum - 1]} ${yearNum}`, monthShort = MON[monthNum - 1], prevMonthShort = MON[(monthNum + 10) % 12];
   const revDelta = pctDelta(d.monthRev, d.lastRev);
   const mTo2 = `${d.monthKey}-${String(new Date(yearNum, monthNum, 0).getDate()).padStart(2, "0")}`;
-  const monthDays = isoRangeDays(`${d.monthKey}-01`, mTo2 <= today ? mTo2 : today);
+  const monthDays = isoRange(`${d.monthKey}-01`, mTo2 <= today ? mTo2 : today);
   const tradingDays = monthDays.filter((x) => (byDay.get(x) ?? 0) > 0).length || monthDays.length;
   const avgPerDay = tradingDays ? d.monthRev / tradingDays : 0;
   const heroData: ChartPt[] = monthDays.map((x) => ({ label: fmtDate(x, "d MMM"), full: fmtDate(x, "d MMM yyyy"), value: byDay.get(x) ?? 0 }));
@@ -189,7 +189,7 @@ export function DashboardScreen() {
   for (const e of spendRows) catMap.set(e.category, (catMap.get(e.category) ?? 0) + e.amount);
   const cats = [...catMap.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 5);
   const catMax = Math.max(1, ...cats.map((c) => c.value));
-  const CATCOL = ["var(--mag)", "var(--violet)", "var(--cyan)", "var(--amber)", "var(--lime)"];
+  const CATCOL = ["var(--mag)", "rgb(var(--violet))", "rgb(var(--cyan))", "var(--amber)", "rgb(var(--lime))"];
 
   const venMap = new Map<string, number>();
   for (const e of spendRows) if (e.notes) venMap.set(e.notes, (venMap.get(e.notes) ?? 0) + e.amount);
@@ -202,18 +202,18 @@ export function DashboardScreen() {
 
   // this week — daily bars ending at the latest recorded day
   const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const weekDays = isoRangeDays(isoShift(d.latest, -6), d.latest);
-  const weekBars = weekDays.map((x) => ({ label: WD[new Date(x + "T00:00:00").getDay()], full: fmtDate(x, "EEE d MMM"), value: byDay.get(x) ?? 0 }));
+  const weekDays = isoRange(isoDaysAgo(d.latest, 6), d.latest);
+  const weekBars = weekDays.map((x) => ({ label: WD[new Date(x + "T00:00:00Z").getUTCDay()], full: fmtDate(x, "EEE d MMM"), value: byDay.get(x) ?? 0 }));
   const weekTotal = weekBars.reduce((s, b) => s + b.value, 0);
-  const priorTotal = isoRangeDays(isoShift(d.latest, -13), isoShift(d.latest, -7)).reduce((s, x) => s + (byDay.get(x) ?? 0), 0);
+  const priorTotal = isoRange(isoDaysAgo(d.latest, 13), isoDaysAgo(d.latest, 7)).reduce((s, x) => s + (byDay.get(x) ?? 0), 0);
   const weekDelta = pctDelta(weekTotal, priorTotal);
 
   // trend — daily over the selected window
   const trendTo = trendR === "Custom" ? (cTo || d.latest) : d.latest;
   const trendFrom = trendR === "Custom" ? (cFrom || d.earliest)
     : trendR === "All" ? d.earliest
-    : (() => { const n = { "1D": 1, "1W": 7, "1M": 30, "3M": 90, "6M": 180 }[trendR]; const f = isoShift(trendTo, -(n - 1)); return f < d.earliest ? d.earliest : f; })();
-  const trendData: ChartPt[] = isoRangeDays(trendFrom, trendTo).map((x) => ({ label: fmtDate(x, "d MMM"), full: fmtDate(x, "d MMM yyyy"), value: byDay.get(x) ?? 0 }));
+    : (() => { const n = { "1D": 1, "1W": 7, "1M": 30, "3M": 90, "6M": 180 }[trendR]; const f = isoDaysAgo(trendTo, n - 1); return f < d.earliest ? d.earliest : f; })();
+  const trendData: ChartPt[] = isoRange(trendFrom, trendTo).map((x) => ({ label: fmtDate(x, "d MMM"), full: fmtDate(x, "d MMM yyyy"), value: byDay.get(x) ?? 0 }));
 
   return (
     <div className="cdk space-y-5">
@@ -224,11 +224,11 @@ export function DashboardScreen() {
           <div><div className="tkl">Revenue · {monthShort}</div><div className="tkv tnum">{money2(d.monthRev)}{revDelta != null && <em style={{ color: revDelta >= 0 ? "var(--green)" : "var(--red)", fontStyle: "normal", fontSize: 11, fontWeight: 700 }}> {revDelta >= 0 ? "▲" : "▼"}{Math.abs(revDelta).toFixed(1)}%</em>}</div></div>
         </div>
         <div className="tk">
-          <div className="tkic" style={{ background: "rgba(157,107,255,.14)", color: "var(--violet)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.spend}</svg></div>
+          <div className="tkic" style={{ background: "rgba(157,107,255,.14)", color: "rgb(var(--violet))" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.spend}</svg></div>
           <div><div className="tkl">Spend · {monthShort}</div><div className="tkv tnum">{money2(monthSpend)}</div></div>
         </div>
         <div className="tk">
-          <div className="tkic" style={{ background: "rgba(39,229,204,.14)", color: "var(--cyan)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.bank}</svg></div>
+          <div className="tkic" style={{ background: "rgba(39,229,204,.14)", color: "rgb(var(--cyan))" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.bank}</svg></div>
           <div><div className="tkl">Cheques logged</div><div className="tkv tnum">{cycle.data?.cheques.length ?? 0} · EGP {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</div></div>
         </div>
         <div className="tk">
@@ -244,7 +244,7 @@ export function DashboardScreen() {
           <div className="orb" />
           <div className="heronut"><img src="/assets/bosta-mascot.svg" alt="" /></div>
           <div className="th"><span className="eyebrow">Revenue · {monthLabel}</span></div>
-          <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500, marginTop: 2 }}>Latest reporting month · {tradingDays} trading days</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 2 }}>Latest reporting month · {tradingDays} trading days</div>
           <div className="hv tnum" style={{ marginTop: "auto" }}><span className="hcur">EGP</span>{money2(d.monthRev)}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
             {revDelta != null && (
@@ -253,7 +253,7 @@ export function DashboardScreen() {
                 {Math.abs(revDelta).toFixed(1)}%
               </span>
             )}
-            <span style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500 }}>{d.lastRev > 0 ? `vs EGP ${money2(d.lastRev)} in ${prevMonthShort}` : "first month"} · EGP {money2(avgPerDay)}/day avg</span>
+            <span style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500 }}>{d.lastRev > 0 ? `vs EGP ${money2(d.lastRev)} in ${prevMonthShort}` : "first month"} · EGP {money2(avgPerDay)}/day avg</span>
           </div>
           <div style={{ marginTop: 14 }}>{daily.isLoading ? null : <AreaChart data={heroData} id="hero" height={110} strong />}</div>
         </div>
@@ -262,15 +262,15 @@ export function DashboardScreen() {
         <div className="tile spend">
           <div className="th"><span className="tname">Spend · {monthShort}</span></div>
           <div className="bn tnum"><small>EGP</small>{money2(monthSpend)}</div>
-          <div className="bar" style={{ marginTop: 18 }}><i style={{ width: `${spendRatio}%`, background: "linear-gradient(90deg,var(--violet),var(--mag))" }} /></div>
-          <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of {monthShort} revenue · mostly stock</div>
+          <div className="bar" style={{ marginTop: 18 }}><i style={{ width: `${spendRatio}%`, background: "linear-gradient(90deg,rgb(var(--violet)),var(--mag))" }} /></div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of {monthShort} revenue · mostly stock</div>
         </div>
 
         {/* net cash */}
         <div className="tile netcash">
           <div className="th"><span className="tname">Net cash · {monthShort}</span></div>
           <div className="bn tnum" style={{ color: netCash >= 0 ? "var(--green)" : "var(--red)" }}><small>EGP</small>{money2(netCash)}</div>
-          <div style={{ fontSize: 12.5, color: "var(--dim)", fontWeight: 500, marginTop: 18 }}>{marginPct}% cash margin · revenue − recorded spend</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 18 }}>{marginPct}% cash margin · revenue − recorded spend</div>
         </div>
 
         {/* performance gauge */}
@@ -297,9 +297,9 @@ export function DashboardScreen() {
           </div>
           {trendR === "Custom" && (
             <div className="crange" style={{ marginTop: 12 }}>
-              <span style={{ fontSize: 12, color: "var(--dim)", fontWeight: 600 }}>From</span>
+              <span style={{ fontSize: 12, color: "rgb(var(--dim))", fontWeight: 600 }}>From</span>
               <input type="date" value={cFrom || d.earliest} min={d.earliest} max={d.latest} onChange={(e) => setCFrom(e.target.value)} />
-              <span style={{ fontSize: 12, color: "var(--dim)", fontWeight: 600 }}>to</span>
+              <span style={{ fontSize: 12, color: "rgb(var(--dim))", fontWeight: 600 }}>to</span>
               <input type="date" value={cTo || d.latest} min={d.earliest} max={d.latest} onChange={(e) => setCTo(e.target.value)} />
             </div>
           )}
@@ -313,7 +313,7 @@ export function DashboardScreen() {
             <span className="disp" style={{ fontWeight: 700, fontSize: 27, letterSpacing: "-.02em" }}>EGP {money2(weekTotal)}</span>
             {weekDelta != null && <span className={`delta ${weekDelta >= 0 ? "up" : "down"}`}>{weekDelta >= 0 ? "+" : ""}{weekDelta.toFixed(1)}%</span>}
           </div>
-          <div style={{ fontSize: 12, color: "var(--dim)", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM")} · vs EGP {money2(priorTotal)} prior 7 days</div>
+          <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM")} · vs EGP {money2(priorTotal)} prior 7 days</div>
           <div style={{ marginTop: 14 }}><BarChart data={weekBars} height={150} /></div>
         </div>
 
@@ -335,7 +335,7 @@ export function DashboardScreen() {
 
         {/* recent cheques */}
         <div className="tile cheques">
-          <div className="th"><span className="tname">Recent cheques</span><span className="tag" style={{ marginLeft: "auto", color: "var(--cyan)", background: "rgba(39,229,204,.12)" }}>{cycle.data?.cheques.length ?? 0} · {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</span></div>
+          <div className="th"><span className="tname">Recent cheques</span><span className="tag" style={{ marginLeft: "auto", color: "rgb(var(--cyan))", background: "rgba(39,229,204,.12)" }}>{cycle.data?.cheques.length ?? 0} · {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</span></div>
           {cycle.isLoading ? <SkeletonRows rows={4} /> : cheques.length === 0 ? <Note>No cheques logged yet.</Note> :
             cheques.map((c) => (
               <div className="lrow" key={c.id}>
@@ -343,7 +343,7 @@ export function DashboardScreen() {
                   <div className="lname">Cheque deposited</div>
                   <div className="lsub">{fmtDate(c.date, "d MMM yyyy")}</div>
                 </div>
-                <div className="lamt tnum" style={{ color: "var(--cyan)" }}>{money2(c.amount)}</div>
+                <div className="lamt tnum" style={{ color: "rgb(var(--cyan))" }}>{money2(c.amount)}</div>
               </div>
             ))}
         </div>
@@ -358,22 +358,13 @@ export function DashboardScreen() {
             <span className="disp" style={{ fontWeight: 700, fontSize: 26, color: "var(--green)" }}>EGP {money2(d.best.v)}</span>
             {d.best.k && <span className="delta up">peak</span>}
           </div>
-          <div style={{ fontSize: 12.5, color: "var(--dim)", marginTop: 10, fontWeight: 500, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 10, fontWeight: 500, lineHeight: 1.5 }}>
             {topVen ? `Top supplier is ${topVen[0]} at EGP ${money2(topVen[1])} across all purchases — ${venPct}% of stock spend.` : "Add supplier notes on purchases to surface your top supplier."}
           </div>
         </div>
       </div>
     </div>
   );
-}
-
-const isoShift = (iso: string, days: number): string => { const dt = new Date(iso + "T00:00:00"); dt.setDate(dt.getDate() + days); return dt.toISOString().slice(0, 10); };
-
-/** Inclusive list of ISO dates between two bounds. */
-function isoRangeDays(from: string, to: string): string[] {
-  const out: string[] = []; const d = new Date(from + "T00:00:00"); const end = new Date(to + "T00:00:00");
-  while (d <= end) { out.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1); }
-  return out;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -407,7 +398,7 @@ export function InsightRow({ i }: { i: Insight }) {
 }
 
 function Note({ children }: { children: React.ReactNode }) {
-  return <div className="py-1 text-sm" style={{ color: "var(--dim)" }}>{children}</div>;
+  return <div className="py-1 text-sm" style={{ color: "rgb(var(--dim))" }}>{children}</div>;
 }
 
 /* ─ Gaps: risks & signals + data gaps ──────────────────────────────────── */
@@ -475,9 +466,9 @@ export function ActivityScreen() {
             <tbody>
               {feed.data!.map((e) => (
                 <tr key={`${e.kind}-${e.id}`} className="prodcell" onClick={() => navigate(e.route)}>
-                  <td style={{ whiteSpace: "nowrap", color: "var(--dim)" }}>{fmtDate(e.date, "d MMM yyyy")}</td>
+                  <td style={{ whiteSpace: "nowrap", color: "rgb(var(--dim))" }}>{fmtDate(e.date, "d MMM yyyy")}</td>
                   <td><span style={{ marginRight: 8 }}>{kindGlyph[e.kind]}</span>{e.label}</td>
-                  <td className="r" style={{ color: e.amount > 0 ? "var(--green)" : "var(--muted)" }}>{e.amount !== 0 ? `${e.amount > 0 ? "+" : "−"}${egp(Math.abs(e.amount))}` : "—"}</td>
+                  <td className="r" style={{ color: e.amount > 0 ? "var(--green)" : "rgb(var(--muted))" }}>{e.amount !== 0 ? `${e.amount > 0 ? "+" : "−"}${egp(Math.abs(e.amount))}` : "—"}</td>
                 </tr>
               ))}
             </tbody>

@@ -7,6 +7,23 @@ export interface DateRange {
   to: string;
 }
 
+/** PostgREST silently caps un-paginated selects at 1000 rows. Every read that
+ *  can exceed that (sale_items, sales, movements over long ranges) must page
+ *  through .range() until a short page. `build` receives the query to page. */
+export async function fetchAllRows<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  pageSize = 1000,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let off = 0; ; off += pageSize) {
+    const { data, error } = await build(off, off + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    out.push(...page);
+    if (page.length < pageSize) return out;
+  }
+}
+
 /** Active + inactive products, by English name. */
 export async function getProducts(): Promise<Tables<"products">[]> {
   const { data, error } = await requireEngine()
@@ -19,11 +36,6 @@ export async function getProducts(): Promise<Tables<"products">[]> {
 
 export function productMap(products: Tables<"products">[]): Map<string, Tables<"products">> {
   return new Map(products.map((p) => [p.id, p]));
-}
-
-/** Display unit + factor: stock is stored in base units; owners think in sale units. */
-export function displayQty(p: Pick<Tables<"products">, "current_stock">): number {
-  return p.current_stock;
 }
 
 /** Active business locations (the stall). Needed when posting purchases/sales. */

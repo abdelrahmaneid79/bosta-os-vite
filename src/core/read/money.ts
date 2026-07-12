@@ -6,7 +6,7 @@
 import { requireEngine } from "@/core/db/engine";
 import { todayCairo } from "@/core/time";
 import type { Tables } from "@/core/db/tables";
-import type { DateRange } from "./common";
+import { fetchAllRows, type DateRange } from "./common";
 import { getExpenses, getExpenseTotal } from "./expenses";
 import { getPurchases, getPurchaseTotal } from "./purchases";
 
@@ -27,13 +27,23 @@ export interface MoneyMovement {
   id: string; date: string; type: Tables<"money_movements">["movement_type"];
   amount: number; notes: string | null; isWithdrawal: boolean;
 }
-export async function getMoneyMovements(range: DateRange, limit = 80): Promise<MoneyMovement[]> {
-  const { data, error } = await requireEngine()
-    .from("money_movements").select("id,movement_date,movement_type,amount,notes")
-    .is("voided_at", null) // voided movements are reversals — never shown or summed
-    .gte("movement_date", range.from).lte("movement_date", range.to)
-    .order("movement_date", { ascending: false }).limit(limit);
-  if (error) throw error;
+/** limit=Infinity pages through everything (financial sums must never be
+ *  capped); a finite limit is for display lists only. */
+export async function getMoneyMovements(range: DateRange, limit: number = 80): Promise<MoneyMovement[]> {
+  const build = (a: number, b: number) =>
+    requireEngine()
+      .from("money_movements").select("id,movement_date,movement_type,amount,notes")
+      .is("voided_at", null) // voided movements are reversals — never shown or summed
+      .gte("movement_date", range.from).lte("movement_date", range.to)
+      .order("movement_date", { ascending: false }).range(a, b);
+  let data: NonNullable<Awaited<ReturnType<typeof build>>["data"]>;
+  if (Number.isFinite(limit)) {
+    const res = await build(0, limit - 1);
+    if (res.error) throw res.error;
+    data = res.data ?? [];
+  } else {
+    data = await fetchAllRows((a, b) => build(a, b));
+  }
   return data.map((m) => ({
     id: m.id, date: m.movement_date, type: m.movement_type, amount: m.amount, notes: m.notes,
     isWithdrawal: m.movement_type === "personal_withdrawal",
@@ -66,17 +76,15 @@ export async function getCashPosition(): Promise<CashPosition> {
   const anchored = !!(books.date && books.openingCash != null);
   const from = anchored ? books.date! : EPOCH;
   const opening = anchored ? books.openingCash! : 0;
-  const [mvRes, chqRes, expFwd, purFwd] = await Promise.all([
-    sb.from("money_movements").select("amount").is("voided_at", null).gte("movement_date", from),
-    sb.from("cheques").select("amount_received").is("voided_at", null).not("received_date", "is", null).gte("received_date", from),
+  const [mvRows, chqRows, expFwd, purFwd] = await Promise.all([
+    fetchAllRows((a, b) => sb.from("money_movements").select("amount").is("voided_at", null).gte("movement_date", from).range(a, b)),
+    fetchAllRows((a, b) => sb.from("cheques").select("amount_received").is("voided_at", null).not("received_date", "is", null).gte("received_date", from).range(a, b)),
     getExpenseTotal({ from, to: today }),
     getPurchaseTotal({ from, to: today }),
   ]);
-  if (mvRes.error) throw mvRes.error;
-  if (chqRes.error) throw chqRes.error;
   let mvIn = 0, mvOut = 0;
-  for (const m of mvRes.data) { if (m.amount >= 0) mvIn += m.amount; else mvOut += Math.abs(m.amount); }
-  const chqIn = (chqRes.data ?? []).reduce((s, c) => s + Number(c.amount_received ?? 0), 0);
+  for (const m of mvRows) { if (m.amount >= 0) mvIn += m.amount; else mvOut += Math.abs(m.amount); }
+  const chqIn = chqRows.reduce((s, c) => s + Number(c.amount_received ?? 0), 0);
   const inflowsAll = r2(opening + mvIn + chqIn);
   const outflowsAll = r2(mvOut + expFwd + purFwd);
   return { onHand: r2(inflowsAll - outflowsAll), inflowsAll, outflowsAll, opening, since: anchored ? books.date : null };
@@ -91,7 +99,7 @@ export interface CashEntry { id: string; date: string; label: string; amount: nu
 export async function getCashLedger(range: DateRange): Promise<CashEntry[]> {
   const sb = requireEngine();
   const [mv, exps, purs, chqRes] = await Promise.all([
-    getMoneyMovements(range, 1000), getExpenses(range), getPurchases(range),
+    getMoneyMovements(range, Infinity), getExpenses(range), getPurchases(range),
     sb.from("cheques").select("id,received_date,amount_received").is("voided_at", null)
       .not("received_date", "is", null).gte("received_date", range.from).lte("received_date", range.to),
   ]);

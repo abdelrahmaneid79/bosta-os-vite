@@ -38,15 +38,15 @@ function Markdown({ text }: { text: string }) {
   const blocks: React.ReactNode[] = [];
   const lines = text.split("\n");
   let list: string[] = [];
-  const inline = (s: string) => s.split(/(\*\*[^*]+\*\*)/g).map((p, k) => (p.startsWith("**") && p.endsWith("**")) ? <b key={k} style={{ color: "var(--text)", fontWeight: 700 }}>{p.slice(2, -2)}</b> : <span key={k}>{p}</span>);
-  const flush = (i: number) => { if (!list.length) return; blocks.push(<ul key={`u${i}`} style={{ margin: "4px 0 10px", paddingLeft: 18, display: "grid", gap: 5 }}>{list.map((l, j) => <li key={j} style={{ fontSize: 13, lineHeight: 1.5, color: "var(--muted)" }}>{inline(l)}</li>)}</ul>); list = []; };
+  const inline = (s: string) => s.split(/(\*\*[^*]+\*\*)/g).map((p, k) => (p.startsWith("**") && p.endsWith("**")) ? <b key={k} style={{ color: "rgb(var(--text))", fontWeight: 700 }}>{p.slice(2, -2)}</b> : <span key={k}>{p}</span>);
+  const flush = (i: number) => { if (!list.length) return; blocks.push(<ul key={`u${i}`} style={{ margin: "4px 0 10px", paddingLeft: 18, display: "grid", gap: 5 }}>{list.map((l, j) => <li key={j} style={{ fontSize: 13, lineHeight: 1.5, color: "rgb(var(--muted))" }}>{inline(l)}</li>)}</ul>); list = []; };
   lines.forEach((raw, i) => {
     const l = raw.trim();
     if (/^\*\*[^*]+\*\*$/.test(l)) { flush(i); blocks.push(<div key={i} style={{ fontWeight: 800, color: "var(--mag)", fontSize: 11.5, letterSpacing: ".06em", textTransform: "uppercase", margin: "14px 0 5px" }}>{l.slice(2, -2)}</div>); }
-    else if (/^#{1,3}\s/.test(l)) { flush(i); blocks.push(<div key={i} style={{ fontWeight: 700, color: "var(--text)", fontSize: 14.5, margin: "12px 0 4px" }}>{inline(l.replace(/^#{1,3}\s/, ""))}</div>); }
+    else if (/^#{1,3}\s/.test(l)) { flush(i); blocks.push(<div key={i} style={{ fontWeight: 700, color: "rgb(var(--text))", fontSize: 14.5, margin: "12px 0 4px" }}>{inline(l.replace(/^#{1,3}\s/, ""))}</div>); }
     else if (/^[-*]\s/.test(l)) { list.push(l.replace(/^[-*]\s/, "")); }
     else if (!l) { flush(i); }
-    else { flush(i); blocks.push(<p key={i} style={{ fontSize: 13, lineHeight: 1.55, color: "var(--muted)", margin: "0 0 8px" }}>{inline(l)}</p>); }
+    else { flush(i); blocks.push(<p key={i} style={{ fontSize: 13, lineHeight: 1.55, color: "rgb(var(--muted))", margin: "0 0 8px" }}>{inline(l)}</p>); }
   });
   flush(lines.length);
   return <div>{blocks}</div>;
@@ -55,9 +55,9 @@ function Markdown({ text }: { text: string }) {
 function Kpi({ label, value, sub, accent, spark, gauge }: { label: string; value: string; sub?: React.ReactNode; accent: string; spark?: number[]; gauge?: { value: number | null; color: string } }) {
   return (
     <div style={{ border: "1px solid rgb(var(--line))", borderRadius: 18, padding: "14px 16px", background: "rgb(var(--panel))", display: "flex", flexDirection: "column", gap: 6, minHeight: 118 }}>
-      <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".04em", color: "var(--dim)" }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 800, color: "var(--text)", fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11.5, color: "var(--muted)" }}>{sub}</div>}
+      <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".04em", color: "rgb(var(--dim))" }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: "rgb(var(--text))", fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 11.5, color: "rgb(var(--muted))" }}>{sub}</div>}
       <div style={{ marginTop: "auto" }}>
         {gauge ? <Gauge value={gauge.value} color={gauge.color} size={92} /> : spark ? <Sparkline data={spark} height={34} /> : <div style={{ height: 3, borderRadius: 999, background: accent, opacity: 0.5, marginTop: 8 }} />}
       </div>
@@ -117,7 +117,7 @@ export function StrategistScreen() {
   const monthlyVals = monthly.map((m) => m.revenue ?? 0);
   const latest = monthly.length ? monthly[monthly.length - 1] : null;
   const overall = s.heuristics.health.overall;
-  const hcol = overall == null ? "var(--faint)" : overall >= 75 ? "var(--green)" : overall >= 55 ? "var(--amber)" : "var(--red)";
+  const hcol = overall == null ? "rgb(var(--faint))" : overall >= 75 ? "var(--green)" : overall >= 55 ? "var(--amber)" : "var(--red)";
 
   // Revenue-by-product donut: top 5 + "Other"
   const prods = s.products.topByRevenue.filter((p) => p.revenue != null) as { name: string; revenue: number }[];
@@ -133,23 +133,23 @@ export function StrategistScreen() {
     <div style={{ display: "grid", gap: 16 }}>
       {/* KPI strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(178px, 1fr))", gap: 12 }}>
-        <Kpi label="Total revenue" accent="var(--violet)" value={s.revenue.allTime == null ? "—" : egpShort(s.revenue.allTime)} sub={`${num(s.coverage.daysTraded)} days · ${s.trends.trajectory}`} spark={monthlyVals} />
+        <Kpi label="Total revenue" accent="rgb(var(--violet))" value={s.revenue.allTime == null ? "—" : egpShort(s.revenue.allTime)} sub={`${num(s.coverage.daysTraded)} days · ${s.trends.trajectory}`} spark={monthlyVals} />
         <Kpi label={`Latest month${latest ? ` · ${latest.month}` : ""}`} accent="var(--mag)" value={latest?.revenue == null ? "—" : egp(latest.revenue)} sub={<span>MoM {pct(s.trends.momPct)}</span>} spark={monthlyVals.slice(-6)} />
-        <Kpi label="Year-over-year" accent="var(--green)" value={pct(s.trends.yoyLatestPct)} sub={<span style={{ color: "var(--dim)" }}>latest vs a year ago</span>} />
-        <Kpi label="Cheque income" accent="var(--cyan)" value={s.settlement.totalReceived == null ? "—" : egpShort(s.settlement.totalReceived)} sub={`mall takes ${s.settlement.blendedDeductionPct ?? "—"}%`} />
-        <Kpi label="Cash on hand" accent="var(--amber)" value={s.cash.onHand == null ? "—" : egp(s.cash.onHand)} sub={<span style={{ color: "var(--dim)" }}>net position</span>} />
+        <Kpi label="Year-over-year" accent="var(--green)" value={pct(s.trends.yoyLatestPct)} sub={<span style={{ color: "rgb(var(--dim))" }}>latest vs a year ago</span>} />
+        <Kpi label="Cheque income" accent="rgb(var(--cyan))" value={s.settlement.totalReceived == null ? "—" : egpShort(s.settlement.totalReceived)} sub={`mall takes ${s.settlement.blendedDeductionPct ?? "—"}%`} />
+        <Kpi label="Cash on hand" accent="var(--amber)" value={s.cash.onHand == null ? "—" : egp(s.cash.onHand)} sub={<span style={{ color: "rgb(var(--dim))" }}>net position</span>} />
         <Kpi label="Business health" accent={hcol} value={overall == null ? "—" : `${overall}/100`} sub={<span style={{ color: hcol, fontWeight: 700 }}>{s.heuristics.health.status}</span>} gauge={{ value: overall, color: hcol }} />
       </div>
 
       {/* AI strategy — hero */}
-      <div style={{ border: `1px solid color-mix(in srgb, var(--violet) 40%, rgb(var(--line)))`, borderRadius: 20, padding: 20, background: "linear-gradient(135deg, color-mix(in srgb, var(--violet) 14%, rgb(var(--panel))), rgb(var(--panel)) 60%)" }}>
+      <div style={{ border: `1px solid color-mix(in srgb, rgb(var(--violet)) 40%, rgb(var(--line)))`, borderRadius: 20, padding: 20, background: "linear-gradient(135deg, color-mix(in srgb, rgb(var(--violet)) 14%, rgb(var(--panel))), rgb(var(--panel)) 60%)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 16 }}>✦</span>
-            <span style={{ fontWeight: 800, fontSize: 15, color: "var(--text)" }}>AI strategy · {calendar.dayOfWeek}{calendar.isWeekend ? " (weekend)" : ""}</span>
+            <span style={{ fontWeight: 800, fontSize: 15, color: "rgb(var(--text))" }}>AI strategy · {calendar.dayOfWeek}{calendar.isWeekend ? " (weekend)" : ""}</span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setTune((t) => !t)} style={{ fontSize: 12, padding: "5px 10px", borderRadius: 8, border: "1px solid rgb(var(--line))", background: tune ? "rgb(var(--panel2))" : "transparent", color: "var(--muted)", cursor: "pointer" }}>⚙ Tune</button>
+            <button onClick={() => setTune((t) => !t)} style={{ fontSize: 12, padding: "5px 10px", borderRadius: 8, border: "1px solid rgb(var(--line))", background: tune ? "rgb(var(--panel2))" : "transparent", color: "rgb(var(--muted))", cursor: "pointer" }}>⚙ Tune</button>
             <Button size="sm" variant="outline" onClick={() => gen.mutate()} disabled={busy}>{busy ? "Thinking…" : briefing ? "Refresh" : "Generate"}</Button>
           </div>
         </div>
@@ -157,12 +157,12 @@ export function StrategistScreen() {
           <div style={{ display: "grid", gap: 10, margin: "8px 0 14px", padding: 12, border: "1px dashed rgb(var(--line))", borderRadius: 12 }}>
             <textarea className="input" style={{ minHeight: 42, resize: "vertical", width: "100%" }} placeholder="Your objective (optional) — e.g. grow monthly profit 20% without adding cash risk" value={obj} onChange={(e) => setObjective(e.target.value)} onBlur={() => saveObjective(obj)} />
             <textarea className="input" style={{ minHeight: 42, resize: "vertical", width: "100%" }} placeholder="Situational context (optional) — e.g. cashew supplier raised prices 12%" value={ctx} onChange={(e) => setContext(e.target.value)} onBlur={() => saveContext(ctx)} />
-            <div style={{ fontSize: 11, color: "var(--faint)" }}>Tap Refresh after editing to fold these in.</div>
+            <div style={{ fontSize: 11, color: "rgb(var(--faint))" }}>Tap Refresh after editing to fold these in.</div>
           </div>
         )}
-        {!briefing && busy && <div style={{ fontSize: 13, color: "var(--dim)" }}>Reading your numbers, trends and the calendar to build today's strategy…</div>}
-        {!briefing && !busy && <div style={{ fontSize: 13, color: "var(--dim)" }}>No strategy yet — tap Generate.</div>}
-        {briefing && <><Markdown text={briefing.reply} /><div style={{ fontSize: 10.5, color: "var(--faint)", marginTop: 6 }}>Generated {briefing.generatedAt.slice(0, 16).replace("T", " ")} · grounded in your live data{latest ? ` · freshest ${latest.month}` : ""}.</div></>}
+        {!briefing && busy && <div style={{ fontSize: 13, color: "rgb(var(--dim))" }}>Reading your numbers, trends and the calendar to build today's strategy…</div>}
+        {!briefing && !busy && <div style={{ fontSize: 13, color: "rgb(var(--dim))" }}>No strategy yet — tap Generate.</div>}
+        {briefing && <><Markdown text={briefing.reply} /><div style={{ fontSize: 10.5, color: "rgb(var(--faint))", marginTop: 6 }}>Generated {briefing.generatedAt.slice(0, 16).replace("T", " ")} · grounded in your live data{latest ? ` · freshest ${latest.month}` : ""}.</div></>}
       </div>
 
       {/* Donut · Trend · Health radar */}
@@ -176,19 +176,19 @@ export function StrategistScreen() {
                 {donutSegs.map((sg, i) => (
                   <div key={sg.label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                     <span style={{ width: 9, height: 9, borderRadius: 3, background: VIZ_PALETTE[i % VIZ_PALETTE.length], flexShrink: 0 }} />
-                    <span dir="rtl" style={{ color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{sg.label}</span>
-                    <span style={{ color: "var(--dim)", fontVariantNumeric: "tabular-nums" }}>{Math.round((sg.value / prodTotal) * 100)}%</span>
+                    <span dir="rtl" style={{ color: "rgb(var(--muted))", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{sg.label}</span>
+                    <span style={{ color: "rgb(var(--dim))", fontVariantNumeric: "tabular-nums" }}>{Math.round((sg.value / prodTotal) * 100)}%</span>
                   </div>
                 ))}
               </div>
             </div>
-          ) : <div style={{ fontSize: 12.5, color: "var(--dim)" }}>No product-level sales yet — import daily reports to populate.</div>}
+          ) : <div style={{ fontSize: 12.5, color: "rgb(var(--dim))" }}>No product-level sales yet — import daily reports to populate.</div>}
         </DeckTile>
 
         <DeckTile>
           <TileHead name="Revenue trend" right={`${s.trends.monthsOfData} months · YoY ${pct(s.trends.yoyLatestPct)}`} />
           <Area data={monthlyVals} height={150} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--dim)", marginTop: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgb(var(--dim))", marginTop: 6 }}>
             <span>{monthly[0]?.month ?? ""}</span>
             <span>Best {s.trends.best ? `${s.trends.best.month} · ${egpShort(s.trends.best.revenue)}` : "—"}</span>
             <span>{latest?.month ?? ""}</span>
@@ -200,7 +200,7 @@ export function StrategistScreen() {
           <HealthRadar categories={s.heuristics.health.categories.map((c) => ({ label: c.label, score: c.score }))} overall={overall} status={s.heuristics.health.status} size={210} />
           {s.heuristics.dataGaps.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-              {s.heuristics.dataGaps.map((g) => <span key={g.title} style={{ fontSize: 10.5, padding: "3px 7px", borderRadius: 999, border: "1px solid rgb(var(--line))", color: g.severity === "high" ? "var(--red)" : g.severity === "medium" ? "var(--amber)" : "var(--dim)" }}>{g.title} · {g.count}</span>)}
+              {s.heuristics.dataGaps.map((g) => <span key={g.title} style={{ fontSize: 10.5, padding: "3px 7px", borderRadius: 999, border: "1px solid rgb(var(--line))", color: g.severity === "high" ? "var(--red)" : g.severity === "medium" ? "var(--amber)" : "rgb(var(--dim))" }}>{g.title} · {g.count}</span>)}
             </div>
           )}
         </DeckTile>
@@ -210,22 +210,22 @@ export function StrategistScreen() {
       <div style={grid3}>
         <DeckTile>
           <TileHead name="Revenue by weekday" right="avg/day" />
-          {dow.length ? <Bars data={dow} color="var(--cyan)" fmt={(n) => egpShort(n)} /> : <div style={{ fontSize: 12.5, color: "var(--dim)" }}>—</div>}
+          {dow.length ? <Bars data={dow} color="rgb(var(--cyan))" fmt={(n) => egpShort(n)} /> : <div style={{ fontSize: 12.5, color: "rgb(var(--dim))" }}>—</div>}
         </DeckTile>
         <DeckTile>
           <TileHead name="Top products" right="by revenue" />
-          {top5.length ? <Bars data={top5.map((p) => ({ label: p.name, value: p.revenue }))} color="var(--violet)" fmt={(n) => egpShort(n)} /> : <div style={{ fontSize: 12.5, color: "var(--dim)" }}>No product lines yet.</div>}
+          {top5.length ? <Bars data={top5.map((p) => ({ label: p.name, value: p.revenue }))} color="rgb(var(--violet))" fmt={(n) => egpShort(n)} /> : <div style={{ fontSize: 12.5, color: "rgb(var(--dim))" }}>No product lines yet.</div>}
         </DeckTile>
         <DeckTile>
           <TileHead name="Recent activity" right="latest" />
-          {(activity.data ?? []).length === 0 ? <div style={{ fontSize: 12.5, color: "var(--dim)" }}>No recent activity.</div> : (
+          {(activity.data ?? []).length === 0 ? <div style={{ fontSize: 12.5, color: "rgb(var(--dim))" }}>No recent activity.</div> : (
             <div style={{ display: "grid", gap: 9 }}>
               {(activity.data ?? []).map((a) => (
                 <div key={a.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline", fontSize: 12.5 }}>
-                  <span style={{ color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.label}</span>
+                  <span style={{ color: "rgb(var(--muted))", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.label}</span>
                   <span style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <span style={{ color: a.amount >= 0 ? "var(--green)" : "var(--red)", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{a.amount >= 0 ? "+" : ""}{egpShort(Math.abs(a.amount))}</span>
-                    <span style={{ color: "var(--faint)" }}>{fmtDate(a.date, "d MMM")}</span>
+                    <span style={{ color: "rgb(var(--faint))" }}>{fmtDate(a.date, "d MMM")}</span>
                   </span>
                 </div>
               ))}
@@ -241,13 +241,13 @@ export function StrategistScreen() {
           <table className="tbl">
             <thead><tr><th>Product</th><th className="r">Margin</th><th>Cost basis</th><th className="r">Revenue</th></tr></thead>
             <tbody>
-              {watch.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--dim)", padding: "18px" }}>No costed product lines yet.</td></tr>}
+              {watch.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "rgb(var(--dim))", padding: "18px" }}>No costed product lines yet.</td></tr>}
               {watch.map((p) => (
                 <tr key={p.name}>
                   <td dir="rtl" style={{ fontSize: 13 }}>{p.name}</td>
-                  <td className="r" style={{ color: (p.marginPct ?? 0) < 30 ? "var(--amber)" : "var(--text)", fontWeight: 700 }}>{p.marginPct}%</td>
+                  <td className="r" style={{ color: (p.marginPct ?? 0) < 30 ? "var(--amber)" : "rgb(var(--text))", fontWeight: 700 }}>{p.marginPct}%</td>
                   <td><span style={{ fontSize: 11, color: p.costSource === "verified" ? "var(--green)" : "var(--amber)" }}>{p.costSource}</span></td>
-                  <td className="r" style={{ color: "var(--dim)" }}>{p.revenue == null ? "—" : egpShort(p.revenue)}</td>
+                  <td className="r" style={{ color: "rgb(var(--dim))" }}>{p.revenue == null ? "—" : egpShort(p.revenue)}</td>
                 </tr>
               ))}
             </tbody>
@@ -262,9 +262,9 @@ export function StrategistScreen() {
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {calendar.upcoming.map((e) => (
               <div key={e.name + e.date} style={{ border: "1px solid rgb(var(--line))", borderRadius: 12, padding: "8px 12px", minWidth: 148 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)" }}>{e.name}{e.approx ? " *" : ""}</div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "rgb(var(--text))" }}>{e.name}{e.approx ? " *" : ""}</div>
                 <div style={{ fontSize: 11.5, color: "var(--mag)", fontWeight: 700 }}>in {e.daysUntil} days</div>
-                <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 3, lineHeight: 1.4 }}>{e.why}</div>
+                <div style={{ fontSize: 11, color: "rgb(var(--dim))", marginTop: 3, lineHeight: 1.4 }}>{e.why}</div>
               </div>
             ))}
           </div>

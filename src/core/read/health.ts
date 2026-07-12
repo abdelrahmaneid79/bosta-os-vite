@@ -34,7 +34,7 @@ const colorFor = (s: number | null): HealthColor => s == null ? "none" : s >= 80
 export interface HealthInputs {
   monthRev: number;
   lastRev: number;
-  profit: { complete: boolean; margin: number | null; missingCostLines: number };
+  profit: { complete: boolean; margin: number | null; missingCostLines: number; uncoveredRevenue?: number };
   stock: { activeCount: number; costedCount: number; costedNonNegCount: number };
   issuesCount: number;
   streakDays: number;
@@ -58,11 +58,18 @@ export function composeHealth(i: HealthInputs): HealthReport {
       lift: "Log every sales day to sharpen the trend.", color: colorFor(score),
     });
   }
-  // Profit / margin — withheld when COGS incomplete
-  const profitScore = i.profit.complete && i.profit.margin != null ? clamp(i.profit.margin) : null;
+  // Profit / margin — margin is computed on COVERED revenue only (honest
+  // denominator), so it is scoreable even when header-only days exist; the
+  // unknown-COGS exposure is named in the reason instead of hidden.
+  const profitScore = i.profit.margin != null ? clamp(i.profit.margin) : null;
+  const uncov = Math.round(i.profit.uncoveredRevenue ?? 0);
   cats.push({
     key: "profit", label: "Profit", score: profitScore, trend: null,
-    reason: i.profit.complete ? `Net margin ${Math.round(i.profit.margin ?? 0)}% after cost.` : `Margin can't be scored — ${i.profit.missingCostLines} sold line(s) missing cost.`,
+    reason: profitScore == null
+      ? (i.profit.missingCostLines > 0
+        ? `Margin can't be scored — ${i.profit.missingCostLines} sold line(s) missing cost.`
+        : "Margin can't be scored — no costed product lines this month.")
+      : `Gross margin ${Math.round(i.profit.margin ?? 0)}% on costed sales${uncov >= 1 ? ` · EGP ${uncov.toLocaleString()} of revenue has no product detail` : ""}.`,
     lift: "Add cost to every sold product.", color: colorFor(profitScore),
   });
   // Cash accuracy — from the latest physical count
@@ -116,7 +123,7 @@ export async function getHealthReport(): Promise<HealthReport> {
   const active = stock.positions.filter((p) => p.active);
   return composeHealth({
     monthRev, lastRev,
-    profit: { complete: profit.complete, margin: profit.margin, missingCostLines: profit.missingCostLines },
+    profit: { complete: profit.complete, margin: profit.margin, missingCostLines: profit.missingCostLines, uncoveredRevenue: profit.uncoveredRevenue },
     stock: {
       activeCount: active.length,
       costedCount: active.filter((p) => p.hasCost).length,
@@ -148,13 +155,22 @@ async function salesStreak(): Promise<number> {
   return n;
 }
 
+/** Pure scoring for a cash count. When expected ≤ 0 the old percent formula
+ *  divided by a non-positive number and flattered the score to 100 no matter
+ *  what was counted — use the largest live magnitude as the denominator so a
+ *  real discrepancy always registers. */
+export function scoreCashAccuracy(expected: number, counted: number): { score: number; errPct: number } {
+  const diff = Math.abs(counted - expected);
+  const denom = Math.max(Math.abs(expected), Math.abs(counted), 1);
+  const errPct = (diff / denom) * 100;
+  return { score: clamp(100 - errPct * 4), errPct };
+}
+
 async function cashAccuracy(): Promise<{ score: number | null; errPct: number }> {
   const { data, error } = await requireEngine()
     .from("cash_reconciliations").select("counted_amount,expected_balance,difference,count_date")
     .order("count_date", { ascending: false }).limit(1);
   if (error || !data || data.length === 0) return { score: null, errPct: 0 };
   const r = data[0];
-  const diff = r.difference ?? (r.counted_amount - r.expected_balance);
-  const errPct = r.expected_balance > 0 ? Math.abs(diff) / r.expected_balance * 100 : 0;
-  return { score: clamp(100 - errPct * 4), errPct };
+  return { ...scoreCashAccuracy(r.expected_balance, r.counted_amount) };
 }

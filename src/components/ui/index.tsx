@@ -6,12 +6,12 @@ import { cn } from "@/core/utils/cn";
    accent maps to a token class set so tinted chips/cards stay theme-aware. */
 export type Accent = "pink" | "mint" | "blue" | "amber" | "violet" | "red";
 export const ACCENTS: Record<Accent, { text: string; bg: string; soft: string; ring: string; rgb: string }> = {
-  pink:   { text: "text-pink",   bg: "bg-pink",   soft: "bg-pink/10",   ring: "rgb(var(--pink))",   rgb: "var(--pink)" },
-  mint:   { text: "text-good",   bg: "bg-good",   soft: "bg-good/10",   ring: "rgb(var(--good))",   rgb: "var(--good)" },
-  blue:   { text: "text-info",   bg: "bg-info",   soft: "bg-info/10",   ring: "rgb(var(--info))",   rgb: "var(--info)" },
-  amber:  { text: "text-warn",   bg: "bg-warn",   soft: "bg-warn/10",   ring: "rgb(var(--warn))",   rgb: "var(--warn)" },
-  violet: { text: "text-violet", bg: "bg-violet", soft: "bg-violet/10", ring: "rgb(var(--violet))", rgb: "var(--violet)" },
-  red:    { text: "text-bad",    bg: "bg-bad",    soft: "bg-bad/10",    ring: "rgb(var(--bad))",    rgb: "var(--bad)" },
+  pink:   { text: "text-pink",   bg: "bg-pink",   soft: "bg-pink/10",   ring: "rgb(var(--pink))",   rgb: "rgb(var(--pink))" },
+  mint:   { text: "text-good",   bg: "bg-good",   soft: "bg-good/10",   ring: "rgb(var(--good))",   rgb: "rgb(var(--good))" },
+  blue:   { text: "text-info",   bg: "bg-info",   soft: "bg-info/10",   ring: "rgb(var(--info))",   rgb: "rgb(var(--info))" },
+  amber:  { text: "text-warn",   bg: "bg-warn",   soft: "bg-warn/10",   ring: "rgb(var(--warn))",   rgb: "rgb(var(--warn))" },
+  violet: { text: "text-violet", bg: "bg-violet", soft: "bg-violet/10", ring: "rgb(var(--violet))", rgb: "rgb(var(--violet))" },
+  red:    { text: "text-bad",    bg: "bg-bad",    soft: "bg-bad/10",    ring: "rgb(var(--bad))",    rgb: "rgb(var(--bad))" },
 };
 
 /* ─ Surfaces ───────────────────────────────────────────────────────────── */

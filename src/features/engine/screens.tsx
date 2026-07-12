@@ -78,8 +78,8 @@ export function StockScreen() {
     <div>
       <div className="statgrid">
         <Stat label="Products" color="var(--mag)" value={s ? s.positions.length : "—"} onClick={() => setManageOpen(true)} sub={<div style={{ fontSize: 11, color: "var(--mag)", fontWeight: 700, marginTop: 8 }}>Manage full list ↗</div>} />
-        <Stat label="Total stock value" color="var(--violet)" value={s ? egp(s.totalValue) : "—"} sub={s && s.totalValue === 0 ? <div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600, marginTop: 8 }}>count stock to set →</div> : undefined} />
-        <Stat label="Counted / uncounted" color="var(--cyan)" value={s ? `${counted} / ${s.positions.length - counted}` : "—"} />
+        <Stat label="Total stock value" color="rgb(var(--violet))" value={s ? egp(s.totalValue) : "—"} sub={s && s.totalValue === 0 ? <div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>count stock to set →</div> : undefined} />
+        <Stat label="Counted / uncounted" color="rgb(var(--cyan))" value={s ? `${counted} / ${s.positions.length - counted}` : "—"} />
         <Stat label="Missing cost" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
       </div>
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
@@ -95,8 +95,8 @@ export function StockScreen() {
             return (
               <button key={v} onClick={() => setVendor(v)} style={{
                 padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                border: on ? "1px solid var(--mag)" : "1px solid var(--line)",
-                background: on ? "var(--mag)" : "transparent", color: on ? "#fff" : "var(--muted)",
+                border: on ? "1px solid var(--mag)" : "1px solid rgb(var(--line))",
+                background: on ? "var(--mag)" : "transparent", color: on ? "#fff" : "rgb(var(--muted))",
               }}>{v} <span style={{ opacity: 0.7 }}>· {count}</span></button>
             );
           })}
@@ -110,11 +110,11 @@ export function StockScreen() {
               <tbody>
                 {positions.map((p) => (
                   <tr key={p.id} className="prodcell" onClick={() => setDetailId(p.id)}>
-                    <td style={{ fontSize: 14 }}>{p.marketCode && <span className="tnum" style={{ color: "var(--faint)", fontSize: 12, marginRight: 6 }}>#{p.marketCode}</span>}{p.nameEn}{p.vendor && <span style={{ marginLeft: 6, fontSize: 11, color: "var(--dim)", border: "1px solid var(--line)", borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>{p.vendor}</span>}{!p.active && <span style={{ color: "var(--faint)" }}> · inactive</span>}</td>
-                    <td className="r" style={{ color: p.isNegative ? "var(--red)" : p.onHand === 0 ? "var(--faint)" : undefined }}>
-                      {p.onHand === 0 ? "—" : num(p.onHand)} <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span>
+                    <td style={{ fontSize: 14 }}>{p.marketCode && <span className="tnum" style={{ color: "rgb(var(--faint))", fontSize: 12, marginRight: 6 }}>#{p.marketCode}</span>}{p.nameEn}{p.vendor && <span style={{ marginLeft: 6, fontSize: 11, color: "rgb(var(--dim))", border: "1px solid rgb(var(--line))", borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>{p.vendor}</span>}{!p.active && <span style={{ color: "rgb(var(--faint))" }}> · inactive</span>}</td>
+                    <td className="r" style={{ color: p.isNegative ? "var(--red)" : p.onHand === 0 ? "rgb(var(--faint))" : undefined }}>
+                      {p.onHand === 0 ? "—" : num(p.onHand)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span>
                     </td>
-                    <td className="r">{p.hasCost && p.onHand !== 0 ? egp(p.stockValue) : <span style={{ color: "var(--faint)", fontFamily: "Satoshi", fontWeight: 500 }}>{p.hasCost ? "—" : "add cost"}</span>}</td>
+                    <td className="r">{p.hasCost && p.onHand !== 0 ? egp(p.stockValue) : <span style={{ color: "rgb(var(--faint))", fontFamily: "Satoshi", fontWeight: 500 }}>{p.hasCost ? "—" : "add cost"}</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -149,7 +149,7 @@ function ManageProducts() {
   const list = prods.data ?? [];
   return (
     <div>
-      <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>{list.length} products · edit prices, activate/deactivate, or remove.</div>
+      <div style={{ fontSize: 13, color: "rgb(var(--muted))", marginBottom: 14 }}>{list.length} products · edit prices, activate/deactivate, or remove.</div>
       {prods.isLoading ? <SkeletonRows rows={5} /> : (
         <div className="scroll" style={{ maxHeight: "52vh" }}>
           <table className="etbl">
@@ -157,12 +157,12 @@ function ManageProducts() {
             <tbody>
               {list.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.name_en}{p.name_ar ? <span className="ar" style={{ color: "var(--dim)", fontSize: 12 }}> · {p.name_ar}</span> : null}</td>
+                  <td>{p.name_en}{p.name_ar ? <span className="ar" style={{ color: "rgb(var(--dim))", fontSize: 12 }}> · {p.name_ar}</span> : null}</td>
                   <td className="r">{p.selling_price != null ? egp(p.selling_price) : "—"}</td>
-                  <td className="r"><button onClick={() => toggle.mutate({ id: p.id, active: !p.active })} className="pill2" style={{ cursor: "pointer", color: p.active ? "var(--green)" : "var(--faint)" }}>{p.active ? "active" : "off"}</button></td>
+                  <td className="r"><button onClick={() => toggle.mutate({ id: p.id, active: !p.active })} className="pill2" style={{ cursor: "pointer", color: p.active ? "var(--green)" : "rgb(var(--faint))" }}>{p.active ? "active" : "off"}</button></td>
                   <td className="r" style={{ whiteSpace: "nowrap" }}>
                     <button className="addbtn" style={{ padding: "6px 10px" }} onClick={() => setEdit(p)}>Edit</button>
-                    <button onClick={() => setDel(p)} title="Remove" style={{ marginLeft: 6, color: "var(--faint)", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✕</button>
+                    <button onClick={() => setDel(p)} title="Remove" style={{ marginLeft: 6, color: "rgb(var(--faint))", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✕</button>
                   </td>
                 </tr>
               ))}
@@ -225,8 +225,8 @@ export function SalesScreen() {
         <>
           <div className="statgrid">
             <Stat label="Lifetime revenue" value={egp(d.lifetime)} color="var(--mag)" />
-            <Stat label="Trading days" value={d.days} color="var(--violet)" />
-            <Stat label="Avg / day" value={egp(d.avgDay)} color="var(--cyan)" />
+            <Stat label="Trading days" value={d.days} color="rgb(var(--violet))" />
+            <Stat label="Avg / day" value={egp(d.avgDay)} color="rgb(var(--cyan))" />
             <Stat label="Best month" value={egp(d.best[1])} color="var(--green)" />
           </div>
 
@@ -240,7 +240,7 @@ export function SalesScreen() {
                 <span className="tname">Daily sales</span>
                 <button className="addbtn" style={{ marginLeft: "auto" }} onClick={() => setAddOpen(true)}>+ New sale</button>
               </div>
-              <div style={{ padding: "0 24px 12px", display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: "var(--dim)" }}>
+              <div style={{ padding: "0 24px 12px", display: "flex", flexWrap: "wrap", gap: 14, fontSize: 12, color: "rgb(var(--dim))" }}>
                 <span><DayDot sig="green" />complete</span>
                 <span><DayDot sig="yellow" />total only</span>
                 <span><DayDot sig="red" />doesn’t reconcile</span>
@@ -255,7 +255,7 @@ export function SalesScreen() {
                         <td className="r">{egp(r.total)}</td>
                       </tr>
                     ))}
-                    {rows.length === 0 && <tr><td colSpan={2} style={{ textAlign: "center", color: "var(--faint)", padding: 28 }}>No sales recorded yet.</td></tr>}
+                    {rows.length === 0 && <tr><td colSpan={2} style={{ textAlign: "center", color: "rgb(var(--faint))", padding: 28 }}>No sales recorded yet.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -292,8 +292,8 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
     <div className="space-y-4">
       {/* summary + reconciliation */}
       <div style={{ display: "flex", alignItems: "center", gap: 26, flexWrap: "wrap" }}>
-        <div><div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600 }}>Day total</div><div className="disp" style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-.01em" }}>{egp(sale.total)}</div></div>
-        <div><div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600 }}>Breakdown</div><div className="disp" style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-.01em" }}>{egp(lineSum)}</div></div>
+        <div><div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600 }}>Day total</div><div className="disp" style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-.01em" }}>{egp(sale.total)}</div></div>
+        <div><div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600 }}>Breakdown</div><div className="disp" style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-.01em" }}>{egp(lineSum)}</div></div>
         <span className="recon" style={{ marginLeft: "auto", color: ok ? "var(--green)" : "var(--amber)", background: ok ? "rgba(66,226,154,.13)" : "rgba(255,177,62,.12)" }}>
           {ok ? "reconciled" : diff > 0 ? `${egp(diff)} unallocated` : `${egp(-diff)} over`}
         </span>
@@ -312,12 +312,12 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
                 <td className="r">{egp(l.unitPrice ?? 0)}</td>
                 <td className="r">{egp(l.lineTotal)}</td>
                 <td className="r" style={{ whiteSpace: "nowrap" }}>
-                  <button onClick={() => setEditItem(l)} title="Edit" style={{ color: "var(--dim)", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✎</button>
-                  <button onClick={() => setConfirm({ kind: "line", item: l })} title="Void" style={{ color: "var(--faint)", background: "none", border: "none", cursor: "pointer", fontSize: 13, marginLeft: 6 }}>✕</button>
+                  <button onClick={() => setEditItem(l)} title="Edit" style={{ color: "rgb(var(--dim))", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✎</button>
+                  <button onClick={() => setConfirm({ kind: "line", item: l })} title="Void" style={{ color: "rgb(var(--faint))", background: "none", border: "none", cursor: "pointer", fontSize: 13, marginLeft: 6 }}>✕</button>
                 </td>
               </tr>
             ))}
-            {lines.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--dim)", padding: "22px 12px" }}>No product lines yet — add what sold below to deduct stock &amp; track profit.</td></tr>}
+            {lines.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "rgb(var(--dim))", padding: "22px 12px" }}>No product lines yet — add what sold below to deduct stock &amp; track profit.</td></tr>}
           </tbody>
         </table>
       )}
@@ -372,8 +372,8 @@ export function PurchasesScreen() {
       </div>
       <div className="statgrid c3">
         <Stat label={productId ? "Spend · filtered" : "Stock spend · range"} color="var(--amber)" value={egp(filteredTotal)} />
-        <Stat label="Entries" color="var(--cyan)" value={entries} sub={lump.length ? <div style={{ fontSize: 11, color: "var(--dim)", fontWeight: 600, marginTop: 8 }}>{lump.length} historical</div> : undefined} />
-        <Stat label="Avg / entry" color="var(--violet)" value={entries ? egp(filteredTotal / entries) : "—"} />
+        <Stat label="Entries" color="rgb(var(--cyan))" value={entries} sub={lump.length ? <div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{lump.length} historical</div> : undefined} />
+        <Stat label="Avg / entry" color="rgb(var(--violet))" value={entries ? egp(filteredTotal / entries) : "—"} />
       </div>
       <Guarded q={q} empty={entries === 0}>
         <DeckTile style={{ padding: 0 }}>
@@ -393,7 +393,7 @@ export function PurchasesScreen() {
                   <tr key={r.id}>
                     <td>{r.note}</td>
                     <td>{fmtDate(r.date, "d MMM yyyy")}</td>
-                    <td className="r" style={{ color: "var(--dim)" }}>no breakdown</td>
+                    <td className="r" style={{ color: "rgb(var(--dim))" }}>no breakdown</td>
                     <td className="r">{egp(r.totalCost)}</td>
                   </tr>
                 ))}

@@ -182,7 +182,7 @@ export async function addAlias(
 export interface PurchaseInput {
   productId: string;
   quantity: number;        // in product base units
-  unitCost: number;        // per base unit
+  unitCost: number | null; // per base unit; null = cost-neutral (weighted avg cost untouched)
   vendor: string | null;   // free-text supplier note (kept simple for now)
   invoiceRef: string | null;
   date: string;            // YYYY-MM-DD

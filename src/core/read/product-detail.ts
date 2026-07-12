@@ -3,8 +3,8 @@
  *  withheld when a line lacks cost), velocity & days-of-cover, plus its sale
  *  lines and purchase batches. READ-ONLY. */
 import { requireEngine } from "@/core/db/engine";
-import { isoRange } from "@/core/time";
-import type { DateRange } from "./common";
+import { isoRange, todayCairo } from "@/core/time";
+import { fetchAllRows, type DateRange } from "./common";
 
 export interface ProductSaleLine { saleId: string; date: string; qty: number; unitPrice: number | null; lineTotal: number; cogs: number | null; hasCogs: boolean }
 export interface ProductPurchase { id: string; date: string; qty: number; unitCost: number; totalCost: number }
@@ -51,25 +51,24 @@ export async function getProductDetail(productId: string, range: DateRange): Pro
   if (prod.error) throw prod.error;
   const p = prod.data;
 
-  const sales = await sb.from("sales").select("id,sale_date").is("voided_at", null)
-    .gte("sale_date", range.from).lte("sale_date", range.to);
-  if (sales.error) throw sales.error;
-  const dateById = new Map(sales.data.map((s) => [s.id, s.sale_date]));
-  const saleIds = sales.data.map((s) => s.id);
-
-  const lines: ProductSaleLine[] = [];
-  if (saleIds.length) {
-    const items = await sb.from("sale_items").select("sale_id,quantity,unit_price,line_total,cogs_at_sale")
-      .eq("product_id", productId).is("voided_at", null).in("sale_id", saleIds);
-    if (items.error) throw items.error;
-    for (const r of items.data) {
-      lines.push({
-        saleId: r.sale_id, date: dateById.get(r.sale_id) ?? "", qty: Number(r.quantity),
-        unitPrice: r.unit_price, lineTotal: Number(r.line_total), cogs: r.cogs_at_sale, hasCogs: r.cogs_at_sale != null,
-      });
-    }
-    lines.sort((a, b) => (a.date < b.date ? 1 : -1));
-  }
+  // One product's lines via the embedded parent join — never fetch every sale
+  // id in range just to build an `.in()` filter (URL explodes); paged so long
+  // ranges can't silently truncate at PostgREST's 1000-row cap.
+  const items = await fetchAllRows((a, b) =>
+    sb.from("sale_items")
+      .select("sale_id,quantity,unit_price,line_total,cogs_at_sale,sales!inner(sale_date,voided_at)")
+      .eq("product_id", productId)
+      .is("voided_at", null)
+      .is("sales.voided_at", null)
+      .gte("sales.sale_date", range.from)
+      .lte("sales.sale_date", range.to)
+      .range(a, b),
+  );
+  const lines: ProductSaleLine[] = items.map((r) => ({
+    saleId: r.sale_id, date: (r.sales as { sale_date: string }).sale_date, qty: Number(r.quantity),
+    unitPrice: r.unit_price, lineTotal: Number(r.line_total), cogs: r.cogs_at_sale, hasCogs: r.cogs_at_sale != null,
+  }));
+  lines.sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const purch = await sb.from("purchase_batches").select("id,purchase_date,quantity,unit_cost,total_cost")
     .eq("product_id", productId).is("voided_at", null)
@@ -86,16 +85,24 @@ export async function getProductDetail(productId: string, range: DateRange): Pro
   const complete = lines.length > 0 && missingCostLines === 0;
   const grossProfit = complete ? revenue - cogs : null;
 
-  // velocity from observed sale span within range
+  // Velocity from the observed sale span within range. The window END is
+  // clamped to today — a "this month" preset ends at the calendar month end,
+  // and counting future days diluted velocity ~2× (overstating days-of-cover
+  // and suppressing restock warnings). Same ≥7-day gate as the alerts engine
+  // so this screen and the alerts can't disagree on thin data.
   const onHand = Number(p.current_stock);
   const avgCost = Number(p.avg_cost);
   let unitsPerDay: number | null = null;
   let daysCover: number | null = null;
   if (lines.length) {
-    const earliest = lines.reduce((m, l) => (l.date && l.date < m ? l.date : m), range.to);
-    const daysObserved = Math.max(1, isoRange(earliest, range.to).length);
-    unitsPerDay = unitsSold / daysObserved;
-    if (unitsPerDay > 0 && onHand > 0) daysCover = onHand / unitsPerDay;
+    const today = todayCairo();
+    const spanEnd = range.to < today ? range.to : today;
+    const earliest = lines.reduce((m, l) => (l.date && l.date < m ? l.date : m), spanEnd);
+    const daysObserved = Math.max(1, isoRange(earliest, spanEnd).length);
+    if (daysObserved >= 7) {
+      unitsPerDay = unitsSold / daysObserved;
+      if (unitsPerDay > 0 && onHand > 0) daysCover = onHand / unitsPerDay;
+    }
   }
 
   return {

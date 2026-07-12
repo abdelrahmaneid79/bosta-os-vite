@@ -163,7 +163,7 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
               {p.saleLines.slice(0, 60).map((l, i) => (
                 <tr key={i}>
                   <td>{fmtDate(l.date, "d MMM yyyy")}</td>
-                  <td className="r">{num(l.qty)} <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
+                  <td className="r">{num(l.qty)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
                   <td className="r">{egp(l.unitPrice ?? 0)}{l.hasCogs ? "" : <span style={{ color: "var(--amber)", fontSize: 11 }}> · no cost</span>}</td>
                   <td className="r" style={{ color: "var(--green)" }}>{egp(l.lineTotal)}</td>
                 </tr>
@@ -183,7 +183,7 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
               {p.purchases.map((b) => (
                 <tr key={b.id}>
                   <td>{fmtDate(b.date, "d MMM yyyy")}</td>
-                  <td className="r">{num(b.qty)} <span style={{ color: "var(--dim)", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
+                  <td className="r">{num(b.qty)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
                   <td className="r">{egp(b.unitCost)}</td>
                   <td className="r">{egp(b.totalCost)}</td>
                 </tr>

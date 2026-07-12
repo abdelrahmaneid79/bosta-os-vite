@@ -3,7 +3,7 @@
  *  revenue. Reconciliation tolerance = max(5, 0.5% * total). READ-ONLY. */
 import { requireEngine } from "@/core/db/engine";
 import type { Tables } from "@/core/db/tables";
-import type { DateRange } from "./common";
+import { fetchAllRows, type DateRange } from "./common";
 
 export const reconTolerance = (total: number) => Math.max(5, 0.005 * total);
 
@@ -13,13 +13,17 @@ export interface DailyRevenuePoint {
 }
 
 export async function getDailyRevenue(range: DateRange): Promise<DailyRevenuePoint[]> {
-  const { data, error } = await requireEngine()
-    .from("sales")
-    .select("sale_date,total_amount")
-    .is("voided_at", null)
-    .gte("sale_date", range.from)
-    .lte("sale_date", range.to);
-  if (error) throw error;
+  // Paged: one row per trading day crosses PostgREST's silent 1000-row cap
+  // after ~3 years of history — un-paged this would quietly drop revenue.
+  const data = await fetchAllRows((a, b) =>
+    requireEngine()
+      .from("sales")
+      .select("sale_date,total_amount")
+      .is("voided_at", null)
+      .gte("sale_date", range.from)
+      .lte("sale_date", range.to)
+      .range(a, b),
+  );
   const byDay = new Map<string, number>();
   for (const r of data) byDay.set(r.sale_date, (byDay.get(r.sale_date) ?? 0) + r.total_amount);
   return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, total]) => ({ date, total }));

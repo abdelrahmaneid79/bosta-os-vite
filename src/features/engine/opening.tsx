@@ -49,7 +49,7 @@ export function OpeningBalancesScreen() {
       let n = 0;
       for (const e of stockEntries) {
         const prod = active.find((p) => p.id === e.id);
-        await addPurchase({ productId: e.id, quantity: e.qty, unitCost: prod?.reference_cost ?? 0, vendor: "Opening stock", invoiceRef: "opening", date, locationId: loc.id });
+        await addPurchase({ productId: e.id, quantity: e.qty, unitCost: prod?.reference_cost ?? null, vendor: "Opening stock", invoiceRef: "opening", date, locationId: loc.id });
         n++;
       }
       return n;

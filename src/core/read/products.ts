@@ -6,7 +6,7 @@
 import { requireEngine } from "@/core/db/engine";
 import type { SearchableProduct } from "@/core/products/match";
 import { composeLifetimeProfit, effectiveCost, type CostSource } from "@/core/products/profit";
-import type { DateRange } from "./common";
+import { fetchAllRows, type DateRange } from "./common";
 
 /** Owner cost settings — the roasting-loss + packaging uplift applied to
  *  estimate-source (raw nut/seed) costs. Default 15%. */
@@ -121,18 +121,22 @@ export async function getLifetimeProducts(): Promise<LifetimeProduct[]> {
 
 export async function getProductProfit(range: DateRange): Promise<ProductProfit[]> {
   const sb = requireEngine();
-  const sales = await sb.from("sales").select("id").is("voided_at", null)
-    .gte("sale_date", range.from).lte("sale_date", range.to);
-  if (sales.error) throw sales.error;
-  const saleIds = sales.data.map((s) => s.id);
-  if (saleIds.length === 0) return [];
-
-  const [{ data, error }, products] = await Promise.all([
-    sb.from("sale_items").select("product_id,raw_product_name,quantity,line_total,cogs_at_sale")
-      .is("voided_at", null).in("sale_id", saleIds),
+  // Inner-join filter on the parent sale + pagination — never `.in(saleIds)`
+  // (URL explodes past ~hundreds of days) and never trust one un-paged
+  // response (PostgREST silently caps at 1000 rows → understated products).
+  const [data, products] = await Promise.all([
+    fetchAllRows((a, b) =>
+      sb.from("sale_items")
+        .select("product_id,raw_product_name,quantity,line_total,cogs_at_sale,sales!inner(sale_date,voided_at)")
+        .is("voided_at", null)
+        .is("sales.voided_at", null)
+        .gte("sales.sale_date", range.from)
+        .lte("sales.sale_date", range.to)
+        .range(a, b),
+    ),
     sb.from("products").select("id,name_en"),
   ]);
-  if (error) throw error;
+  if (products.error) throw products.error;
   const names = new Map((products.data ?? []).map((p) => [p.id, p.name_en]));
   return aggregateProductProfit(
     data.map((r) => ({

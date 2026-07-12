@@ -42,7 +42,8 @@ async function rpc<T extends keyof Database["public"]["Functions"]>(
 export interface PurchaseLine {
   product_id: string;
   quantity: number;
-  unit_cost: number;
+  /** null = cost-neutral inflow (opening counts with unknown cost) — WAC unchanged per 0006. */
+  unit_cost: number | null;
   total_cost?: number;
 }
 
