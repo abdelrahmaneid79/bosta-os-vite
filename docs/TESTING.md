@@ -5,7 +5,7 @@ _Updated 2026-07-13 (replaces the 2026-06 checklist — superseded sections live
 ## Gates (all must pass before push)
 ```bash
 npm run typecheck   # tsc -b (strict, noUnusedLocals)
-npm run test        # vitest — 239 tests / 19 files
+npm run test        # vitest — 243 tests / 20 files
 npm run build       # tsc -b && vite build
 ```
 (`lint` was removed — eslint was never installed/configured; typecheck is the gate.)
