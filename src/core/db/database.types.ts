@@ -522,78 +522,6 @@ export type Database = {
           },
         ]
       }
-      expenses_backup_20260629: {
-        Row: {
-          amount: number | null
-          category_id: string | null
-          created_at: string | null
-          edited_at: string | null
-          employee_id: string | null
-          expense_date: string | null
-          id: string | null
-          is_estimated: boolean | null
-          location_id: string | null
-          notes: string | null
-          payment_method: Database["public"]["Enums"]["payment_method"] | null
-          receipt_url: string | null
-          source_type: Database["public"]["Enums"]["source_type"] | null
-          supplier_id: string | null
-          tax_amount: number | null
-          updated_at: string | null
-          verification:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
-          void_reason: string | null
-          voided_at: string | null
-        }
-        Insert: {
-          amount?: number | null
-          category_id?: string | null
-          created_at?: string | null
-          edited_at?: string | null
-          employee_id?: string | null
-          expense_date?: string | null
-          id?: string | null
-          is_estimated?: boolean | null
-          location_id?: string | null
-          notes?: string | null
-          payment_method?: Database["public"]["Enums"]["payment_method"] | null
-          receipt_url?: string | null
-          source_type?: Database["public"]["Enums"]["source_type"] | null
-          supplier_id?: string | null
-          tax_amount?: number | null
-          updated_at?: string | null
-          verification?:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
-          void_reason?: string | null
-          voided_at?: string | null
-        }
-        Update: {
-          amount?: number | null
-          category_id?: string | null
-          created_at?: string | null
-          edited_at?: string | null
-          employee_id?: string | null
-          expense_date?: string | null
-          id?: string | null
-          is_estimated?: boolean | null
-          location_id?: string | null
-          notes?: string | null
-          payment_method?: Database["public"]["Enums"]["payment_method"] | null
-          receipt_url?: string | null
-          source_type?: Database["public"]["Enums"]["source_type"] | null
-          supplier_id?: string | null
-          tax_amount?: number | null
-          updated_at?: string | null
-          verification?:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
-          void_reason?: string | null
-          voided_at?: string | null
-        }
-        Relationships: []
-      }
       gl_accounts: {
         Row: {
           active: boolean
@@ -1265,6 +1193,7 @@ export type Database = {
       products: {
         Row: {
           active: boolean
+          alt_pos_codes: string[]
           avg_cost: number
           base_unit: string
           base_units_per_sale_unit: number
@@ -1278,7 +1207,6 @@ export type Database = {
           name_en: string
           notes: string | null
           pos_code: string | null
-          alt_pos_codes: string[]
           reference_cost: number | null
           sale_unit: string | null
           selling_price: number | null
@@ -1288,6 +1216,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          alt_pos_codes?: string[]
           avg_cost?: number
           base_unit?: string
           base_units_per_sale_unit?: number
@@ -1301,7 +1230,6 @@ export type Database = {
           name_en: string
           notes?: string | null
           pos_code?: string | null
-          alt_pos_codes?: string[]
           reference_cost?: number | null
           sale_unit?: string | null
           selling_price?: number | null
@@ -1311,6 +1239,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          alt_pos_codes?: string[]
           avg_cost?: number
           base_unit?: string
           base_units_per_sale_unit?: number
@@ -1324,7 +1253,6 @@ export type Database = {
           name_en?: string
           notes?: string | null
           pos_code?: string | null
-          alt_pos_codes?: string[]
           reference_cost?: number | null
           sale_unit?: string | null
           selling_price?: number | null
@@ -1423,6 +1351,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      report_extractions: {
+        Row: {
+          branch_total_net: number | null
+          created_at: string
+          lines: Json
+          model: string | null
+          sale_date: string
+          updated_at: string
+        }
+        Insert: {
+          branch_total_net?: number | null
+          created_at?: string
+          lines?: Json
+          model?: string | null
+          sale_date: string
+          updated_at?: string
+        }
+        Update: {
+          branch_total_net?: number | null
+          created_at?: string
+          lines?: Json
+          model?: string | null
+          sale_date?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       sale_items: {
         Row: {
@@ -1720,6 +1675,223 @@ export type Database = {
           },
         ]
       }
+      strategist_actions: {
+        Row: {
+          category: string
+          completed_at: string | null
+          completion_note: string | null
+          conversation_id: string | null
+          created_at: string
+          description: string
+          dismissed_at: string | null
+          due_date: string | null
+          expected_outcome: string | null
+          finding_id: string | null
+          id: string
+          priority: string
+          screen_link: string
+          source: string
+          status: string
+          title: string
+        }
+        Insert: {
+          category?: string
+          completed_at?: string | null
+          completion_note?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          description?: string
+          dismissed_at?: string | null
+          due_date?: string | null
+          expected_outcome?: string | null
+          finding_id?: string | null
+          id?: string
+          priority?: string
+          screen_link?: string
+          source: string
+          status?: string
+          title: string
+        }
+        Update: {
+          category?: string
+          completed_at?: string | null
+          completion_note?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          description?: string
+          dismissed_at?: string | null
+          due_date?: string | null
+          expected_outcome?: string | null
+          finding_id?: string | null
+          id?: string
+          priority?: string
+          screen_link?: string
+          source?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategist_actions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "strategist_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategist_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          mode: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mode?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mode?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      strategist_feedback: {
+        Row: {
+          created_at: string
+          id: string
+          reason: string | null
+          snapshot_meta: Json | null
+          subject_id: string | null
+          subject_type: string
+          verdict: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          snapshot_meta?: Json | null
+          subject_id?: string | null
+          subject_type: string
+          verdict: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reason?: string | null
+          snapshot_meta?: Json | null
+          subject_id?: string | null
+          subject_type?: string
+          verdict?: string
+        }
+        Relationships: []
+      }
+      strategist_insights: {
+        Row: {
+          class: string
+          confidence: string
+          detail: string
+          dismissed_at: string | null
+          evidence: Json
+          finding_id: string
+          first_seen_at: string
+          id: string
+          impact_egp: number | null
+          last_seen_at: string
+          owner_note: string | null
+          period: string | null
+          resolved_at: string | null
+          screen_link: string
+          seen_count: number
+          status: string
+          title: string
+          urgency: string
+        }
+        Insert: {
+          class: string
+          confidence?: string
+          detail?: string
+          dismissed_at?: string | null
+          evidence?: Json
+          finding_id: string
+          first_seen_at?: string
+          id?: string
+          impact_egp?: number | null
+          last_seen_at?: string
+          owner_note?: string | null
+          period?: string | null
+          resolved_at?: string | null
+          screen_link?: string
+          seen_count?: number
+          status?: string
+          title: string
+          urgency?: string
+        }
+        Update: {
+          class?: string
+          confidence?: string
+          detail?: string
+          dismissed_at?: string | null
+          evidence?: Json
+          finding_id?: string
+          first_seen_at?: string
+          id?: string
+          impact_egp?: number | null
+          last_seen_at?: string
+          owner_note?: string | null
+          period?: string | null
+          resolved_at?: string | null
+          screen_link?: string
+          seen_count?: number
+          status?: string
+          title?: string
+          urgency?: string
+        }
+        Relationships: []
+      }
+      strategist_messages: {
+        Row: {
+          content: Json
+          conversation_id: string
+          created_at: string
+          id: string
+          role: string
+          snapshot_meta: Json | null
+        }
+        Insert: {
+          content: Json
+          conversation_id: string
+          created_at?: string
+          id?: string
+          role: string
+          snapshot_meta?: Json | null
+        }
+        Update: {
+          content?: Json
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          snapshot_meta?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategist_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "strategist_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           active: boolean
@@ -1977,6 +2149,7 @@ export type Database = {
         Args: { p_sale_item_id: string }
         Returns: undefined
       }
+      rebuild_day_from_memory: { Args: { p_date: string }; Returns: number }
       recalc_money_account: {
         Args: { p_account_id: string }
         Returns: undefined
