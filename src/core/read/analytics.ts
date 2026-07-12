@@ -8,7 +8,7 @@ import { getPurchases } from "./purchases";
 import { getProductProfit } from "./products";
 import { getProfitReadout } from "./profit";
 import { getChequeCycle } from "./settlements";
-import { todayCairo, monthBoundsCairo, priorRange } from "@/core/time";
+import { todayCairo, monthBoundsCairo, priorRange, isoDaysAgo } from "@/core/time";
 import type { DateRange } from "./common";
 
 export interface DailyPoint { date: string; total: number }
@@ -48,16 +48,6 @@ export function rollingAverage(points: DailyPoint[], window = 7): Series[] {
 export function topDays(points: DailyPoint[], n = 10): DailyPoint[] {
   return [...points].filter((p) => p.total > 0).sort((a, b) => b.total - a.total).slice(0, n);
 }
-export function lastNDaysAvg(points: DailyPoint[], today: string, n: number): number {
-  const cutoff = isoDaysAgoLocal(today, n - 1);
-  const win = points.filter((p) => p.date >= cutoff && p.date <= today);
-  return win.length ? sumTotals(win) / n : 0;
-}
-function isoDaysAgoLocal(iso: string, n: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d)); dt.setUTCDate(dt.getUTCDate() - n);
-  return dt.toISOString().slice(0, 10);
-}
 
 export interface Kpi { key: string; label: string; value: number | null; sub: string; tone?: "good" | "warn" | "muted" }
 
@@ -96,7 +86,10 @@ export async function getAnalytics(range: DateRange, accountingStart?: string): 
   const sortedDates = allPoints.map((p) => p.date).sort();
   const firstDate = sortedDates[0] ?? today;
   const lastDate = sortedDates[sortedDates.length - 1] ?? today;
-  const owed = cycle.openTab.revenue; // real "awaiting cheque" = sales since the last cheque
+  // "Awaiting cheque" is GROSS sales since the last cheque; the cheque itself
+  // arrives net of rent + revenue share, so show the empirically implied net.
+  const owed = cycle.openTab.revenue;
+  const owedNet = cycle.blendedDeductionPct != null ? owed * (1 - cycle.blendedDeductionPct / 100) : null;
 
   // expense distribution by category
   const catMap = new Map<string, number>();
@@ -116,7 +109,7 @@ export async function getAnalytics(range: DateRange, accountingStart?: string): 
     { key: "allTime", label: "All-time revenue", value: sumTotals(allPoints), sub: `${firstDate} → ${lastDate}` },
     { key: "monthProfit", label: "Est. monthly profit", value: monthProfit.netProfit, sub: monthProfit.netProfit == null ? "needs product costs" : "this month, net", tone: "good" },
     { key: "totalExp", label: "Total spend", value: totalExpensesAll, sub: "operating + inventory" },
-    { key: "owed", label: "Awaiting cheque", value: owed, sub: "sales since last cheque", tone: "warn" },
+    { key: "owed", label: "Awaiting cheque (gross)", value: owed, sub: owedNet != null ? `~${Math.round(owedNet).toLocaleString()} net after mall cut` : "sales since last cheque, before deductions", tone: "warn" },
     { key: "totalDays", label: "Days traded", value: allPoints.length, sub: `since ${firstDate}` },
     { key: "growth", label: "Growth vs prev", value: growth, sub: growth == null ? "no prior data" : "vs previous period", tone: growth != null && growth < 0 ? "warn" : "good" },
   ];
@@ -128,7 +121,7 @@ export async function getAnalytics(range: DateRange, accountingStart?: string): 
     monthlyPurchases,
     expenseDistribution,
     dayOfWeek: dayOfWeekAverages(rangePoints),
-    rolling: rollingAverage(inRange(allPoints, { from: isoDaysAgoLocal(today, 89), to: today }), 7).map((s) => ({ label: s.label.slice(5), value: s.value })),
+    rolling: rollingAverage(inRange(allPoints, { from: isoDaysAgo(today, 89), to: today }), 7).map((s) => ({ label: s.label.slice(5), value: s.value })),
     topRevenueDays: topDays(rangePoints, 10),
     productsByRevenue: products.slice().sort((a, b) => b.revenue - a.revenue).slice(0, 10).map((p) => ({ label: p.name, value: p.revenue })),
     productsByVolume: products.slice().sort((a, b) => b.units - a.units).slice(0, 10).map((p) => ({ label: p.name, value: p.units })),

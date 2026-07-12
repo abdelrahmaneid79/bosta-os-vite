@@ -54,7 +54,7 @@ export function buildStockInsights(
       out.push({ key: `stock-neg-${p.id}`, severity: "critical", confidence: "high",
         title: `${p.nameEn} is at negative stock`,
         detail: "On-hand is below zero — a purchase was sold against but never recorded, so stock value and COGS are understated.",
-        action: "Record the missing purchase on Buy to correct on-hand and cost.",
+        action: "Record the missing purchase on Purchases to correct on-hand and cost.",
         route: "/purchases", metric: `${p.onHand} ${p.baseUnit}` });
       continue;
     }
@@ -62,7 +62,7 @@ export function buildStockInsights(
       out.push({ key: `stock-out-${p.id}`, severity: "warning", confidence: "high",
         title: `${p.nameEn} is out of stock`,
         detail: "On-hand is zero — it can't be sold until restocked.",
-        action: "Add a purchase on Buy to restock.", route: "/purchases" });
+        action: "Add a purchase on Purchases to restock.", route: "/purchases" });
       continue;
     }
     const v = velocity.get(p.id);
@@ -81,7 +81,7 @@ export function buildStockInsights(
       out.push({ key: `stock-low-${p.id}`, severity: "warning", confidence: "high",
         title: `${p.nameEn} is below its low-stock level`,
         detail: "On-hand has fallen to or below the threshold you set for this product.",
-        action: "Restock on Buy, or adjust the threshold in the product if it's too high.",
+        action: "Restock on Purchases, or adjust the threshold in the product if it's too high.",
         route: "/purchases", metric: `${round1(p.onHand)} ${p.baseUnit}` });
     }
   }

@@ -3,7 +3,7 @@
  * (every policy targets the `authenticated` role), so the app reads under the
  * owner's login — never bypassing RLS, never using a service key.
  */
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
 import { sb, isEngineConfigured } from "./engine";
 
 export async function getSession(): Promise<Session | null> {
@@ -27,10 +27,6 @@ export async function signIn(email: string, password: string): Promise<void> {
 export async function signOut(): Promise<void> {
   if (!sb) return;
   await sb.auth.signOut();
-}
-
-export function currentUser(session: Session | null): User | null {
-  return session?.user ?? null;
 }
 
 export { isEngineConfigured };

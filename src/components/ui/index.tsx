@@ -52,15 +52,6 @@ export function Eyebrow({ children, className, accent }: { children: ReactNode; 
   return <div className={cn("text-[11px] font-semibold uppercase tracking-[0.14em]", accent ?? "text-dim", className)}>{children}</div>;
 }
 
-export function SectionTitle({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
-  return (
-    <div>
-      <h2 className="font-display text-lg font-bold text-text">{children}</h2>
-      {sub && <p className="text-xs text-dim">{sub}</p>}
-    </div>
-  );
-}
-
 /* ─ Icon chip (tinted rounded-square with an icon) ─────────────────────────── */
 export function IconChip({ d, accent = "pink", size = "md" }: { d: string; accent?: Accent; size?: "sm" | "md" | "lg" }) {
   const a = ACCENTS[accent];
@@ -140,44 +131,8 @@ export function DeltaChip({ pct, suffix = "%" }: { pct?: number | null; suffix?:
     </span>
   );
 }
-/** Back-compat: simple inline delta. */
-export function Delta({ value, suffix }: { value: number; suffix?: string }) {
-  return <DeltaChip pct={value} suffix={suffix ?? "%"} />;
-}
 
 /* ─ Progress ring (SVG, theme-aware track) ─────────────────────────────── */
-export function Ring({ value, size = 128, stroke = 12, color, children }: {
-  value: number | null; size?: number; stroke?: number; color?: string; children?: ReactNode;
-}) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const v = Math.max(0, Math.min(100, value ?? 0));
-  const tier: [string, string, string] = color ? [color, color, color]
-    : v >= 80 ? ["#34D399", "#10B981", "#10B981"]
-    : v >= 55 ? ["#FBBF24", "#F59E0B", "#F59E0B"]
-    : v >= 1 ? ["#FB7185", "#F43F5E", "#F43F5E"]
-    : ["#CBD5E1", "#CBD5E1", "#CBD5E1"];
-  const gid = `ring-${tier[0].slice(1)}-${size}`;
-  return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <defs>
-          <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={tier[0]} /><stop offset="100%" stopColor={tier[1]} />
-          </linearGradient>
-        </defs>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke: "rgb(var(--line2))" }} strokeWidth={stroke} />
-        {value != null && (
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`url(#${gid})`} strokeWidth={stroke}
-            strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)}
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            style={{ transition: "stroke-dashoffset .7s cubic-bezier(.4,0,.2,1)", filter: `drop-shadow(0 0 ${stroke / 2}px ${tier[2]}55)` }} />
-        )}
-      </svg>
-      <div className="absolute flex flex-col items-center">{children}</div>
-    </div>
-  );
-}
 
 /* ─ Buttons ────────────────────────────────────────────────────────────── */
 export function Button({ variant = "primary", size = "md", className, children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "outline" | "danger"; size?: "sm" | "md" }) {
@@ -193,11 +148,6 @@ export function Button({ variant = "primary", size = "md", className, children, 
       {children}
     </button>
   );
-}
-
-/** A capability that's visible but not built yet. */
-export function GatedButton({ children }: { children: ReactNode }) {
-  return <Button variant="outline" disabled title="Coming soon — not built yet">{children}</Button>;
 }
 
 /* ─ Form controls ──────────────────────────────────────────────────────── */

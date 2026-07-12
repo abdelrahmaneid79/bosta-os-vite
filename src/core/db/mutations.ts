@@ -280,7 +280,10 @@ export async function voidExpense(id: string): Promise<void> {
 /** Find-or-create an expense category by name. */
 export async function ensureExpenseCategory(name: string, isOperating: boolean): Promise<string> {
   const sb = requireEngine();
-  const existing = await sb.from("expense_categories").select("id").ilike("name", name.trim()).limit(1);
+  // ilike treats % and _ as wildcards — escape them so a literal name match
+  // can't collide with an unrelated category.
+  const needle = name.trim().replace(/([%_\\])/g, "\\$1");
+  const existing = await sb.from("expense_categories").select("id").ilike("name", needle).limit(1);
   if (existing.error) throw existing.error;
   if (existing.data.length) return existing.data[0].id;
   const { data, error } = await sb.from("expense_categories")
@@ -297,6 +300,9 @@ export interface MovementInput {
   date: string; direction?: "in" | "out"; notes: string | null;
 }
 export async function createMovement(i: MovementInput): Promise<void> {
+  // Cheques live ONLY in the cheques table — cash reads sum BOTH sources, so a
+  // manual cheque_inflow movement would double-count the same money.
+  if (i.type === "cheque_inflow") throw new Error("Record cheques on the Cheques screen — they already count as cash inflow.");
   const sb = requireEngine();
   const { error } = await sb.from("money_movements").insert({
     account_id: i.accountId, movement_date: i.date, movement_type: i.type,
@@ -370,7 +376,6 @@ export async function recordCheque(i: ChequeInput): Promise<void> {
   });
   if (error) throw error;
 }
-/** Mark a recorded cheque reconciled (forward-only lifecycle). */
 export async function reconcileCheque(id: string): Promise<void> {
   const { error } = await requireEngine().from("cheques")
     .update({ status: "reconciled", edited_at: new Date().toISOString() }).eq("id", id);
@@ -389,10 +394,6 @@ export async function voidCheque(id: string): Promise<void> {
 // ── Alert dismissals (cross-device; additive table alert_dismissals) ─────────
 export async function dismissAlert(key: string): Promise<void> {
   const { error } = await requireEngine().from("alert_dismissals").upsert({ key }, { onConflict: "key" });
-  if (error) throw error;
-}
-export async function restoreAlert(key: string): Promise<void> {
-  const { error } = await requireEngine().from("alert_dismissals").delete().eq("key", key);
   if (error) throw error;
 }
 export async function restoreAllAlerts(): Promise<void> {

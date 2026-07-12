@@ -6,7 +6,7 @@ export interface NavTab { to: string; label: string }
 export interface NavSection { id: string; label: string; icon: string; accent: string; tabs: NavTab[] }
 
 export const NAV_SECTIONS: NavSection[] = [
-  { id: "today", label: "Today", icon: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5", accent: "#F868C8", tabs: [
+  { id: "today", label: "Today", icon: "M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5", accent: "#ff4dbb", tabs: [
     { to: "/dashboard", label: "Today" },
   ] },
   { id: "sales", label: "Sales", icon: "M3 3v18h18M7 14l3-3 3 3 5-6", accent: "#2BD4C4", tabs: [
@@ -46,6 +46,7 @@ export const SETTINGS_SECTION: NavSection = {
     { to: "/settings/opening", label: "Opening balances" },
     { to: "/settings/history", label: "Load history" },
     { to: "/system", label: "System" },
+    { to: "/qa", label: "QA checklist" },
   ],
 };
 

@@ -154,32 +154,56 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
   const approve = useMutation({
     mutationFn: async () => {
       let imported = 0, skipped = 0, failed = 0;
+      const failures: string[] = [];
       if (kind === "sales") {
         const loc = locations.data?.[0], ch = channels.data?.[0];
         if (!loc || !ch) throw new Error("No active location/channel.");
         const seen = new Set(dupSet);
         for (const r of salesView) {
           if (r.issues.length || !r.iso || r.totalNum == null || seen.has(r.iso)) { skipped++; continue; }
-          try { await createSale({ date: r.iso, total: r.totalNum, locationId: loc.id, channelId: ch.id }); seen.add(r.iso); imported++; } catch { failed++; }
+          try { await createSale({ date: r.iso, total: r.totalNum, locationId: loc.id, channelId: ch.id }); seen.add(r.iso); imported++; } catch (e) { failed++; if (failures.length < 5) failures.push(`${r.iso}: ${(e as Error)?.message ?? "failed"}`); }
         }
       } else {
         const loc = locations.data?.[0];
         if (!loc) throw new Error("No active location.");
+        // Dedupe against expenses ALREADY in the DB — re-uploading the same
+        // file must never double-book operating costs. Fingerprint mirrors
+        // the seed importer: date|category(lower)|amount(2dp).
+        const isos = expView.map((r) => r.iso).filter(Boolean) as string[];
+        const existing = new Set<string>();
+        if (isos.length) {
+          const span = { from: isos.reduce((a, b) => (a < b ? a : b)), to: isos.reduce((a, b) => (a > b ? a : b)) };
+          const { data: rows, error } = await requireEngine()
+            .from("expenses").select("expense_date,amount,expense_categories(name)")
+            .is("voided_at", null).gte("expense_date", span.from).lte("expense_date", span.to);
+          if (error) throw error;
+          for (const e of rows ?? []) {
+            const cat = ((e.expense_categories as { name: string } | null)?.name ?? "").trim().toLowerCase();
+            existing.add(`${e.expense_date}|${cat}|${Number(e.amount).toFixed(2)}`);
+          }
+        }
         const cache = new Map<string, string>();
         for (const r of expView) {
           if (r.issues.length || !r.iso || r.amountNum == null) { skipped++; continue; }
+          const fp = `${r.iso}|${r.category.trim().toLowerCase()}|${r.amountNum.toFixed(2)}`;
+          if (existing.has(fp)) { skipped++; continue; }
           try {
             const key = r.category.trim().toLowerCase();
             let catId = cache.get(key);
             if (!catId) { catId = await ensureExpenseCategory(r.category.trim(), true); cache.set(key, catId); }
             await addExpense({ date: r.iso, categoryId: catId, amount: r.amountNum, paymentMethod: "cash", notes: null, locationId: loc.id });
+            existing.add(fp);
             imported++;
-          } catch { failed++; }
+          } catch (e) { failed++; if (failures.length < 5) failures.push(`${r.iso} ${r.category}: ${(e as Error)?.message ?? "failed"}`); }
         }
       }
-      return { imported, skipped, failed };
+      return { imported, skipped, failed, failures };
     },
-    onSuccess: (res) => { reportSuccess("Import", `Imported ${res.imported} · skipped ${res.skipped}${res.failed ? ` · failed ${res.failed}` : ""}`); qc.invalidateQueries(); reset(); },
+    onSuccess: (res) => {
+      reportSuccess("Import", `Imported ${res.imported} · skipped ${res.skipped}${res.failed ? ` · ${res.failed} FAILED — ${res.failures.join(" · ")}` : ""}`);
+      qc.invalidateQueries();
+      if (res.failed === 0) reset(); // keep the table on partial failure so failed rows can be retried
+    },
     onError: (e) => reportError("Import", e),
   });
 

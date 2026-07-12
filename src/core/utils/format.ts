@@ -35,3 +35,6 @@ export function num(n: number | null | undefined, digits = 3): string {
 export function signed(n: number, fmt: (x: number) => string = egp): string {
   return (n >= 0 ? "+" : "−") + fmt(Math.abs(n));
 }
+
+/** egpShort without the currency prefix — for tiles that render "EGP" separately. */
+export const egpShortBare = (n: number | null | undefined): string => egpShort(n).replace("EGP ", "");

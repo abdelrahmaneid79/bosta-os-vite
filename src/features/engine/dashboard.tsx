@@ -5,13 +5,14 @@ import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
 import { DeckTile } from "./deck";
 import { BarChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
-import { egp, egpShort } from "@/core/utils/format";
+import { egp, egpShort, egpShortBare } from "@/core/utils/format";
+import { ALL_TIME_FROM } from "@/core/range";
+import { getPurchaseTotal } from "@/core/read/purchases";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { getMissingData } from "@/core/read/missing";
 import { getRiskInsights } from "@/core/read/insights";
 import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
-import { getHealthReport } from "@/core/read/health";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getExpenses } from "@/core/read/expenses";
 import { getChequeCycle } from "@/core/read/settlements";
@@ -140,15 +141,15 @@ const Ic = {
 export function DashboardScreen() {
   const today = todayCairo();
   const month = monthBoundsCairo();
-  const histFrom = "2024-01-01";
+  const histFrom = ALL_TIME_FROM;
   const [trendR, setTrendR] = useState<"1D" | "1W" | "1M" | "3M" | "6M" | "All" | "Custom">("3M");
   const [cFrom, setCFrom] = useState("");
   const [cTo, setCTo] = useState("");
 
   const daily = useQuery({ queryKey: ["dailyHist", histFrom], queryFn: () => getDailyRevenue({ from: histFrom, to: today }), enabled: en });
   const spendAll = useQuery({ queryKey: ["dash-spend", histFrom], queryFn: () => getExpenses({ from: histFrom, to: today }), enabled: en });
-  const health = useQuery({ queryKey: ["health"], queryFn: getHealthReport, enabled: en });
   const cycle = useQuery({ queryKey: ["cheque-cycle"], queryFn: getChequeCycle, enabled: en });
+  const monthPurch = useQuery({ queryKey: ["dash-purch", month.from], queryFn: () => getPurchaseTotal({ from: month.from, to: month.to }), enabled: en });
 
   const rows = daily.data ?? [];
   const byDay = useMemo(() => new Map(rows.map((r) => [r.date, r.total])), [rows]);
@@ -163,25 +164,33 @@ export function DashboardScreen() {
     const best = monthly.reduce((b, m) => (m.v > b.v ? m : b), { k: "", v: 0 });
     const dates = rows.map((r) => r.date).sort();
     const latest = rows.filter((r) => r.total > 0).map((r) => r.date).sort().pop() ?? today;
-    return { monthKey: cur.k, monthRev: cur.v, lastRev: prev.v, monthly, lifetimeRev, best, earliest: dates[0] ?? today, latest };
+    return { monthKey: cur.k, monthRev: cur.v, lastRev: prev.v, prevKey: prev.k, monthly, lifetimeRev, best, earliest: dates[0] ?? today, latest };
   }, [rows, month.from, today]);
 
   if (daily.isError) return <ErrorState message={String((daily.error as Error)?.message)} />;
   if (!en) return <EmptyState title="Sign in to load your deck" hint="Wired to your live data only — never faked." />;
 
   const monthNum = +d.monthKey.slice(5, 7), yearNum = +d.monthKey.slice(0, 4);
-  const monthLabel = `${MON[monthNum - 1]} ${yearNum}`, monthShort = MON[monthNum - 1], prevMonthShort = MON[(monthNum + 10) % 12];
+  const monthLabel = `${MON[monthNum - 1]} ${yearNum}`, monthShort = MON[monthNum - 1];
+  // name the month actually compared against (the previous ACTIVE month, which
+  // is not always the calendar-previous one when a month has no data)
+  const prevMonthShort = d.prevKey ? `${MON[+d.prevKey.slice(5, 7) - 1]}${d.prevKey.slice(0, 4) !== String(yearNum) ? " " + d.prevKey.slice(2, 4) : ""}` : MON[(monthNum + 10) % 12];
   const revDelta = pctDelta(d.monthRev, d.lastRev);
   const mTo2 = `${d.monthKey}-${String(new Date(yearNum, monthNum, 0).getDate()).padStart(2, "0")}`;
   const monthDays = isoRange(`${d.monthKey}-01`, mTo2 <= today ? mTo2 : today);
-  const tradingDays = monthDays.filter((x) => (byDay.get(x) ?? 0) > 0).length || monthDays.length;
+  const tradingDays = monthDays.filter((x) => (byDay.get(x) ?? 0) > 0).length;
   const avgPerDay = tradingDays ? d.monthRev / tradingDays : 0;
   const heroData: ChartPt[] = monthDays.map((x) => ({ label: fmtDate(x, "d MMM"), full: fmtDate(x, "d MMM yyyy"), value: byDay.get(x) ?? 0 }));
 
   const spendRows = spendAll.data ?? [];
-  const monthSpend = spendRows.filter((e) => e.date.slice(0, 7) === d.monthKey).reduce((s, e) => s + e.amount, 0);
-  const netCash = d.monthRev - monthSpend;
+  const monthExpRows = spendRows.filter((e) => e.date.slice(0, 7) === d.monthKey);
+  const monthSpend = monthExpRows.reduce((s, e) => s + e.amount, 0);
+  const monthStockExp = monthExpRows.filter((e) => !e.isOperating).reduce((s, e) => s + e.amount, 0);
+  const stockShare = monthSpend > 0 ? Math.round((monthStockExp / monthSpend) * 100) : 0;
+  const monthOut = monthSpend + (monthPurch.data ?? 0); // expenses + purchase-batch stock buys
+  const netCash = d.monthRev - monthOut;
   const marginPct = d.monthRev > 0 ? Math.round((netCash / d.monthRev) * 100) : 0;
+  const loadErr = spendAll.isError || cycle.isError || monthPurch.isError;
   const spendRatio = d.monthRev > 0 ? Math.min(100, Math.round((monthSpend / d.monthRev) * 100)) : 0;
   const gaugeCol = marginPct >= 55 ? "var(--green)" : marginPct >= 35 ? "var(--amber)" : "var(--red)";
 
@@ -192,13 +201,12 @@ export function DashboardScreen() {
   const CATCOL = ["var(--mag)", "rgb(var(--violet))", "rgb(var(--cyan))", "var(--amber)", "rgb(var(--lime))"];
 
   const venMap = new Map<string, number>();
-  for (const e of spendRows) if (e.notes) venMap.set(e.notes, (venMap.get(e.notes) ?? 0) + e.amount);
+  for (const e of spendRows) if (e.notes && !e.isOperating) venMap.set(e.notes, (venMap.get(e.notes) ?? 0) + e.amount);
   const topVen = [...venMap.entries()].sort((a, b) => b[1] - a[1])[0];
   const stockSpend = spendRows.filter((e) => !e.isOperating).reduce((s, e) => s + e.amount, 0);
   const venPct = topVen && stockSpend ? Math.round((topVen[1] / stockSpend) * 100) : 0;
 
   const cheques = (cycle.data?.cheques ?? []).slice(0, 4);
-  const hs = health.data;
 
   // this week — daily bars ending at the latest recorded day
   const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -217,6 +225,11 @@ export function DashboardScreen() {
 
   return (
     <div className="cdk space-y-5">
+      {loadErr && (
+        <div style={{ border: "1px solid rgb(var(--warn))", background: "rgba(255,177,62,.08)", color: "rgb(var(--warn))", borderRadius: 12, padding: "8px 14px", fontSize: 12.5, fontWeight: 600 }}>
+          Some deck data failed to load — figures below may be incomplete. Reload to retry.
+        </div>
+      )}
       {/* ── ticker ─────────────────────────────────────────────────────── */}
       <div className="ticker">
         <div className="tk">
@@ -229,10 +242,9 @@ export function DashboardScreen() {
         </div>
         <div className="tk">
           <div className="tkic" style={{ background: "rgba(39,229,204,.14)", color: "rgb(var(--cyan))" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.bank}</svg></div>
-          <div><div className="tkl">Cheques logged</div><div className="tkv tnum">{cycle.data?.cheques.length ?? 0} · EGP {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</div></div>
+          <div><div className="tkl">Cheques logged</div><div className="tkv tnum">{cycle.data?.cheques.length ?? 0} · EGP {egpShortBare(cycle.data?.totalReceived ?? 0)}</div></div>
         </div>
         <div className="tk">
-          <span className="live"><span className="livedot" /> LIVE</span>
           <div><div className="tkl">Books to</div><div className="tkv" style={{ fontSize: 14 }}>{fmtDate(d.latest, "d MMM yyyy")}</div></div>
         </div>
       </div>
@@ -263,25 +275,25 @@ export function DashboardScreen() {
           <div className="th"><span className="tname">Spend · {monthShort}</span></div>
           <div className="bn tnum"><small>EGP</small>{money2(monthSpend)}</div>
           <div className="bar" style={{ marginTop: 18 }}><i style={{ width: `${spendRatio}%`, background: "linear-gradient(90deg,rgb(var(--violet)),var(--mag))" }} /></div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of {monthShort} revenue · mostly stock</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of {monthShort} revenue · {stockShare}% stock</div>
         </div>
 
         {/* net cash */}
         <div className="tile netcash">
           <div className="th"><span className="tname">Net cash · {monthShort}</span></div>
           <div className="bn tnum" style={{ color: netCash >= 0 ? "var(--green)" : "var(--red)" }}><small>EGP</small>{money2(netCash)}</div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 18 }}>{marginPct}% cash margin · revenue − recorded spend</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 18 }}>{marginPct}% cash margin · revenue − expenses − stock buys</div>
         </div>
 
         {/* performance gauge */}
         <div className="tile perf">
           <HealthGauge score={marginPct} suffix="%" color={gaugeCol} label="Net cash margin" />
           <div className="hbody">
-            <span className="eyebrow">Performance · lifetime</span>
-            <div className="hhead">EGP {money2(d.lifetimeRev)} earned to date — {hs?.status ? hs.status.toLowerCase() : "steady"} cash conversion.</div>
+            <span className="eyebrow">Cash conversion · {monthShort}</span>
+            <div className="hhead">EGP {money2(d.lifetimeRev)} earned to date.</div>
             <div className="hstats">
-              <div className="hstat"><div className="l">Lifetime revenue</div><div className="v tnum">{egpShort(d.lifetimeRev).replace("EGP ", "")}</div></div>
-              <div className="hstat"><div className="l">Cheques settled</div><div className="v tnum">{egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</div></div>
+              <div className="hstat"><div className="l">Lifetime revenue</div><div className="v tnum">{egpShortBare(d.lifetimeRev)}</div></div>
+              <div className="hstat"><div className="l">Cheques settled</div><div className="v tnum">{egpShortBare(cycle.data?.totalReceived ?? 0)}</div></div>
               <div className="hstat"><div className="l">Best month</div><div className="v tnum">{d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(2, 4)}` : "—"}</div></div>
             </div>
           </div>
@@ -335,7 +347,7 @@ export function DashboardScreen() {
 
         {/* recent cheques */}
         <div className="tile cheques">
-          <div className="th"><span className="tname">Recent cheques</span><span className="tag" style={{ marginLeft: "auto", color: "rgb(var(--cyan))", background: "rgba(39,229,204,.12)" }}>{cycle.data?.cheques.length ?? 0} · {egpShort(cycle.data?.totalReceived ?? 0).replace("EGP ", "")}</span></div>
+          <div className="th"><span className="tname">Recent cheques</span><span className="tag" style={{ marginLeft: "auto", color: "rgb(var(--cyan))", background: "rgba(39,229,204,.12)" }}>{cycle.data?.cheques.length ?? 0} · {egpShortBare(cycle.data?.totalReceived ?? 0)}</span></div>
           {cycle.isLoading ? <SkeletonRows rows={4} /> : cheques.length === 0 ? <Note>No cheques logged yet.</Note> :
             cheques.map((c) => (
               <div className="lrow" key={c.id}>

@@ -24,24 +24,6 @@ export async function getChequeCycle(): Promise<ChequeCycle> {
   return buildChequeCycle(cheques, daily, today);
 }
 
-export interface SettlementPeriod {
-  id: string; start: string; end: string | null;
-  revenue: number; deductions: number; netExpected: number;
-  status: Tables<"settlement_periods">["status"];
-}
-export async function getSettlementPeriods(): Promise<SettlementPeriod[]> {
-  const { data, error } = await requireEngine()
-    .from("settlement_periods")
-    .select("id,start_date,end_date,accumulated_revenue,total_deductions,net_expected,status")
-    .is("voided_at", null).order("start_date", { ascending: false });
-  if (error) throw error;
-  return data.map((p) => ({
-    id: p.id, start: p.start_date, end: p.end_date,
-    revenue: p.accumulated_revenue, deductions: p.total_deductions,
-    netExpected: p.net_expected, status: p.status,
-  }));
-}
-
 export interface ChequeView {
   id: string; periodId: string; receivedDate: string | null;
   expected: number; received: number | null; difference: number | null;

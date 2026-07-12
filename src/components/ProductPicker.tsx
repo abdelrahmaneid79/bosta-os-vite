@@ -1,7 +1,7 @@
 /** Searchable product picker — typeahead over English + Arabic POS names and
  *  aliases/barcodes (pure matcher in core/products/match.ts). Used by the sale
- *  line form for fast entry. Keyboard + click; shows on-hand so the owner can
- *  see stock while picking. */
+ *  line form for fast entry. Keyboard + click. Inactive (retired) products are
+ *  excluded — you can't sell what's no longer ranged. */
 import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/core/utils/cn";
@@ -10,7 +10,7 @@ import { buildIndex, searchProducts } from "@/core/products/match";
 
 export function ProductPicker({ value, onChange, autoFocus, bare }: { value: string; onChange: (id: string) => void; autoFocus?: boolean; bare?: boolean }) {
   const q = useQuery({ queryKey: ["searchable-products"], queryFn: getSearchableProducts });
-  const products = q.data ?? [];
+  const products = (q.data ?? []).filter((p) => p.active);
   const index = useMemo(() => buildIndex(products), [products]);
   const selected = products.find((p) => p.id === value) ?? null;
   const [term, setTerm] = useState("");

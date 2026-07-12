@@ -1,40 +1,13 @@
-import { format, parseISO, isWithinInterval, subDays, startOfMonth, endOfMonth } from "date-fns";
+/** Date DISPLAY helper only. All date *math* (today, windows, ranges) lives in
+ *  src/core/time.ts on the Cairo business clock — the local-TZ helpers that
+ *  used to live here (todayISO/lastNDays/thisMonth/inRange) shifted days for
+ *  any viewer outside Cairo and have been deleted. */
+import { format, parseISO } from "date-fns";
 
-type ISODate = string;
-interface DateRange { from: string; to: string }
-
-export function todayISO(): ISODate {
-  return format(new Date(), "yyyy-MM-dd");
-}
-
-export function fmtDate(iso: ISODate, pattern = "d MMM yyyy"): string {
+export function fmtDate(iso: string, pattern = "d MMM yyyy"): string {
   try {
     return format(parseISO(iso), pattern);
   } catch {
     return iso;
   }
-}
-
-export function inRange(iso: ISODate, range: DateRange): boolean {
-  try {
-    return isWithinInterval(parseISO(iso), {
-      start: parseISO(range.from),
-      end: parseISO(range.to),
-    });
-  } catch {
-    return false;
-  }
-}
-
-export function lastNDays(n: number): DateRange {
-  const to = new Date();
-  return { from: format(subDays(to, n - 1), "yyyy-MM-dd"), to: format(to, "yyyy-MM-dd") };
-}
-
-export function thisMonth(): DateRange {
-  const now = new Date();
-  return {
-    from: format(startOfMonth(now), "yyyy-MM-dd"),
-    to: format(endOfMonth(now), "yyyy-MM-dd"),
-  };
 }

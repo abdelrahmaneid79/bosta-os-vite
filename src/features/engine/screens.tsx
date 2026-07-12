@@ -153,7 +153,7 @@ function ManageProducts() {
       {prods.isLoading ? <SkeletonRows rows={5} /> : (
         <div className="scroll" style={{ maxHeight: "52vh" }}>
           <table className="etbl">
-            <thead><tr><th>Product</th><th className="r">Selling / kg</th><th className="r">Status</th><th style={{ width: 92 }} /></tr></thead>
+            <thead><tr><th>Product</th><th className="r">Selling price</th><th className="r">Status</th><th style={{ width: 92 }} /></tr></thead>
             <tbody>
               {list.map((p) => (
                 <tr key={p.id}>
@@ -221,7 +221,7 @@ export function SalesScreen() {
           <button className="qadd" style={{ height: 38 }} onClick={() => setAddOpen(true)}><span>+ New sale</span></button>
         </>} />
 
-      {!isEngineConfigured ? <ConnectPanel /> : all.isLoading ? <SkeletonRows rows={6} /> : (
+      {!isEngineConfigured ? <ConnectPanel /> : all.isError ? <ErrorState message={String((all.error as Error)?.message ?? "Read failed")} /> : all.isLoading ? <SkeletonRows rows={6} /> : (
         <>
           <div className="statgrid">
             <Stat label="Lifetime revenue" value={egp(d.lifetime)} color="var(--mag)" />
@@ -302,6 +302,7 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
 
       {/* editable product table */}
       {items.isLoading ? <SkeletonRows rows={3} /> : (
+        <div className="scroll" style={{ overflowX: "auto" }}>
         <table className="etbl">
           <thead><tr><th>Product</th><th className="r">Qty sold</th><th className="r">Unit price</th><th className="r">Amount</th><th style={{ width: 74 }} /></tr></thead>
           <tbody>
@@ -320,6 +321,7 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
             {lines.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "rgb(var(--dim))", padding: "22px 12px" }}>No product lines yet — add what sold below to deduct stock &amp; track profit.</td></tr>}
           </tbody>
         </table>
+        </div>
       )}
 
       {/* add line */}
@@ -449,9 +451,13 @@ export function ReconcileScreen() {
           </Card>
           {p && !p.complete && (
             <Card>
-              <div className="text-sm text-warn">
-                ⚠ Profit withheld — {p.missingCostLines} of {p.soldLines} sold lines have no recorded cost.
-                Revenue is exact; COGS is incomplete, so we show “unknown” rather than a wrong number.
+              <div className="space-y-1 text-sm text-warn">
+                <div>⚠ Whole-period profit withheld — revenue is exact, but COGS is incomplete, so we show “unknown” rather than a wrong number.</div>
+                {p.missingCostLines > 0 && <div>· {p.missingCostLines} of {p.soldLines} sold lines have no recorded cost.</div>}
+                {p.uncoveredRevenue >= 1 && (
+                  <div>· {egp(p.uncoveredRevenue)} of revenue ({p.coveredPct != null ? pct(100 - p.coveredPct) : "—"}) sits on days with no product-line detail — its cost is unknowable until those days are imported.</div>
+                )}
+                {p.margin != null && <div className="text-dim">Measured gross margin on the {p.coveredPct != null ? pct(p.coveredPct) : "—"} of revenue with detail: {pct(p.margin)}.</div>}
               </div>
             </Card>
           )}

@@ -261,7 +261,7 @@ export function ChequesScreen() {
         </div>
       )}
 
-      {cy.isLoading ? <SkeletonRows /> : (
+      {cy.isLoading ? <SkeletonRows /> : cy.isError ? <ErrorState message={String((cy.error as Error)?.message ?? "Read failed")} /> : (
         <>
           <div className="statgrid">
             <Stat label="Cheques logged" color="rgb(var(--cyan))" value={chq.length} />
@@ -320,6 +320,7 @@ export function SettlementsScreen() {
     onSuccess: (_d, v) => { reportSuccess("Settlement status", `Period marked ${v.status}`); qc.invalidateQueries(); },
     onError: (e) => reportError("Settlement status", e),
   });
+  const [statusAsk, setStatusAsk] = useState<{ id: string; status: "received" | "reconciled" | "open"; label: string } | null>(null);
   if (!en) return <EmptyState title="Sign in to load settlements" />;
   const rows = q.data ?? [];
   const tol = (r: { revenue: number }) => Math.max(5, 0.005 * r.revenue); // reconciliation tolerance
@@ -369,9 +370,12 @@ export function SettlementsScreen() {
                             <span style={{ textTransform: "capitalize", color: STATUS_COLOR[r.status] ?? "rgb(var(--dim))", fontWeight: 600, fontSize: 12.5 }}>{r.status}</span>
                             {r.status !== "reconciled" && r.chequeReceived != null && (
                               <>
-                                {r.status === "open" && <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatus.mutate({ id: r.id, status: "received" })}>Mark received</button>}
-                                <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatus.mutate({ id: r.id, status: "reconciled" })}>Reconcile</button>
+                                {r.status === "open" && <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatusAsk({ id: r.id, status: "received", label: `Mark ${r.month} as received?` })}>Mark received</button>}
+                                <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatusAsk({ id: r.id, status: "reconciled", label: `Reconcile ${r.month}? You can reopen it later if something changes.` })}>Reconcile</button>
                               </>
+                            )}
+                            {r.status !== "open" && (
+                              <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatusAsk({ id: r.id, status: "open", label: `Reopen ${r.month}? Its status goes back to open so it can be corrected.` })}>Reopen</button>
                             )}
                           </div>
                         </td>
@@ -383,6 +387,9 @@ export function SettlementsScreen() {
               </table>
             </div>
           </DeckTile>
+          <Confirm open={!!statusAsk} title="Settlement status" message={statusAsk?.label ?? ""} busy={setStatus.isPending}
+            onConfirm={() => { if (statusAsk) setStatus.mutate({ id: statusAsk.id, status: statusAsk.status }); setStatusAsk(null); }}
+            onClose={() => setStatusAsk(null)} />
         </>
       )}
     </div>

@@ -31,29 +31,3 @@ export function DeckTile({ children, className = "", style, onClick }: { childre
 export function TileHead({ name, right }: { name: ReactNode; right?: ReactNode }) {
   return <div className="th"><span className="tname">{name}</span>{right && <span className="eyebrow" style={{ marginLeft: "auto" }}>{right}</span>}</div>;
 }
-
-export interface Bar { label: string; full: string; value: number }
-/** The design's .mbars bar chart (hover tooltip, animated grow). */
-export function MBars({ data, height = 200, gradient }: { data: Bar[]; height?: number; gradient?: string }) {
-  const max = Math.max(1, ...data.map((d) => Math.abs(d.value)));
-  const money = (n: number) => "EGP " + n.toLocaleString("en-US", { maximumFractionDigits: 2 });
-  return (
-    <div className="mbars" style={{ height }}>
-      {data.map((d, i) => (
-        <div className="mbar" key={i}>
-          <div className="mbtip"><b>{money(d.value)}</b>{d.full}</div>
-          <i style={{ height: `${Math.round((Math.abs(d.value) / max) * 100)}%`, ...(gradient ? { background: gradient } : {}) }} />
-          <small>{d.label}</small>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export function SubTabs<T extends string>({ tabs, value, onChange }: { tabs: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
-  return (
-    <div className="subtabs">
-      {tabs.map((t) => <span key={t.value} className={value === t.value ? "on" : ""} onClick={() => onChange(t.value)}>{t.label}</span>)}
-    </div>
-  );
-}

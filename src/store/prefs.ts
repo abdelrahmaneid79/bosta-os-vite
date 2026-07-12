@@ -11,7 +11,7 @@ export interface Prefs {
   defaultRange: RangeKey;     // global period applied on launch
   hiddenSections: string[];   // nav section ids hidden from the rail/mobile nav
   accountingStart: string;    // bookkeeping start; before it, profit is revenue-only
-  theme: ThemeMode;           // light (default) / dark / follow system
+  theme: ThemeMode;           // dark-only today; kept in the shape so a future light theme restores cleanly
 }
 
 export const DEFAULT_PREFS: Prefs = { landing: "/dashboard", defaultRange: "all", hiddenSections: [], accountingStart: "2026-07-01", theme: "dark" };

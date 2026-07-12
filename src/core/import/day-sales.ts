@@ -51,7 +51,7 @@ export interface RawDayReport {
 }
 
 // ── Product code index ──────────────────────────────────────────────────────
-export interface CodedProduct { id: string; nameEn: string; nameAr: string | null; posCode: string | null; marketCode: string | null }
+export interface CodedProduct { id: string; nameEn: string; nameAr: string | null; posCode: string | null; marketCode: string | null; altCodes?: string[] }
 
 /** Canonical form of an item code: digits only, leading zeros folded, so a code
  *  read as "00021043", "21043" or "0021043" all resolve to the same key. */
@@ -70,6 +70,11 @@ export function buildCodeIndex(products: CodedProduct[]): Map<string, CodedProdu
   for (const p of products) {
     const c = canonCode(p.posCode);
     if (c && !m.has(`p:${c}`)) m.set(`p:${c}`, p);
+    // alternate POS codes (flavour variants) all resolve to the same product
+    for (const alt of p.altCodes ?? []) {
+      const ac = canonCode(alt);
+      if (ac && !m.has(`p:${ac}`)) m.set(`p:${ac}`, p);
+    }
     if (p.marketCode && !m.has(`m:${p.marketCode}`)) m.set(`m:${p.marketCode}`, p);
   }
   return m;

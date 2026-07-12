@@ -138,10 +138,12 @@ export function ProductLineImportScreen() {
       const loc = locs[0], ch = chans[0];
       if (!loc || !ch) throw new Error("No active location/channel.");
       const saleByDate = new Map((existing.data ?? []).map((s) => [s.sale_date, s.id as string]));
-      // create a sale day where none exists (total = sum of its line totals)
+      // Create a sale day where none exists. The header total must be the sum of
+      // ALL parsed lines for that date — not just the ready (mapped) ones — so a
+      // day with unmapped rows shows up UN-reconciled instead of green-but-short.
       for (const date of dates) {
         if (saleByDate.has(date)) continue;
-        const dayTotal = ready.filter((l) => l.date === date).reduce((s, l) => s + (l.lineTotal ?? 0), 0);
+        const dayTotal = classified.filter((l) => l.date === date).reduce((s, l) => s + (l.lineTotal ?? 0), 0);
         const id = await createSale({ date, total: Math.round(dayTotal * 100) / 100, locationId: loc.id, channelId: ch.id });
         saleByDate.set(date, id);
       }
@@ -151,6 +153,7 @@ export function ProductLineImportScreen() {
       if (itemsRes.error) throw itemsRes.error;
       const seen = new Set((itemsRes.data ?? []).map((i) => `${i.sale_id}|${i.product_id}|${Number(i.quantity)}|${Number(i.line_total)}`));
       let created = 0, skipped = 0, failed = 0;
+      const failures: string[] = [];
       for (const l of ready) {
         const saleId = saleByDate.get(l.date)!;
         const key = `${saleId}|${l.productId}|${l.qty}|${l.lineTotal}`;
@@ -161,11 +164,11 @@ export function ProductLineImportScreen() {
             l.confidence, // provenance: verified / unverified / estimated
           );
           seen.add(key); created++;
-        } catch { failed++; }
+        } catch (e) { failed++; if (failures.length < 5) failures.push(`${l.date} ${l.matchedName ?? l.rawName ?? ""}: ${(e as Error)?.message ?? "failed"}`); }
       }
-      return { created, skipped, failed, days: dates.length };
+      return { created, skipped, failed, failures, days: dates.length };
     },
-    onSuccess: (res) => { setResult(res); reportSuccess("Import product lines", `${res.created} lines added across ${res.days} day(s) · ${res.skipped} duplicates skipped${res.failed ? ` · ${res.failed} failed` : ""}`); qc.invalidateQueries(); },
+    onSuccess: (res) => { setResult(res); reportSuccess("Import product lines", `${res.created} lines added across ${res.days} day(s) · ${res.skipped} duplicates skipped${res.failed ? ` · ${res.failed} FAILED — ${res.failures.join(" · ")}` : ""}`); qc.invalidateQueries(); },
     onError: (e) => reportError("Import product lines", e),
   });
 

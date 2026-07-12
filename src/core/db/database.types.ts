@@ -1278,6 +1278,7 @@ export type Database = {
           name_en: string
           notes: string | null
           pos_code: string | null
+          alt_pos_codes: string[]
           reference_cost: number | null
           sale_unit: string | null
           selling_price: number | null
@@ -1300,6 +1301,7 @@ export type Database = {
           name_en: string
           notes?: string | null
           pos_code?: string | null
+          alt_pos_codes?: string[]
           reference_cost?: number | null
           sale_unit?: string | null
           selling_price?: number | null
@@ -1322,6 +1324,7 @@ export type Database = {
           name_en?: string
           notes?: string | null
           pos_code?: string | null
+          alt_pos_codes?: string[]
           reference_cost?: number | null
           sale_unit?: string | null
           selling_price?: number | null

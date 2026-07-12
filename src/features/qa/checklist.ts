@@ -17,8 +17,8 @@ export const QA_FLOWS: QAFlow[] = [
   { id: "goods-active", group: "Goods", screen: "Goods", action: "Edit → untick Active → Save", expected: "Shows “inactive” badge", touches: "products (update)" },
 
   // Purchases
-  { id: "purchase-create", group: "Purchases", screen: "Buy", action: "+ Purchase → product, qty (base units), unit cost → Save", expected: "Stock + qty; weighted cost shows; toast shows stock change", touches: "RPC create_purchase" },
-  { id: "purchase-backdated", group: "Purchases", screen: "Buy", action: "+ Purchase with a past date", expected: "Warning shown; prior sales keep their captured cost", touches: "RPC create_purchase" },
+  { id: "purchase-create", group: "Purchases", screen: "Purchases", action: "+ Purchase → product, qty (base units), unit cost → Save", expected: "Stock + qty; weighted cost shows; toast shows stock change", touches: "RPC create_purchase" },
+  { id: "purchase-backdated", group: "Purchases", screen: "Purchases", action: "+ Purchase with a past date", expected: "Warning shown; prior sales keep their captured cost", touches: "RPC create_purchase" },
 
   // Sales
   { id: "sale-create", group: "Sales", screen: "Sales", action: "+ Sale → date + day total → Save", expected: "Appears in Recent; toast shows revenue", touches: "sales (insert)" },
@@ -29,8 +29,8 @@ export const QA_FLOWS: QAFlow[] = [
   { id: "sale-day-void", group: "Sales", screen: "Sales → open day", action: "Void whole day → Confirm", expected: "Day voided; movements reversed; revenue drops", touches: "RPC void_sale_movements + sales" },
 
   // Expenses
-  { id: "expense-add", group: "Expenses", screen: "Spend", action: "+ Expense → category + amount → Save", expected: "Total ↑; net profit ↓ (cash unchanged)", touches: "expenses (insert)" },
-  { id: "expense-void", group: "Expenses", screen: "Spend", action: "✕ → Confirm", expected: "Removed from total; kept for audit", touches: "expenses (update)" },
+  { id: "expense-add", group: "Expenses", screen: "Expenses", action: "+ Expense → category + amount → Save", expected: "Total ↑; net profit ↓ (cash unchanged)", touches: "expenses (insert)" },
+  { id: "expense-void", group: "Expenses", screen: "Expenses", action: "✕ → Confirm", expected: "Removed from total; kept for audit", touches: "expenses (update)" },
 
   // Cash
   { id: "cash-in", group: "Cash", screen: "Cash", action: "+ Cash in → amount → Save", expected: "Balance recalculated; profit unaffected", touches: "money_movements + RPC recalc_money_account" },
@@ -40,7 +40,7 @@ export const QA_FLOWS: QAFlow[] = [
   { id: "cash-void", group: "Cash", screen: "Cash", action: "✕ on a movement → Confirm", expected: "Balance recomputed", touches: "money_movements (update) + recalc" },
 
   // Cheques / settlements
-  { id: "settle-open", group: "Cheques", screen: "Cheques", action: "Open this month", expected: "Period appears (rent + share seeded); idempotent", touches: "RPC ensure_monthly_settlement_period" },
+  { id: "settle-open", group: "Cheques", screen: "Cheques", action: "Record a cheque for the month (period opens automatically)", expected: "Period appears (rent + share seeded); idempotent", touches: "RPC ensure_monthly_settlement_period" },
   { id: "cheque-record", group: "Cheques", screen: "Cheques", action: "+ Cheque → status received → amount + date → Save", expected: "Appears with expected/received/diff", touches: "cheques (insert)" },
   { id: "cheque-reconcile", group: "Cheques", screen: "Cheques", action: "reconcile → Confirm", expected: "Status → reconciled", touches: "cheques (update)" },
   { id: "cheque-void", group: "Cheques", screen: "Cheques", action: "✕ → Confirm", expected: "Removed from totals; kept for audit", touches: "cheques (update)" },

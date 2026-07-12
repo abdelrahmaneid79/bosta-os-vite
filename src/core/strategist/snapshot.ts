@@ -4,8 +4,8 @@
  *  pre-computed so the Edge Function never does business math. Product-level reads
  *  are flagged as partial-coverage (only a subset of days have product-line detail).
  *  READ-ONLY. */
-import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo } from "@/core/time";
-import { lastNDays } from "@/core/utils/date";
+import { todayCairo, monthBoundsCairo, lastMonthBoundsCairo, isoDaysAgo } from "@/core/time";
+
 import { ALL_TIME_FROM } from "@/core/range";
 import { getRevenueTotal, getSalesStats } from "@/core/read/sales";
 import { getProfitReadout } from "@/core/read/profit";
@@ -91,7 +91,7 @@ export async function assembleSnapshot(): Promise<BusinessSnapshot> {
   const allTime = { from: ALL_TIME_FROM, to: today };
   const tM = monthBoundsCairo();
   const lM = lastMonthBoundsCairo();
-  const l30 = lastNDays(30);
+  const l30 = { from: isoDaysAgo(today, 29), to: today }; // Cairo-clock window
 
   const [
     revAll, rev30, revThis, revLast, salesAll,
@@ -102,7 +102,7 @@ export async function assembleSnapshot(): Promise<BusinessSnapshot> {
     getRevenueTotal(allTime), getRevenueTotal(l30), getRevenueTotal(tM), getRevenueTotal(lM), getSalesStats(allTime),
     getProfitReadout(tM), getCashSummary(l30), getChequeCycle(), getStockSummary(), getRevenueForecast(180),
     getHealthReport(), getRiskInsights(), getMissingData(), getLifetimeProducts(), getProductProfit(allTime),
-    getBudgetStatus(), getExpenseCategoryTrends(l30, { from: lastNDays(60).from, to: l30.from }), getOperatingExpenseTotal(l30), getInventorySpendTotal(l30), getAnalytics(allTime),
+    getBudgetStatus(), getExpenseCategoryTrends(l30, { from: isoDaysAgo(today, 59), to: l30.from }), getOperatingExpenseTotal(l30), getInventorySpendTotal(l30), getAnalytics(allTime),
   ]);
 
   const momGrowth = revThis != null && revLast ? ((revThis - revLast) / revLast) * 100 : null;

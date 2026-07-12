@@ -1,18 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import Papa from "papaparse";
-import { Card, Eyebrow, Stat, Button, Tabs, Field, Input, Badge, Select } from "@/components/ui";
+import { Card, Eyebrow, Stat, Button, Field, Input, Badge, Select } from "@/components/ui";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, PartialNote } from "@/components/feedback";
 import { usePrefs } from "@/store/prefs";
 import { useBooksStartDate } from "@/store/books";
 import { LANDING_OPTIONS, HIDEABLE_SECTIONS } from "@/core/nav";
 import { RANGE_PRESETS } from "@/core/range";
-import { parseSalesRows, parseExpenseRows, type Row } from "@/core/import/csv";
-import { getChannels } from "@/core/read/common";
-import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
-import type { Enums } from "@/core/db/tables";
 import { egp, egpShort, pct } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured, sb } from "@/core/db/engine";
@@ -31,7 +26,6 @@ import { getSettings, getExpenses, getExpenseCategoryTrends } from "@/core/read/
 import { getCheques } from "@/core/read/settlements";
 import { getLocations } from "@/core/read/common";
 import { setAppSetting, setLocationTerm, setCostUplift } from "@/core/db/mutations";
-import { WRITE_BADGE } from "@/core/capabilities";
 import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
@@ -222,7 +216,6 @@ export function SystemCheckScreen() {
   const env: Chk[] = [
     { name: "Supabase configured", ok: isEngineConfigured, detail: isEngineConfigured ? "URL + anon key present" : "missing env" },
     { name: "Authenticated session", ok: !!session, detail: session ? (email ?? "signed in") : "not signed in" },
-    { name: "Write mode", ok: true, detail: "Fully operational" },
   ];
   return (
     <div className="space-y-4">
@@ -236,7 +229,7 @@ function Group({ title, checks }: { title: string; checks: Chk[] }) {
     <Card className="!p-0">
       <div className="border-b border-line px-4 py-3 font-display text-sm font-semibold">{title}</div>
       <div className="divide-y divide-line">
-        {checks.length === 0 && <div className="px-4 py-3 text-sm text-dim">…</div>}
+        {checks.length === 0 && <div className="px-4 py-3 text-sm text-dim">{isEngineConfigured ? "Checking…" : "Supabase not configured — checks skipped."}</div>}
         {checks.map((c) => (
           <div key={c.name} className="flex items-center gap-3 px-4 py-3">
             <span className={`h-2.5 w-2.5 rounded-full ${c.ok == null ? "bg-dim" : c.ok ? "bg-good" : "bg-bad"}`} />
@@ -246,132 +239,6 @@ function Group({ title, checks }: { title: string; checks: Chk[] }) {
         ))}
       </div>
     </Card>
-  );
-}
-
-// ── Imports (CSV → preview → approve; never auto-saves) ──────────────────────
-const PAY: Enums<"payment_method">[] = ["cash", "cheque", "card", "transfer", "credit", "unknown"];
-type ImpKind = "sales" | "expenses";
-
-export function ImportsScreen() {
-  const { toast, reportSuccess, reportError } = useUI();
-  const qc = useQueryClient();
-  const [kind, setKind] = useState<ImpKind>("sales");
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [fileName, setFileName] = useState("");
-  const locations = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
-  const channels = useQuery({ queryKey: ["channels"], queryFn: getChannels, enabled: en });
-  const existingDays = useQuery({
-    queryKey: ["sale-days"], enabled: en && kind === "sales",
-    queryFn: async () => { const { data, error } = await sb!.from("sales").select("sale_date").is("voided_at", null); if (error) throw error; return new Set((data ?? []).map((r) => r.sale_date)); },
-  });
-
-  const sales = kind === "sales" && rows ? parseSalesRows(rows) : [];
-  const exps = kind === "expenses" && rows ? parseExpenseRows(rows) : [];
-  const dup = (d: string | null) => kind === "sales" && d != null && (existingDays.data?.has(d) ?? false);
-
-  const salesReady = sales.filter((r) => !r.issues.length && !dup(r.date));
-  const salesDup = sales.filter((r) => !r.issues.length && dup(r.date));
-  const expReady = exps.filter((r) => !r.issues.length);
-  const blocked = (kind === "sales" ? sales : exps).filter((r) => r.issues.length).length;
-
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f) return;
-    setFileName(f.name);
-    Papa.parse<Row>(f, { header: true, skipEmptyLines: true, complete: (res) => setRows(res.data), error: () => toast("Could not parse CSV", "error") });
-  }
-
-  const approve = useMutation({
-    mutationFn: async () => {
-      let imported = 0, skipped = 0, failed = 0;
-      if (kind === "sales") {
-        const loc = locations.data?.[0], ch = channels.data?.[0];
-        if (!loc || !ch) throw new Error("No active location/channel.");
-        const seen = new Set(existingDays.data ?? []);
-        for (const r of sales) {
-          if (r.issues.length || seen.has(r.date!)) { skipped++; continue; }
-          try { await createSale({ date: r.date!, total: r.total!, locationId: loc.id, channelId: ch.id }); seen.add(r.date!); imported++; }
-          catch { failed++; }
-        }
-      } else {
-        const loc = locations.data?.[0];
-        if (!loc) throw new Error("No active location.");
-        const cache = new Map<string, string>();
-        for (const r of exps) {
-          if (r.issues.length) { skipped++; continue; }
-          try {
-            const key = r.category.toLowerCase();
-            let catId = cache.get(key);
-            if (!catId) { catId = await ensureExpenseCategory(r.category, true); cache.set(key, catId); }
-            const pay = (PAY.includes(r.payment as Enums<"payment_method">) ? r.payment : "cash") as Enums<"payment_method">;
-            await addExpense({ date: r.date!, categoryId: catId, amount: r.amount!, paymentMethod: pay, notes: r.notes || null, locationId: loc.id });
-            imported++;
-          } catch { failed++; }
-        }
-      }
-      return { imported, skipped, failed };
-    },
-    onSuccess: (res) => { reportSuccess("Import", `Imported ${res.imported} · skipped ${res.skipped}${res.failed ? ` · failed ${res.failed}` : ""}`); qc.invalidateQueries(); setRows(null); setFileName(""); },
-    onError: (e) => reportError("Import", e),
-  });
-
-  if (!en) return <EmptyState title="Sign in to import" />;
-  const readyCount = kind === "sales" ? salesReady.length : expReady.length;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>CSV import · preview → approve (never auto-saves)</Eyebrow>
-        <div className="flex-1" />
-        <Tabs value={kind} onChange={(v) => { setKind(v); setRows(null); }} options={[{ value: "sales", label: "Daily sales" }, { value: "expenses", label: "Expenses" }]} />
-      </div>
-
-      {!rows ? (
-        <Card className="border-dashed">
-          <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <div className="font-display text-base font-semibold">Upload a {kind === "sales" ? "daily sales" : "expenses"} CSV</div>
-            <div className="max-w-md text-sm text-dim">
-              {kind === "sales" ? "Columns: date, total (grand total per day). Duplicate days are skipped." : "Columns: date, category, amount, payment, notes. New categories are created."}
-            </div>
-            <label className="lift cursor-pointer rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">
-              Choose CSV<input type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
-            </label>
-          </div>
-        </Card>
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-dim">{fileName}</span>
-            <Badge tone="good">{readyCount} ready</Badge>
-            {kind === "sales" && salesDup.length > 0 && <Badge tone="neutral">{salesDup.length} duplicate</Badge>}
-            {blocked > 0 && <Badge tone="bad">{blocked} blocked</Badge>}
-            <div className="flex-1" />
-            <Button variant="ghost" onClick={() => { setRows(null); setFileName(""); }}>Cancel</Button>
-            <Button disabled={approve.isPending || readyCount === 0} onClick={() => approve.mutate()}>{approve.isPending ? "Importing…" : `Approve ${readyCount}`}</Button>
-          </div>
-          <Card className="!p-0">
-            <div className="max-h-[55vh] divide-y divide-line overflow-y-auto">
-              {(kind === "sales" ? sales : exps).slice(0, 200).map((r, i) => {
-                const bad = r.issues.length > 0;
-                const isDup = kind === "sales" && dup((r as { date: string | null }).date);
-                return (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                    <span className={`h-2 w-2 flex-shrink-0 rounded-full ${bad ? "bg-bad" : isDup ? "bg-dim" : "bg-good"}`} />
-                    <div className="min-w-0 flex-1">
-                      {kind === "sales"
-                        ? <span className="text-text">{(r as { date: string | null }).date ?? "—"}</span>
-                        : <span className="text-text">{(r as { date: string | null; category: string }).date ?? "—"} · {(r as { category: string }).category}</span>}
-                      {(bad || isDup) && <span className="ml-2 text-[11px] text-dim">{bad ? r.issues.join(", ") : "already imported"}</span>}
-                    </div>
-                    <div className="font-display font-semibold text-text">{egp(kind === "sales" ? (r as { total: number | null }).total ?? 0 : (r as { amount: number | null }).amount ?? 0)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        </>
-      )}
-    </div>
   );
 }
 
@@ -485,7 +352,6 @@ export function SettingsScreen() {
       <Card>
         <Eyebrow>Account</Eyebrow>
         <Row label="Signed in" value={email ?? "—"} />
-        <Row label="Mode" value={WRITE_BADGE} />
         <Row label="Backend" value="Verified Supabase engine" last />
         <div className="mt-3"><SignOutButton /></div>
       </Card>
@@ -537,18 +403,9 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 
 // ── Preferences (app-wide customization) ─────────────────────────────────────
 export function PreferencesScreen() {
-  const { landing, defaultRange, hiddenSections, accountingStart, theme, set, toggleSection, reset } = usePrefs();
+  const { landing, defaultRange, hiddenSections, accountingStart, set, toggleSection, reset } = usePrefs();
   return (
     <div className="max-w-2xl space-y-4">
-      <Card>
-        <Eyebrow>Appearance</Eyebrow>
-        <p className="mt-1 text-[12px] text-dim">Choose the look. “System” follows your device’s light/dark setting.</p>
-        <div className="mt-3">
-          <Tabs value={theme} onChange={(t) => set({ theme: t })}
-            options={[{ value: "light", label: "☀ Light" }, { value: "dark", label: "🌙 Dark" }, { value: "system", label: "Auto" }]} />
-        </div>
-      </Card>
-
       <Card>
         <Eyebrow>How BostaOS opens</Eyebrow>
         <div className="mt-2 space-y-3">
@@ -576,7 +433,7 @@ export function PreferencesScreen() {
 
       <Card>
         <Eyebrow>Visible sections</Eyebrow>
-        <p className="mt-1 text-[12px] text-dim">Hide sections you don't use from the sidebar. They stay reachable by link — nothing is deleted.</p>
+        <p className="mt-1 text-[12px] text-dim">Hide sections you don't use from the navigation. They stay reachable by link — nothing is deleted.</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {HIDEABLE_SECTIONS.map((s) => {
             const visible = !hiddenSections.includes(s.id);

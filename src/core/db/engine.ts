@@ -73,17 +73,11 @@ export const createSaleItem = (a: FnArgs<"create_sale_item">) => rpc("create_sal
 export const updateSaleItem = (a: FnArgs<"update_sale_item">) => rpc("update_sale_item", a);
 /** Delete: voids movement (restores stock) then removes the line. */
 export const deleteSaleItem = (p_id: string) => rpc("delete_sale_item", { p_id });
-export const voidSaleMovements = (p_sale_id: string) => rpc("void_sale_movements", { p_sale_id });
-/** Atomic day void (migration 0021): movements + header in ONE transaction, so
- *  a failure can never leave revenue counted with stock already restored.
- *  Cast needed until database.types.ts is regenerated to include void_sale. */
 export const voidSaleAtomic = async (p_sale_id: string, p_reason?: string): Promise<void> => {
   const { error } = await requireEngine().rpc("void_sale" as never, { p_sale_id, p_reason: p_reason ?? null } as never);
   if (error) throw error;
 };
 
-/** Idempotent cache rebuilds — safe to call after backdated changes. */
-export const recomputeProductCosts = (p_product_id: string) => rpc("recompute_product_costs", { p_product_id });
 export const recalcMoneyAccount = (p_account_id: string) => rpc("recalc_money_account", { p_account_id });
 export const ensureMonthlySettlementPeriod = (p_location_id: string, p_month: string) =>
   rpc("ensure_monthly_settlement_period", { p_location_id, p_month });

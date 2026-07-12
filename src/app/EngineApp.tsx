@@ -171,7 +171,6 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
             {([["sale", "New sale"], ["purchase", "Add purchase"], ["product", "Add product"], ["expense", "Add expense"], ["cashcount", "Count cash"]] as const).map(([v, label]) => (
               <button key={v} onClick={() => setView(v)} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
                 <span className="font-display text-sm font-semibold text-text">{label}</span>
-                <span className="ml-auto rounded-full bg-good/15 px-2 py-0.5 text-[10px] font-semibold text-good">enabled</span>
               </button>
             ))}
             <button onClick={() => { close(); navigate("/sales/import"); }} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
@@ -192,9 +191,9 @@ function useVisibleGroups(): Group[] {
 }
 
 /** The design's topbar pills: Today / Sales / Stock / Money / Insights / Settings
- *  — six items in one row, exactly like the Command Deck design (no search box,
- *  no avatar). Reports is reachable from Insights and ⌘K. */
-const PILL_IDS = ["today", "sales", "inventory", "money", "insights"] as const;
+ *  — seven items in one row, like the Command Deck design (no search box,
+ *  no avatar). */
+const PILL_IDS = ["today", "sales", "inventory", "money", "reports", "insights"] as const;
 const PILL_LABEL: Record<string, string> = { inventory: "Stock" };
 
 function TopNav({ onAdd }: { onAdd: () => void }) {
@@ -301,7 +300,9 @@ function MobileNav() {
   const { pathname } = useLocation();
   const active = groupForPath(pathname);
   const [open, setOpen] = useState(false);
-  const primary = useVisibleGroups().slice(0, 5);
+  const MOBILE_IDS = ["today", "sales", "inventory", "money", "insights"];
+  const vis = useVisibleGroups();
+  const primary = MOBILE_IDS.map((id) => vis.find((g) => g.id === id)).filter((g): g is Group => !!g);
   return (
     <>
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line bg-rail px-1 pt-2 md:hidden"
