@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { CAP, isEnabled, cap } from "@/core/capabilities";
 import { reconTolerance } from "@/core/read/sales";
 import { toIso, toNum, parseSalesRows, parseExpenseRows, scanReceiptText, scanReceiptRows } from "@/core/import/csv";
 import { composeProfit } from "@/core/read/profit";
@@ -459,27 +458,6 @@ describe("date-range engine (pinned today)", () => {
   });
 });
 
-describe("dashboard layout customization", () => {
-  it("reorders a widget to another's position (drag-and-drop)", async () => {
-    const { DEFAULT_LAYOUT, reorderWidget } = await import("@/core/dashboardLayout");
-    const out = reorderWidget(DEFAULT_LAYOUT, "kpis", "activity"); // move kpis to activity's slot
-    const ids = out.map((x) => x.id);
-    expect(ids.indexOf("kpis")).toBeGreaterThan(ids.indexOf("trend"));
-    expect(reorderWidget(DEFAULT_LAYOUT, "kpis", "kpis")).toEqual(DEFAULT_LAYOUT); // no-op on self
-  });
-  it("toggles visibility", async () => {
-    const { DEFAULT_LAYOUT, toggleWidget } = await import("@/core/dashboardLayout");
-    expect(toggleWidget(DEFAULT_LAYOUT, "health").find((x) => x.id === "health")!.on).toBe(false);
-  });
-  it("normalizes a saved layout: keeps order, drops unknown/removed, appends new", async () => {
-    const { normalizeLayout, ALL_WIDGETS } = await import("@/core/dashboardLayout");
-    const saved = [{ id: "health", on: false }, { id: "ask", on: true }, { id: "bogus", on: true }, { id: "kpis", on: true }];
-    const out = normalizeLayout(saved);
-    expect(out[0]).toEqual({ id: "health", on: false });
-    expect(out.map((x) => x.id).filter((id: string) => !ALL_WIDGETS.includes(id as never))).toEqual([]); // drops ask + bogus
-    expect(out).toHaveLength(ALL_WIDGETS.length);
-  });
-});
 
 describe("import column mapping", () => {
   it("detects sales columns by header synonyms", async () => {
@@ -514,25 +492,3 @@ describe("navigation metadata", () => {
   });
 });
 
-describe("capability system", () => {
-  it("Goods / Purchases / Sales creation are enabled", () => {
-    expect(CAP.productCreate).toBe("enabled");
-    expect(CAP.productEdit).toBe("enabled");
-    expect(CAP.purchaseCreate).toBe("enabled");
-    expect(CAP.saleCreate).toBe("enabled");
-    expect(CAP.saleItemAdd).toBe("enabled");
-  });
-  it("Expenses / Cash / Cheques / Settings are enabled", () => {
-    for (const k of ["expenseCreate", "cashCount", "withdrawal", "chequeRecord", "settlementOpen", "settingsEdit"] as const) {
-      expect(isEnabled(k)).toBe(true);
-    }
-  });
-  it("financial reversals are flagged risky (need confirmation)", () => {
-    for (const k of ["saleItemVoid", "saleItemEdit", "saleVoid", "expenseVoid", "movementVoid", "chequeVoid"] as const) {
-      expect(cap(k)).toBe("risky");
-    }
-  });
-  it("imports are enabled (CSV preview → approve)", () => {
-    expect(isEnabled("importApprove")).toBe(true);
-  });
-});

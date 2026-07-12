@@ -29,7 +29,7 @@ import { ProductDetailScreen } from "./product";
 import { PageHdr, Stat, DeckTile, TileHead } from "./deck";
 import { BarChart } from "@/components/charts";
 import { todayCairo } from "@/core/time";
-import { voidSaleItem, voidSale, setProductActive, deleteProduct } from "@/core/db/mutations";
+import { voidSaleItem, voidSale, setProductActive, deleteProduct , voidPurchase } from "@/core/db/mutations";
 import { useUI } from "@/store/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Tables } from "@/core/db/tables";
@@ -348,10 +348,18 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
 
 // ── Purchases ─────────────────────────────────────────────────────────────────
 export function PurchasesScreen() {
+  const { reportSuccess, reportError } = useUI();
+  const qc = useQueryClient();
   const range = useActiveRange();
   const [addOpen, setAddOpen] = useState(false);
   const [productId, setProductId] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [voidAsk, setVoidAsk] = useState<{ id: string; label: string } | null>(null);
+  const doVoid = useMutation({
+    mutationFn: (id: string) => voidPurchase(id),
+    onSuccess: () => { reportSuccess("Purchase voided", "Stock and weighted cost recomputed."); qc.invalidateQueries(); },
+    onError: (e) => reportError("Void purchase", e),
+  });
   const prods = useQuery({ queryKey: ["products-list"], queryFn: getProducts, enabled: isEngineConfigured });
   const q = useQuery({ queryKey: ["purchases", range], queryFn: () => getPurchases(range), enabled: isEngineConfigured });
   const inv = useQuery({ queryKey: ["inv-purchases", range], queryFn: () => getInventoryPurchases(range), enabled: isEngineConfigured });
@@ -381,7 +389,7 @@ export function PurchasesScreen() {
         <DeckTile style={{ padding: 0 }}>
           <div className="scroll">
             <table className="tbl">
-              <thead><tr><th>Product</th><th>Date</th><th className="r">Qty × cost</th><th className="r">Total</th></tr></thead>
+              <thead><tr><th>Product</th><th>Date</th><th className="r">Qty × cost</th><th className="r">Total</th><th /></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="prodcell" onClick={() => setDetailId(r.productId)}>
@@ -389,6 +397,10 @@ export function PurchasesScreen() {
                     <td>{fmtDate(r.date, "d MMM yyyy")}</td>
                     <td className="r">{num(r.quantity)} × {egp(r.unitCost)}</td>
                     <td className="r">{egp(r.totalCost)}</td>
+                    <td className="r" style={{ width: 44 }}>
+                      <button title="Void this purchase" onClick={(e) => { e.stopPropagation(); setVoidAsk({ id: r.id, label: `Void ${r.productName} · ${egp(r.totalCost)} on ${fmtDate(r.date)}? Stock and weighted cost are recomputed.` }); }}
+                        style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: 14 }}>✕</button>
+                    </td>
                   </tr>
                 ))}
                 {lump.map((r) => (
@@ -406,6 +418,8 @@ export function PurchasesScreen() {
       </Guarded>
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add purchase"><PurchaseForm onDone={() => setAddOpen(false)} /></Modal>
       <Modal open={!!detailId} onClose={() => setDetailId(null)} wide>{detailId && <ProductDetailScreen id={detailId} onClose={() => setDetailId(null)} />}</Modal>
+      <Confirm open={!!voidAsk} title="Void purchase" message={voidAsk?.label ?? ""} danger busy={doVoid.isPending}
+        onConfirm={() => { if (voidAsk) doVoid.mutate(voidAsk.id); setVoidAsk(null); }} onClose={() => setVoidAsk(null)} />
     </div>
   );
 }

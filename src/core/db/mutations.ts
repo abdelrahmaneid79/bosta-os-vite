@@ -9,7 +9,7 @@ import {
   requireEngine, createPurchase as rpcCreatePurchase,
   createSaleItem as rpcCreateSaleItem, updateSaleItem as rpcUpdateSaleItem,
   deleteSaleItem as rpcDeleteSaleItem, voidSaleAtomic,
-  recalcMoneyAccount, ensureMonthlySettlementPeriod,
+  recalcMoneyAccount, ensureMonthlySettlementPeriod, voidPurchaseBatch,
 } from "@/core/db/engine";
 import type { Enums } from "@/core/db/tables";
 import type { Database } from "@/core/db/database.types";
@@ -199,6 +199,12 @@ export async function addPurchase(input: PurchaseInput): Promise<void> {
     source: "manual",
     verification: "verified",
   });
+}
+
+/** Void a purchase batch — the ONLY reverse path for a fat-fingered buy.
+ *  Soft: batch + linked movement get voided_at; the WAC ledger replays. */
+export async function voidPurchase(batchId: string, reason?: string): Promise<void> {
+  await voidPurchaseBatch(batchId, reason ?? "Voided by owner");
 }
 
 // ── Sales (header = safe insert; lines + reversal = verified RPCs) ───────────

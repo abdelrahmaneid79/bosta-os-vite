@@ -59,8 +59,14 @@ export function ReportsScreen() {
   const prods = products.data ?? [];
   const lifeProds = (lifetime.data ?? []).slice().sort((a, b) => b.revenue - a.revenue);
   const cats = expTrends.data ?? [];
+  const failed = [stock, sales, profit, purch, expenses, expTrends, cheques, products, lifetime].filter((q) => q.isError).length;
   return (
     <div className="space-y-4">
+      {failed > 0 && (
+        <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-2 text-[12.5px] font-semibold text-warn">
+          {failed} report read(s) failed — dashes below may hide real numbers. Reload to retry.
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Eyebrow>P&L · {rangeLabel(rk, r)} · vs prior {fmtDate(prior.from)} → {fmtDate(prior.to)}</Eyebrow>
         <DateRangePicker />

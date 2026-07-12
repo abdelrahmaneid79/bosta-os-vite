@@ -18,7 +18,7 @@ import { getChannels, getLocations } from "@/core/read/common";
 import { createSale, addExpense, ensureExpenseCategory } from "@/core/db/mutations";
 import { egp } from "@/core/utils/format";
 import { todayCairo } from "@/core/time";
-import { isEngineConfigured, sb } from "@/core/db/engine";
+import { isEngineConfigured, sb, requireEngine } from "@/core/db/engine";
 import { useUI } from "@/store/ui";
 
 type Kind = "sales" | "expenses";

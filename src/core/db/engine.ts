@@ -79,5 +79,7 @@ export const voidSaleAtomic = async (p_sale_id: string, p_reason?: string): Prom
 };
 
 export const recalcMoneyAccount = (p_account_id: string) => rpc("recalc_money_account", { p_account_id });
+/** Reverse a purchase: voids the batch + its inventory movement; WAC replays. */
+export const voidPurchaseBatch = (p_batch_id: string, p_reason: string) => rpc("void_purchase_batch", { p_batch_id, p_reason });
 export const ensureMonthlySettlementPeriod = (p_location_id: string, p_month: string) =>
   rpc("ensure_monthly_settlement_period", { p_location_id, p_month });
