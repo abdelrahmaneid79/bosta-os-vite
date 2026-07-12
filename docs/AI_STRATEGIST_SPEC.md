@@ -2,6 +2,8 @@
 
 _Written 2026-07-13, before Cycle 2. This is the contract the rebuild is held to._
 
+**Status:** Cycle 2 SHIPPED — `src/core/strategist/contract.ts` (Metric{value,source,period,basis,confidence,completeness,screenLink}), `context.ts` (owner answers in app_settings.strategist_context_v2 over documented defaults), `snapshot-v2.ts` (pure composeSnapshotV2 + I/O assembleSnapshotV2; periods = latest active month vs previous active month; rolling windows anchor to last data date so stale books don't read as collapse), `analysis/engine.ts` (pure pipeline: detectChanges → findDrivers → findContradictions → dataQualityFindings → findOpportunities → rankFindings; Finding{class,evidence,impactEgp,urgency,confidence,action,missingData,score,rank}). 21 scenario/honesty tests in `strategist-engine.test.ts`. Live-assembly verification happens under the owner session in Cycle 4 (RLS blocks anon assembly by design).
+
 ## Verdict on the current strategist (why it's being replaced)
 - Free-text markdown reply; the "format" is a hardcoded client-side user message with a "What the data says" section — an invitation to narrate KPIs.
 - Snapshot is pre-aggregated and truncated (top-6/8 lists), profit is this-month-only, no prior-period profit history, no cash-vs-profit bridge, no withdrawal history, no cheque aging, no per-metric provenance, no freshness stamp.

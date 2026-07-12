@@ -1,0 +1,198 @@
+/** Strategist Snapshot v2 — the ONE authoritative fact base the AI consumes.
+ *
+ *  Rules this file enforces by construction:
+ *  - Every metric carries value + source + period + basis + confidence +
+ *    completeness + screenLink. A missing number is basis:"missing" with
+ *    value:null — NEVER silently zero.
+ *  - All values come from the audited read layer (src/core/read/*). The LLM
+ *    never queries tables or recomputes financial logic.
+ *  - Cash, profit, revenue, settlements and withdrawals are separate blocks
+ *    and must never be conflated downstream. */
+
+export type Basis = "fact" | "calculated" | "estimated" | "forecast" | "missing";
+export type Confidence = "high" | "medium" | "low" | "none";
+
+export interface Metric<T = number> {
+  value: T | null;
+  /** Read-model origin, e.g. "read/profit.getProfitReadout" */
+  source: string;
+  /** Human period label, e.g. "2026-05-01→2026-05-31" or "all-time" */
+  period: string;
+  basis: Basis;
+  confidence: Confidence;
+  /** 0–100 where meaningful (e.g. % of revenue with product detail), else null */
+  completeness: number | null;
+  /** App route where the owner can inspect this number */
+  screenLink: string;
+  note?: string;
+}
+
+/** Constructor for a known value. */
+export function metric<T>(
+  value: T,
+  source: string,
+  period: string,
+  screenLink: string,
+  opts: { basis?: Basis; confidence?: Confidence; completeness?: number | null; note?: string } = {},
+): Metric<T> {
+  return {
+    value,
+    source,
+    period,
+    basis: opts.basis ?? "fact",
+    confidence: opts.confidence ?? "high",
+    completeness: opts.completeness ?? null,
+    screenLink,
+    ...(opts.note ? { note: opts.note } : {}),
+  };
+}
+
+/** Constructor for an UNKNOWN value — explicit, never zero. */
+export function missing<T = number>(source: string, period: string, screenLink: string, note: string): Metric<T> {
+  return { value: null, source, period, basis: "missing", confidence: "none", completeness: 0, screenLink, note };
+}
+
+export interface DayPoint { date: string; total: number }
+export interface NamedValue { name: string; value: number }
+
+export interface SnapshotMeta {
+  generatedAt: string;        // ISO timestamp
+  businessClock: "Africa/Cairo";
+  today: string;              // Cairo date
+  period: { from: string; to: string; label: string };
+  comparePeriod: { from: string; to: string; label: string };
+  lastDataDate: string | null;   // latest sale date in the books
+  staleDays: number | null;      // today − lastDataDate
+  isStale: boolean;              // staleDays > 3
+  completenessScore: number;     // 0–100 blended data-completeness
+}
+
+export interface RevenueBlock {
+  periodRevenue: Metric;
+  priorRevenue: Metric;
+  changePct: Metric;
+  rolling7Avg: Metric;
+  rolling30Avg: Metric;
+  bestDays: Metric<DayPoint[]>;
+  weakestDays: Metric<DayPoint[]>;
+  dayOfWeekPattern: Metric<NamedValue[]>;
+  monthlySeries: Metric<NamedValue[]>;      // seasonality view (label YYYY-MM)
+  unusualDays: Metric<DayPoint[]>;          // > 2.5σ from period mean
+}
+
+export interface ProfitBlock {
+  revenue: Metric;
+  coveredRevenue: Metric;
+  uncoveredRevenue: Metric;    // unknown-COGS exposure — the honesty metric
+  knownCogs: Metric;
+  grossProfit: Metric;         // null unless coverage complete
+  operatingExpenses: Metric;
+  netProfit: Metric;
+  grossMarginPct: Metric;      // on covered revenue only
+  netMarginPct: Metric;
+  priorGrossMarginPct: Metric;
+  monthlyProfitSeries: Metric<{ month: string; revenue: number; knownCogs: number; uncovered: number; opex: number }[]>;
+}
+
+export interface ProductEntry {
+  name: string;
+  revenue: number;
+  units: number;
+  grossProfit: number | null;
+  marginPct: number | null;
+  missingCost: boolean;
+}
+export interface ProductsBlock {
+  coveragePct: Metric;                       // % of period revenue with product lines
+  topRevenue: Metric<ProductEntry[]>;
+  topGrossProfit: Metric<ProductEntry[]>;
+  highestMargin: Metric<ProductEntry[]>;
+  fastestGrowing: Metric<(ProductEntry & { changePct: number })[]>;
+  fastestDeclining: Metric<(ProductEntry & { changePct: number })[]>;
+  highVolumeLowMargin: Metric<ProductEntry[]>;
+  lowVolumeHighMargin: Metric<ProductEntry[]>;
+  missingCosts: Metric<string[]>;            // product names lacking reference cost
+  stockRisk: Metric<{ name: string; daysCover: number | null; onHand: number }[]>;
+}
+
+export interface InventoryBlock {
+  trackedProducts: Metric;
+  stockValue: Metric;
+  negativeStock: Metric;
+  lowStock: Metric;
+  hasLiveData: boolean;        // false today: no counts, no purchases recorded
+  lastPhysicalCount: Metric<string>;
+}
+
+export interface ExpensesBlock {
+  operatingTotal: Metric;
+  priorOperatingTotal: Metric;
+  categories: Metric<(NamedValue & { priorValue: number; changePct: number | null })[]>;
+  spikes: Metric<(NamedValue & { changePct: number })[]>;
+  withdrawals: Metric;         // SEPARATE — never inside operatingTotal
+}
+
+export interface CashBlock {
+  expectedBalance: Metric;     // ledger-derived position
+  latestCount: Metric;         // last physical count amount
+  unexplainedDifference: Metric;
+  inflows: Metric;
+  outflows: Metric;
+  withdrawals: Metric;
+  injections: Metric;
+  lastCountDate: Metric<string>;
+  hasLiveData: boolean;        // false today: no live movements/counts
+}
+
+export interface ChequesBlock {
+  totalReceived: Metric;
+  openTabGross: Metric;        // sales since last cheque, pre-deduction
+  openTabEstimatedNet: Metric;
+  blendedDeductionPct: Metric;
+  overduePeriods: Metric<string[]>;
+  unmatchedCheques: Metric;
+  averageDelayDays: Metric;
+  lastChequeDate: Metric<string>;
+}
+
+export interface DataQualityIssue { issue: string; affectedEgp: number | null; screenLink: string }
+export interface DataQualityBlock {
+  issues: DataQualityIssue[];
+  missingCostLines: Metric;
+  uncoveredRevenueAllTime: Metric;
+  lineCoverageWindow: Metric<string>;   // e.g. "2024-11-01→2025-06-30"
+  unknownProductCodes: Metric<string[]>;
+  missingOwnerInputs: string[];
+}
+
+/** Owner targets & preferences. Every field has a documented default in
+ *  context.ts; `source` says whether it's an owner answer or a default. */
+export interface BusinessContext {
+  monthlyRevenueTarget: Metric;
+  monthlyProfitTarget: Metric;
+  grossMarginFloorPct: Metric;
+  cashReserveFloor: Metric;
+  withdrawalRule: Metric<string>;
+  strategicProducts: Metric<string[]>;
+  productsToGrow: Metric<string[]>;
+  stockoutToleranceDays: Metric;
+  aggressiveness: Metric<"conservative" | "balanced" | "aggressive">;
+  allowPriceRecommendations: Metric<boolean>;
+  challengeOwner: Metric<boolean>;
+  briefingCadence: Metric<string>;
+  upcomingEvents: Metric<{ name: string; date: string; note: string }[]>;
+  knownConstraints: Metric<string[]>;
+}
+
+export interface StrategistSnapshot {
+  meta: SnapshotMeta;
+  revenue: RevenueBlock;
+  profit: ProfitBlock;
+  products: ProductsBlock;
+  inventory: InventoryBlock;
+  expenses: ExpensesBlock;
+  cash: CashBlock;
+  cheques: ChequesBlock;
+  dataQuality: DataQualityBlock;
+  context: BusinessContext;
+}

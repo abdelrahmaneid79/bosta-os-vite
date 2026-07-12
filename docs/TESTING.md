@@ -5,7 +5,7 @@ _Updated 2026-07-13 (replaces the 2026-06 checklist — superseded sections live
 ## Gates (all must pass before push)
 ```bash
 npm run typecheck   # tsc -b (strict, noUnusedLocals)
-npm run test        # vitest — 226 tests / 18 files
+npm run test        # vitest — 239 tests / 19 files
 npm run build       # tsc -b && vite build
 ```
 (`lint` was removed — eslint was never installed/configured; typecheck is the gate.)
@@ -17,6 +17,7 @@ npm run build       # tsc -b && vite build
 - **Imports**: day-sales dedupe/attach/duplicate-block; product-line parse/classify/dedupe; seed fingerprints; CSV column detection.
 - **Engines**: health composition, alerts, budgets, forecast, cheque cycle, product match/advice/profit, retail calendar.
 - **Mutations**: createSale duplicate guard, movement signs, withdrawal typing.
+- **Strategist engine** (`strategist-engine.test.ts`, 21 tests): scenario suite (revenue-up-margin-down, profit-up-cash-low, high withdrawals, stock risk on top seller, overdue cheques, missing COGS, expense spike, insufficient history, stale books, uncovered revenue, settlement lag, steady state) + contract honesty (missing ≠ zero, coverage→confidence, withdrawals outside opex, cash/profit source separation, deterministic ranking).
 
 ## Not covered (accepted, documented)
 - Supabase-bound read fetchers (thin query wrappers) — including `getCashPosition` composition (Cycle 2 adds tests alongside the snapshot rebuild).

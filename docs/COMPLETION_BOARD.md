@@ -29,7 +29,7 @@ Status legend: ✅ working · 🟡 partial · 🔴 broken/missing · ⬜ removed
 | 20 | Imports | ✅ | dedupe (sales days, expense fingerprints, line keys), per-row failure reasons, day headers honest with unmapped rows |
 | 21 | OCR/import preview | ✅ | preview → approve everywhere; nothing auto-saves |
 | 22 | Activity feed | ✅ | |
-| 23 | Ask Bosta / Strategist | 🔴 | **being rebuilt from scratch (Stage 2)** — current daily-brief cached screen still live meanwhile |
+| 23 | Ask Bosta / Strategist | 🟡 | Stage 2 in progress: snapshot v2 + deterministic analysis engine SHIPPED (Cycle 2); edge fn + UI next (Cycles 3-4) |
 | 24 | Settings | ✅ | fake Light/System theme control removed (dark-only by design) |
 | 25 | System check | ✅ | fake "Write mode: Fully operational" row removed; honest not-configured state |
 | 26 | Mobile | ✅ | nav aligned with desktop; sale-detail table scrolls; layouts audited |
