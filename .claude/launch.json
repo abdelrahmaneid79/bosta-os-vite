@@ -4,8 +4,11 @@
     {
       "name": "app",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "4179", "--strictPort"],
-      "port": 4179
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "autoPort": true
     }
   ]
 }

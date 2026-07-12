@@ -10,7 +10,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // PORT is assigned by dev tooling (preview harness); 5173 is the fallback.
+    port: Number(process.env.PORT) || 5173,
     host: true,
   },
   build: {
