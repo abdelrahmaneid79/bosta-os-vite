@@ -29,7 +29,7 @@ Status legend: ✅ working · 🟡 partial · 🔴 broken/missing · ⬜ removed
 | 20 | Imports | ✅ | dedupe (sales days, expense fingerprints, line keys), per-row failure reasons, day headers honest with unmapped rows |
 | 21 | OCR/import preview | ✅ | preview → approve everywhere; nothing auto-saves |
 | 22 | Activity feed | ✅ | |
-| 23 | Ask Bosta / Strategist | 🟡 | Cycles 2-4 SHIPPED: snapshot v2 + engine + workspace UI + persistence (5 tables). Deterministic mode fully working; AI mode awaits edge-fn deploy + API credits (Cycle 5) |
+| 23 | Ask Bosta / Strategist | ✅ | Three-layer architecture complete (Cycle 5): Business Engine / Strategy Engine / replaceable Language Layer. Fully functional with ZERO API keys (deterministic templates); edge fn v5 deployed for enhanced mode — live model verification pending credit top-up |
 | 24 | Settings | ✅ | fake Light/System theme control removed (dark-only by design) |
 | 25 | System check | ✅ | fake "Write mode: Fully operational" row removed; honest not-configured state |
 | 26 | Mobile | ✅ | nav aligned with desktop; sale-detail table scrolls; layouts audited |

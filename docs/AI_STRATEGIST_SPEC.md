@@ -1,53 +1,84 @@
-# BostaOS — AI Strategist Spec (Stage 2 rebuild)
+# BostaOS Strategist — Architecture (as implemented)
 
-_Written 2026-07-13, before Cycle 2. This is the contract the rebuild is held to._
+_Updated 2026-07-13, end of Cycle 5. This describes the shipped system, not intentions._
 
-**Status:** Cycle 2 SHIPPED — `src/core/strategist/contract.ts` (Metric{value,source,period,basis,confidence,completeness,screenLink}), `context.ts` (owner answers in app_settings.strategist_context_v2 over documented defaults), `snapshot-v2.ts` (pure composeSnapshotV2 + I/O assembleSnapshotV2; periods = latest active month vs previous active month; rolling windows anchor to last data date so stale books don't read as collapse), `analysis/engine.ts` (pure pipeline: detectChanges → findDrivers → findContradictions → dataQualityFindings → findOpportunities → rankFindings; Finding{class,evidence,impactEgp,urgency,confidence,action,missingData,score,rank}). 21 scenario/honesty tests in `strategist-engine.test.ts`. Live-assembly verification happens under the owner session in Cycle 4 (RLS blocks anon assembly by design).
+## The three layers
 
-**Cycle 3 SHIPPED (code complete, NOT yet deployed):** `supabase/functions/business-strategist/index.ts` fully rewritten — 8 server-side modes with per-mode instructions + token limits, forced tool-use response schema (headline/conclusion/priorities[rank,type,title,explanation,evidence[],recommendedAction,expectedImpact,urgency,confidence,missingData]/contradictions/dataLimitations/suggestedQuestions), 20-rule system prompt, prompt caching (two cached system blocks: persona + snapshot/findings data block), 90s timeout → 504 with deterministic-fallback signal, usage + latency in every response. Client: `client-v2.ts` (askStrategistV2, StrategistUnavailableError for graceful degradation), `response.ts` (shared types + parseStrategistResponse validator), `analysis/decision.ts` (computeDecisionContext — deterministic scenario numbers: cash headroom vs floor, withdrawal guideline, margin-point value, below-floor products; 4 tests). Fixture extracted to `analysis/fixture.ts` for eval reuse. **Deploy deliberately deferred to Cycle 4** so the live screen is never broken. **BLOCKER: Anthropic API credit balance is exhausted — live grounding test 400s; top-up required before Cycle 4 verification.**
+```
+Layer 1 — BUSINESS ENGINE (authoritative facts)
+  src/core/read/*  ·  src/core/db/*  ·  SQL RPCs/triggers (WAC, settlements)
+  Owns every financial number. Deterministic, audited, LLM-free.
+  → produces the raw inputs for Snapshot V2
 
-**Cycle 4 SHIPPED:** the strategist workspace (`src/features/engine/strategist.tsx`, full rewrite) — executive briefing (deterministic-first, AI on explicit click only, cached briefing labeled with its snapshot), freshness strip, What Matters Now (top-3 + expand, class-differentiated cards, insight lifecycle chips), evidence drawer (owner-language source translation), action queue (accept/own/complete/dismiss, dedup by finding), Ask the Strategist (live suggested questions, structured answer cards with per-priority disclosure, feedback buttons), Decision Mode (withdrawal assessment with strictly separated money concepts + generic decision context; AI judgment optional). Persistence: migration 0033 (5 tables: conversations/messages/insights/actions/feedback; RLS admin_all verified; partial unique index blocks duplicate open actions; unique finding_id dedups insights), `persistence/lifecycle.ts` (pure: shouldPersistFinding threshold, planInsightSync insert/recur/reopen/auto-resolve, action dedup, buildOwnerMemory), `persistence/store.ts` (typed repository; 30-conversation retention). Old v1 code deleted: client.ts, config.ts, snapshot.ts, strategist-viz.tsx. AI availability states: available / unavailable / timeout / invalid-response / snapshot-error / auth — all render useful screens, no auto-retry ever.
+Layer 2 — STRATEGY ENGINE (proprietary BostaOS intelligence)
+  src/core/strategist/
+    contract.ts        Metric{value,source,period,basis,confidence,completeness,screenLink}
+    snapshot-v2.ts     composeSnapshotV2 (pure) + assembleSnapshotV2 (I/O over Layer 1 only)
+    context.ts         owner targets/preferences (app_settings.strategist_context_v2) over documented defaults
+    analysis/engine.ts detectChanges → findDrivers → findContradictions → dataQuality → opportunities → rankFindings
+                       Finding{class,evidence,impactEgp,urgency,confidence(=CEILING),drivers,assumptions,
+                               resolutionCriteria,alternativeAction,persistEligible,action,missingData,rank}
+    analysis/report.ts buildStrategyReport → StrategyReport{executive(status/reason/headline/topRisk/
+                       topOpportunity/topDataIssue/mostUrgentAction), findings, contradictions,
+                       dataQuality, decisionContext, maxConfidence, freshness}
+    analysis/decision.ts / withdrawal.ts   deterministic scenario numbers + withdrawal verdicts
+    questions.ts       suggested questions generated from live findings
+    persistence/       lifecycle.ts (pure plans: insert/recur/reopen/auto-resolve, action dedup,
+                       owner memory) · store.ts (the only module touching strategist_* tables)
+  Decides WHAT matters, WHY, what action, what confidence, what persists, what resolves.
 
-**Deployment (Cycle 5, when credits are topped up):**
-1. `supabase functions deploy business-strategist` (or MCP deploy_edge_function with verify_jwt) — deploys v2 over v4.
-2. Verify anon 401: `curl -X POST https://vvswohkqypzjtmfnpmba.supabase.co/functions/v1/business-strategist -H "Authorization: Bearer <ANON_KEY>" → 401`.
-3. Owner signs in → Strategist → "Generate AI briefing" → verify structured card renders with evidence + confidence.
-4. Ask one question, check schema validation (parseStrategistResponse throws on malformed → error state shown).
-5. Verify read-day-report untouched (photo importer still works).
-6. Live grounding check: `python3 scratchpad/live_test.py` (fixture-based, asserts no invented numbers).
+Layer 3 — LANGUAGE LAYER (replaceable infrastructure)
+  src/core/strategist/language/
+    types.ts           LanguageProvider/LanguageRequest/LanguageResult — the ONLY types the UI imports
+    deterministic.ts   MANDATORY template provider: briefings, topic answers (margin/cash/cheques/
+                       stock/products/priorities/improvement/missing-data), withdrawal parsing
+                       (English+Arabic), honest refusals naming what IS answerable. No key, no cost.
+    anthropic.ts       the ONLY client file that knows Anthropic exists; transport to the
+                       business-strategist edge function (which holds model/prompt/schema/caching)
+    validate.ts        border control: numeric grounding vs a corpus from snapshot+report+decision
+                       context, confidence-ceiling downgrade, disclosure repair
+    router.ts          generateLanguage(): settings-driven, explicit-intent only, daily call budget,
+                       fallback on unavailable/throw/malformed/ungrounded — engine output never lost
+  supabase/functions/business-strategist   (deployed v5) — the Anthropic adapter's server half:
+    8 modes, forced tool-use JSON schema, 20-rule system prompt, prompt caching, per-mode token caps,
+    90s timeout, anon→401.
+```
 
-## Verdict on the current strategist (why it's being replaced)
-- Free-text markdown reply; the "format" is a hardcoded client-side user message with a "What the data says" section — an invitation to narrate KPIs.
-- Snapshot is pre-aggregated and truncated (top-6/8 lists), profit is this-month-only, no prior-period profit history, no cash-vs-profit bridge, no withdrawal history, no cheque aging, no per-metric provenance, no freshness stamp.
-- One mode (daily brief), auto-fired on page visit, cached per day, no follow-ups despite full multi-turn plumbing.
-- No conversation persistence, no prompt caching, no streaming.
+**Ownership rules:** Layer 1 owns calculations. Layer 2 owns judgment (primary issue, action, urgency, confidence ceiling, persistence, resolution). Layer 3 owns wording only — it may not calculate, invent, alter evidence, exceed ceilings, or introduce recommendations the engine doesn't support.
 
-**Kept:** edge-fn auth scaffold (`getKey` env→private_config, `callerIsAuthenticated`), client invoke seam (Bearer + 401 mapping), `calendar.ts` (pure, tested), SVG viz components, the audited read layer underneath, `app_settings` for objective/context, read-day-report fn (untouched).
+## Running without any API key
+Everything works: snapshot → report → workspace (briefing, findings, evidence, actions, Ask with topic answers, withdrawal decisions) via the deterministic provider. Set Tune → Language service → "Off — BostaOS templates only", or simply have no credits — the router falls back identically, with the reason shown.
 
-## Non-negotiable rules (enforced in the system prompt AND the eval suite)
-1. Never invent numbers. 2. Never hide missing data. 3. Never recompute audited metrics. 4. Never conflate revenue/profit/cash/cheque value. 5. Withdrawals are never operating expenses. 6. No trend claims without enough history. 7. No forecast without stated confidence. 8. No advice that could apply to any business. 9. Cite specific snapshot evidence for every claim. 10. Highest-impact issue first. 11. Always name the next action. 12. Separate fact from interpretation. 13. Surface contradictions. 14. Say "cannot know" when it can't. 15. One strong recommendation beats ten weak ones.
+## Adding a provider
+1. Implement `LanguageProvider` (`id`, `isAvailable`, `generate`, `health`) in `language/<name>.ts`. `generate` must return a `StrategistResponse` (validate with `parseStrategistResponse`).
+2. Register it in `router.ts` REGISTRY (or via `registerProvider` — the test seam proves core layers need no changes; see `strategist-language.test.ts` "FAKE provider plugs in").
+3. Add its id to `LanguageSettings["provider"]` and the Tune select.
+Nothing in Layers 1–2, persistence, or the UI changes. Every response still passes `validate.ts`.
 
-## Snapshot v2 (Cycle 2) — data contract
-Every block carries `{ value, source, period, confidence, basis: fact|calculated|estimated|forecast|missing }`.
-- Overview: period + prior period, business clock, completeness score, data freshness (latest sale date!), coverage stats.
-- Revenue: current/prior, growth, rolling averages, best/weakest days, weekday pattern, seasonality.
-- Profit: monthly SERIES (not one point) of revenue/known COGS/**unknown-COGS exposure**/gross/opex/net, coverage-aware margins.
-- Products: top revenue/profit/margin, growth & decline, high-volume-low-margin, low-volume-high-margin, stock risk, per-product coverage.
-- Inventory: on hand, value, negative, low, days-of-cover, stale/missing cost (currently: no live data — must say so).
-- Expenses: total, category split, PoP change, spikes, recurring; withdrawals SEPARATE.
-- Cash: expected vs recorded vs counted, unexplained diff, in/out/withdrawals, confidence (currently: no live data — must say so).
-- Cheques: expected/received/outstanding/overdue/unmatched, differences, average delay, settlement-era context from location_terms (not hardcoded prose).
-- Data quality: missing COGS, unmapped codes, line-coverage window, missing cash counts, staleness.
-- Context: owner goals/targets/limits (from 2G answers or documented defaults), retail calendar, saved decisions.
+## Disabling providers
+Tune → "Off — BostaOS templates only" (`strategist_settings.provider = "deterministic"`), or uncheck "Allow enhanced" (`allowEnhanced: false`), or set the daily call cap to 0.
 
-## Reasoning pipeline (pure TS, unit-tested, runs BEFORE the LLM)
-detect changes → find drivers → find contradictions → rank (impact, urgency, reversibility, confidence, actionability) → the LLM writes the narrative and judgment ON TOP of deterministic findings, never instead of them.
+## Validation & confidence
+`validate.ts` runs on every external response: numbers >100 in headline/conclusion/priorities/evidence must ground (±0.5%) in the snapshot/report/decision-context corpus, else the response is REJECTED → deterministic fallback with the reason. Priority confidence above `report.maxConfidence` is downgraded (repair, logged). Missing data-quality disclosures are appended. The ceiling itself comes from Layer 2 (finding confidence, degraded when completeness < 50).
 
-## Response contract (tool-use JSON schema, not free text)
-Per finding: `{ conclusion, evidence[] (snapshot paths + values), whyItMatters, action { what, screen route, urgency }, confidence, missingData[] }`. Modes: daily_brief, weekly_review, question, decision_support, product_strategy, cash_review, cheque_review, data_quality. Mode templates live SERVER-side.
+## Memory
+Provider-neutral, in the strategist_* tables: completed actions, dismissed insights (+notes), negative feedback (+reasons) → `buildOwnerMemory` compact facts (behavioral only, never business numbers) passed to providers as context. Old AI outputs are never truth: every answer renders from the CURRENT StrategyReport (test: "memory can never override live data").
 
-## UI (Cycle 4)
-"What matters now" card, ranked priorities with evidence links, Ask panel (structured answers), decision mode, feedback (useful/not/dismiss/done), persistence: `strategist_conversations`, `strategist_insights` tables; past decisions feed the snapshot context.
+## Testing each layer
+- Layer 1: `financial-contracts`, `profit-coverage`, `logic` + module suites (`npm run test`).
+- Layer 2: `strategist-engine.test` (13 scenarios), `strategy-report.test` (status/ceiling/scenarios), `decision-context`, `strategist-persistence` (lifecycle/dedup/memory).
+- Layer 3: `strategist-language.test` — templates without credentials, fake-provider plug-in, fallback on throw/unavailable/invented-number/over-confidence/budget, validator internals.
+Run: `npm run typecheck && npm run test && npm run build` — 280 tests, no network, no keys.
 
-## Cost
-Prompt caching (`cache_control`) on the stable snapshot block; streaming on; target < $0.05/interaction typical.
+## Provider cutover / rollback
+Edge fn `business-strategist` v5 (structured) is DEPLOYED with verify_jwt; anon → 401 verified; `read-day-report` untouched. Rollback: redeploy the v1 free-text function from git history (`git show dd248ac~1:supabase/functions/business-strategist/index.ts`) — the router treats its responses as malformed and falls back to templates, so even a bad rollback cannot break the workspace.
+
+## Verification status (honest)
+- Built + locally tested + adapter-tested with mocks: everything above.
+- **Live-provider verified: NO.** Anthropic credits were exhausted throughout Cycle 5 (re-checked 2026-07-13, ~$0.00 spent — the ping itself was rejected). When topped up, run the $3 controlled check: one enhanced briefing, one question, one withdrawal decision, one refusal case — capture latency/tokens/cache/grounding via Tune → Diagnostics and `scratchpad/live_test.py`.
+
+## Performance (measured where possible)
+Engine + report build: ~1–5 ms on realistic fixtures (test timings). Snapshot assembly (~19 paged reads) and insight sync require the owner's session — live numbers appear in Tune → Diagnostics (snapshot/engine/sync/language ms, fallback + repair counts). Optimize only if the diagnostics show pain; candidates: server-composed snapshot, memoized month readouts.
+
+## Cycle 6 candidates (Layer 2 first)
+1. Root-cause contribution analysis (per-product deltas explaining revenue/margin moves once two covered periods exist). 2. Cash-safety reasoning upgrades when the first drawer counts arrive. 3. Product portfolio classification (grow/hold/fix/drop with resolution tracking). 4. Recommendation outcome tracking (action completed → did the metric move?). 5. Purchase recommendation foundations (needs live inventory). 6. Live-provider verification + prompt tuning against real responses.

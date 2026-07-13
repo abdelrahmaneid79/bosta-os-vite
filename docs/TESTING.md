@@ -5,7 +5,7 @@ _Updated 2026-07-13 (replaces the 2026-06 checklist — superseded sections live
 ## Gates (all must pass before push)
 ```bash
 npm run typecheck   # tsc -b (strict, noUnusedLocals)
-npm run test        # vitest — 255 tests / 21 files
+npm run test        # vitest — 280 tests / 23 files
 npm run build       # tsc -b && vite build
 ```
 (`lint` was removed — eslint was never installed/configured; typecheck is the gate.)
@@ -26,6 +26,9 @@ npm run build       # tsc -b && vite build
 
 ## Manual QA
 Settings → **QA checklist** (`/qa`, now reachable from nav) — interactive checklist updated 2026-07-13 to match real screen names and flows. DB-level verification queries live in `supabase/tests/`.
+
+- **Language layer** (`strategist-language.test.ts`, 15 tests): deterministic templates without credentials, fake-provider plug-in (proves provider independence), router fallback on throw/unavailable/invented-number/over-confidence/budget, grounding validator.
+- **Strategy report** (`strategy-report.test.ts`, 10 tests): executive status transitions, confidence-ceiling degradation, persistence eligibility, price/employee/memory-override/settlement/cash-unavailable scenarios.
 
 ## Strategist evals (Cycle 5)
 Scenario suite: revenue-up-margin-down, profit-up-cash-down, high withdrawals, missing COGS, low stock on fast seller, overdue cheque, expense spike, insufficient history, unsupported question, risky withdrawal. Each asserts: no invented numbers, correct issue ranking, a concrete action, stated confidence, explicit missing-data disclosure, a working screen link, no generic advice. Spec in AI_STRATEGIST_SPEC.md.
