@@ -258,7 +258,9 @@ describe("cash priorities", () => {
     const report = buildStrategyReport(s);
     expect(report.findings.some((f) => f.id === "cash-count-required")).toBe(true);
     const w = selectWeeklyPriority(report, { dismissed: [], openActionFindingIds: [], reviewPeriodDays: 14 });
-    expect(["cash-count-required", "stale-books"]).toContain(w.primary!.findingId);
+    // an activation step (confirm live start / first count) or the cash-count finding leads —
+    // never a product optimisation while foundations are missing
+    expect(w.primary!.findingId).toMatch(/^activate-|cash-count-required|stale-books/);
   });
 
   it("stale count produces its own finding", () => {

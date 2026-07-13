@@ -122,33 +122,54 @@ export type Database = {
       cash_reconciliations: {
         Row: {
           account_id: string
+          bank_balance: number | null
           count_date: string
           counted_amount: number
+          counted_source: string
           created_at: string
           difference: number | null
           expected_balance: number
           id: string
+          is_opening_baseline: boolean
           notes: string | null
+          opening_difference: number | null
+          verification: string
+          void_reason: string | null
+          voided_at: string | null
         }
         Insert: {
           account_id: string
+          bank_balance?: number | null
           count_date: string
           counted_amount: number
+          counted_source?: string
           created_at?: string
           difference?: number | null
           expected_balance: number
           id?: string
+          is_opening_baseline?: boolean
           notes?: string | null
+          opening_difference?: number | null
+          verification?: string
+          void_reason?: string | null
+          voided_at?: string | null
         }
         Update: {
           account_id?: string
+          bank_balance?: number | null
           count_date?: string
           counted_amount?: number
+          counted_source?: string
           created_at?: string
           difference?: number | null
           expected_balance?: number
           id?: string
+          is_opening_baseline?: boolean
           notes?: string | null
+          opening_difference?: number | null
+          verification?: string
+          void_reason?: string | null
+          voided_at?: string | null
         }
         Relationships: [
           {
@@ -246,6 +267,68 @@ export type Database = {
             columns: ["settlement_period_id"]
             isOneToOne: false
             referencedRelation: "v_open_settlement"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_closes: {
+        Row: {
+          checklist: Json
+          close_date: string
+          closed_by: string | null
+          completeness: number
+          created_at: string
+          id: string
+          key_numbers: Json | null
+          location_id: string | null
+          next_action: string | null
+          notes: string | null
+          status: string
+          unresolved: Json
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          checklist?: Json
+          close_date: string
+          closed_by?: string | null
+          completeness?: number
+          created_at?: string
+          id?: string
+          key_numbers?: Json | null
+          location_id?: string | null
+          next_action?: string | null
+          notes?: string | null
+          status?: string
+          unresolved?: Json
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          checklist?: Json
+          close_date?: string
+          closed_by?: string | null
+          completeness?: number
+          created_at?: string
+          id?: string
+          key_numbers?: Json | null
+          location_id?: string | null
+          next_action?: string | null
+          notes?: string | null
+          status?: string
+          unresolved?: Json
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_closes_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
             referencedColumns: ["id"]
           },
         ]
@@ -1035,6 +1118,7 @@ export type Database = {
           difference: number
           expected_qty: number
           id: string
+          is_opening_baseline: boolean
           location_id: string | null
           notes: string | null
           product_id: string
@@ -1054,6 +1138,7 @@ export type Database = {
           difference: number
           expected_qty: number
           id?: string
+          is_opening_baseline?: boolean
           location_id?: string | null
           notes?: string | null
           product_id: string
@@ -1073,6 +1158,7 @@ export type Database = {
           difference?: number
           expected_qty?: number
           id?: string
+          is_opening_baseline?: boolean
           location_id?: string | null
           notes?: string | null
           product_id?: string
@@ -1686,6 +1772,7 @@ export type Database = {
       }
       strategist_actions: {
         Row: {
+          amount: number | null
           baseline: Json | null
           category: string
           completed_at: string | null
@@ -1696,12 +1783,17 @@ export type Database = {
           dismissed_at: string | null
           due_date: string | null
           evaluated_at: string | null
+          expected_date: string | null
           expected_outcome: string | null
           finding_id: string | null
+          funding_status: string
           id: string
+          latest_date: string | null
           outcome_metrics: Json | null
           outcome_state: string
           priority: string
+          recurrence: string | null
+          recurring_amount: number | null
           review_date: string | null
           screen_link: string
           source: string
@@ -1710,6 +1802,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          amount?: number | null
           baseline?: Json | null
           category?: string
           completed_at?: string | null
@@ -1720,12 +1813,17 @@ export type Database = {
           dismissed_at?: string | null
           due_date?: string | null
           evaluated_at?: string | null
+          expected_date?: string | null
           expected_outcome?: string | null
           finding_id?: string | null
+          funding_status?: string
           id?: string
+          latest_date?: string | null
           outcome_metrics?: Json | null
           outcome_state?: string
           priority?: string
+          recurrence?: string | null
+          recurring_amount?: number | null
           review_date?: string | null
           screen_link?: string
           source: string
@@ -1734,6 +1832,7 @@ export type Database = {
           title: string
         }
         Update: {
+          amount?: number | null
           baseline?: Json | null
           category?: string
           completed_at?: string | null
@@ -1744,12 +1843,17 @@ export type Database = {
           dismissed_at?: string | null
           due_date?: string | null
           evaluated_at?: string | null
+          expected_date?: string | null
           expected_outcome?: string | null
           finding_id?: string | null
+          funding_status?: string
           id?: string
+          latest_date?: string | null
           outcome_metrics?: Json | null
           outcome_state?: string
           priority?: string
+          recurrence?: string | null
+          recurring_amount?: number | null
           review_date?: string | null
           screen_link?: string
           source?: string

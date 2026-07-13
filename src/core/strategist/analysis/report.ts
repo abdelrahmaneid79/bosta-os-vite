@@ -13,6 +13,9 @@ import {
 } from "./products";
 import { buildObligationCalendar, composeCashState, cashFindings, type CashState, type ObligationCalendar, type AcceptedCommitment } from "./cash";
 import { projectCash, computeRunway, type CashProjection, type RunwayResult } from "./forecast-cash";
+import { buildActivationChecklist, activationFindings, type ActivationChecklist } from "./activation";
+import { buildPurchasePlan, type PurchasePlan } from "./purchase-qty";
+import { groupMissingData, liveHealthScore, type MissingGroup, type LiveHealth } from "./operations";
 
 export type BusinessStatus = "healthy" | "attention" | "critical" | "insufficient_data";
 
@@ -49,6 +52,11 @@ export interface StrategyReport {
   obligations: ObligationCalendar;
   cashProjection: CashProjection;
   runway: RunwayResult;
+  /** Cycle 8 — operational activation */
+  activation: ActivationChecklist;
+  purchasePlan: PurchasePlan;
+  missingData: MissingGroup[];
+  liveHealth: LiveHealth;
   /** the highest confidence ANY consumer may claim about this report */
   maxConfidence: FindingConfidence;
 }
@@ -58,7 +66,8 @@ const CONF_ORDER: FindingConfidence[] = ["low", "medium", "high"];
 export function buildStrategyReport(s: StrategistSnapshot, accepted: AcceptedCommitment[] = []): StrategyReport {
   const obligations = buildObligationCalendar(s, accepted);
   const cash = composeCashState(s, obligations);
-  const findings = analyzeSnapshot(s, cashFindings(s, cash, obligations));
+  const activation = buildActivationChecklist(s);
+  const findings = analyzeSnapshot(s, [...cashFindings(s, cash, obligations), ...activationFindings(s, activation)]);
   const portfolio = classifyPortfolio(s);
 
   const risky = (f: Finding) => f.class === "warning" || f.class === "contradiction" || f.class === "decision_risk";
@@ -123,6 +132,10 @@ export function buildStrategyReport(s: StrategistSnapshot, accepted: AcceptedCom
     obligations,
     cashProjection: projectCash(s, cash, obligations, 30),
     runway: computeRunway(s, cash),
+    activation,
+    purchasePlan: buildPurchasePlan(s, cash),
+    missingData: groupMissingData(s, activation),
+    liveHealth: liveHealthScore(s, activation),
     maxConfidence,
   };
 }

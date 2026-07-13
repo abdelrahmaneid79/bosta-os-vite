@@ -113,6 +113,12 @@ export interface NewAction {
   /** the originating finding — captured as the immutable outcome baseline */
   baselineFinding?: Finding | null;
   reviewPeriodDays?: number;
+  /** Cycle 8 — structured financial amounts (accepted → obligation calendar) */
+  amount?: number | null;
+  recurringAmount?: number | null;
+  recurrence?: "once" | "monthly" | "weekly" | null;
+  expectedDate?: string | null;
+  latestDate?: string | null;
 }
 
 /** Create an action; silently returns the existing one on a duplicate open finding. */
@@ -135,6 +141,12 @@ export async function createAction(a: NewAction): Promise<{ created: boolean }> 
     baseline: f ? ({ period: f.evidence[0]?.period ?? "", capturedAt: new Date().toISOString(), impactEgp: f.impactEgp, evidence: f.evidence, findingId: f.id, resolutionCriteria: f.resolutionCriteria } as never) : null,
     success_criteria: f?.resolutionCriteria ?? null,
     review_date: f ? reviewDate : null,
+    amount: a.amount ?? null,
+    recurring_amount: a.recurringAmount ?? null,
+    recurrence: a.recurrence ?? null,
+    expected_date: a.expectedDate ?? null,
+    latest_date: a.latestDate ?? null,
+    funding_status: "unfunded",
   });
   if (error) {
     if (error.code === "23505") return { created: false }; // race with the unique index

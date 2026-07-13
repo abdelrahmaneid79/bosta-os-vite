@@ -330,17 +330,37 @@ export async function voidMovement(id: string, accountId: string): Promise<void>
   await recalcMoneyAccount(accountId);
 }
 /** Physical cash count: snapshot expected, store reconciliation, land balance via a voidable adjustment. */
-export async function recordCashCount(accountId: string, counted: number, date: string, notes: string | null): Promise<number> {
+export interface CashCountOptions {
+  /** the FIRST verified count: the gap vs the ledger is an OPENING DIFFERENCE,
+   *  NOT an expense/withdrawal — so no adjustment movement is posted. */
+  openingBaseline?: boolean;
+  bankBalance?: number | null;
+  verification?: "verified" | "estimated";
+  source?: string;
+}
+export async function recordCashCount(accountId: string, counted: number, date: string, notes: string | null, opts: CashCountOptions = {}): Promise<number> {
   const sb = requireEngine();
   // expected = the true cash position (movements − expenses − purchases), not the
   // raw movements balance — so a physical count anchors cash on hand to reality.
   const { onHand: expected } = await getCashPosition();
   const difference = r2(counted - expected);
+  const baseline = opts.openingBaseline === true;
   const recon = await sb.from("cash_reconciliations")
-    .insert({ account_id: accountId, count_date: date, counted_amount: counted, expected_balance: expected, notes })
+    .insert({
+      account_id: accountId, count_date: date, counted_amount: counted, expected_balance: expected, notes,
+      is_opening_baseline: baseline,
+      verification: opts.verification ?? "verified",
+      counted_source: opts.source ?? "manual",
+      bank_balance: opts.bankBalance ?? null,
+      // the opening difference is recorded for the record, never actioned
+      opening_difference: baseline ? difference : null,
+    })
     .select("id").single();
   if (recon.error) throw recon.error;
-  if (difference !== 0) {
+  // A NON-baseline count reconciles from the prior baseline forward, so a
+  // real difference posts an adjustment. The opening baseline does NOT —
+  // its gap vs the historical ledger is informational only.
+  if (!baseline && difference !== 0) {
     const mv = await sb.from("money_movements").insert({
       account_id: accountId, movement_date: date, movement_type: "adjustment", amount: difference,
       reference_type: "cash_reconciliation", reference_id: recon.data.id,

@@ -22,7 +22,7 @@ import { requireEngine } from "@/core/db/engine";
 import { loadOwnerContext, composeContext, type OwnerContextAnswers } from "./context";
 import {
   metric, missing, type StrategistSnapshot, type DayPoint, type NamedValue,
-  type ProductEntry, type ProductPeriodEntry, type Confidence, type DataQualityIssue,
+  type ProductEntry, type ProductPeriodEntry, type Confidence, type DataQualityIssue, type LiveOpsConfig,
 } from "./contract";
 
 const r0 = (n: number) => Math.round(n);
@@ -49,6 +49,7 @@ export interface SnapshotInputs {
   expenseTrends: ExpenseCatStat[];
   missingData: MissingIssue[];
   ownerAnswers: OwnerContextAnswers | null;
+  liveOps: LiveOpsConfig;
 }
 
 /* ── pure helpers ─────────────────────────────────────────────────────── */
@@ -201,6 +202,7 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
       staleDays,
       isStale: staleDays != null && staleDays > 3,
       completenessScore,
+      liveOps: i.liveOps,
     },
     revenue: {
       periodRevenue: metric(r0(periodRev), SALES, P, "/sales"),
@@ -384,6 +386,22 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
 
 /* ── I/O assembler ────────────────────────────────────────────────────── */
 
+async function loadLiveOps(): Promise<LiveOpsConfig> {
+  const sb = requireEngine();
+  const [cfg, close] = await Promise.all([
+    sb.from("app_settings").select("value").eq("key", "live_operations").maybeSingle(),
+    sb.from("daily_closes").select("close_date").is("voided_at", null).order("close_date", { ascending: false }).limit(1),
+  ]);
+  const v = (cfg.data?.value ?? null) as { startDate?: string; confirmedAt?: string; reason?: string } | null;
+  return {
+    startDate: typeof v?.startDate === "string" ? v.startDate : null,
+    confirmedAt: typeof v?.confirmedAt === "string" ? v.confirmedAt : null,
+    basis: v?.startDate ? (v.confirmedAt ? "confirmed" : "proposed") : "unset",
+    reason: typeof v?.reason === "string" ? v.reason : null,
+    lastCloseDate: close.data?.[0]?.close_date ?? null,
+  };
+}
+
 async function getLatestCashCount(): Promise<SnapshotInputs["latestCashCount"]> {
   const { data, error } = await requireEngine()
     .from("cash_reconciliations").select("count_date,counted_amount,expected_balance")
@@ -415,7 +433,7 @@ export async function assembleSnapshotV2(): Promise<StrategistSnapshot> {
   const { period, compare } = defaultPeriods(daily, today);
 
   const months = [...new Set(daily.filter((d) => d.total > 0).map((d) => d.date.slice(0, 7)))].sort().slice(-6);
-  const [profitPeriod, profitCompare, productsPeriod, productsCompare, stock, cashPos, cashSummary, latestCashCount, cycle, statements, expenseTrends, missingData, ownerAnswers, ...profitMonthReadouts] = await Promise.all([
+  const [profitPeriod, profitCompare, productsPeriod, productsCompare, stock, cashPos, cashSummary, latestCashCount, cycle, statements, expenseTrends, missingData, ownerAnswers, liveOps, ...profitMonthReadouts] = await Promise.all([
     getProfitReadout(period),
     getProfitReadout(compare),
     getProductProfit(period),
@@ -429,6 +447,7 @@ export async function assembleSnapshotV2(): Promise<StrategistSnapshot> {
     getExpenseCategoryTrends(period, compare),
     getMissingData(),
     loadOwnerContext(),
+    loadLiveOps(),
     ...months.map((m) => getProfitReadout(monthBounds(m))),
   ] as const);
 
@@ -438,6 +457,6 @@ export async function assembleSnapshotV2(): Promise<StrategistSnapshot> {
     profitMonths: months.map((m, idx) => ({ month: m, readout: profitMonthReadouts[idx] })),
     productsPeriod, productsCompare,
     stock, cashPos, cashSummary, latestCashCount, cycle, statements,
-    expenseTrends, missingData, ownerAnswers,
+    expenseTrends, missingData, ownerAnswers, liveOps,
   });
 }

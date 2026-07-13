@@ -55,6 +55,16 @@ export function missing<T = number>(source: string, period: string, screenLink: 
 export interface DayPoint { date: string; total: number }
 export interface NamedValue { name: string; value: number }
 
+export interface LiveOpsConfig {
+  /** the official live-operations start date; null until owner-confirmed */
+  startDate: string | null;
+  confirmedAt: string | null;
+  basis: "confirmed" | "proposed" | "unset";
+  reason: string | null;
+  /** the most recent daily-close date, if any */
+  lastCloseDate: string | null;
+}
+
 export interface SnapshotMeta {
   generatedAt: string;        // ISO timestamp
   businessClock: "Africa/Cairo";
@@ -65,6 +75,7 @@ export interface SnapshotMeta {
   staleDays: number | null;      // today − lastDataDate
   isStale: boolean;              // staleDays > 3
   completenessScore: number;     // 0–100 blended data-completeness
+  liveOps: LiveOpsConfig;
 }
 
 export interface RevenueBlock {

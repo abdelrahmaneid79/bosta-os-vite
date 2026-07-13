@@ -190,6 +190,42 @@ function answerQuestion(req: LanguageRequest): StrategistResponse {
     if (Number.isFinite(amt) && amt > 0) return withdrawal(req, amt);
   }
 
+  // activation questions answer from the readiness model first
+  const act = req.report.activation;
+  if (/record today|need to record|what.*today|fully live|is bostaos live|operational|activate|trust.*(forecast|stock|recommend)|why.*(verify|can't you).*cash|unlock/i.test(q)) {
+    const lh = req.report.liveHealth;
+    const steps = act.steps.filter((x) => x.status !== "done");
+    return {
+      mode: req.mode,
+      headline: act.readiness === "live_verified" || act.readiness === "live_operational"
+        ? "BostaOS is live and operational."
+        : `BostaOS is ${act.readiness.replace(/_/g, " ")} — ${act.requiredRemaining} required step(s) left.`,
+      conclusion: [
+        act.readinessReason,
+        act.nextStep ? `Do this next: ${act.nextStep.action} It unlocks ${act.nextStep.unlocks.join(", ")}.` : "",
+        `Cash confidence: ${lh.cashConfidence}. Inventory confidence: ${lh.inventoryConfidence}. ${/trust.*forecast/i.test(q) ? (lh.cashConfidence === "high" ? "Absolute forecasts are trustworthy." : "Forecasts are relative-only until the first cash count.") : ""}${/trust.*stock/i.test(q) ? (lh.inventoryConfidence !== "none" ? " Stock recommendations are active." : " Stock recommendations need the first stock count.") : ""}`,
+      ].filter(Boolean).join(" "),
+      priorities: req.report.findings.filter((f) => f.id.startsWith("activate-") || f.id.startsWith("cash-count")).slice(0, 3).map(findingToPriority),
+      contradictions: [],
+      dataLimitations: lh.wouldImprove,
+      suggestedQuestions: steps.slice(0, 3).map((x) => x.title + "?"),
+    };
+  }
+  if (/missing.*matter|fix first|most important|which.*missing/i.test(q)) {
+    const groups = req.report.missingData;
+    return {
+      mode: req.mode,
+      headline: groups[0] ? `Start with: ${groups[0].group}` : "Nothing critical is missing.",
+      conclusion: groups.length
+        ? `In priority order: ${groups.map((g) => `${g.group} (${g.items.length})`).join(", ")}. Live activation always outranks historical cleanup.`
+        : "The current live records are complete for what the engine needs.",
+      priorities: req.report.findings.filter((f) => f.class === "data_quality").slice(0, 3).map(findingToPriority),
+      contradictions: [],
+      dataLimitations: [],
+      suggestedQuestions: groups[0]?.items.slice(0, 2).map((i) => i.title + "?") ?? [],
+    };
+  }
+
   for (const intent of INTENTS) {
     if (!intent.match.test(q)) continue;
     const picked = req.findings.filter((f) =>

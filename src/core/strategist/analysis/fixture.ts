@@ -18,6 +18,7 @@ export function makeSnapshot(over: DeepPartial<StrategistSnapshot> = {}): Strate
       period: { from: "2026-05-01", to: "2026-05-31", label: P },
       comparePeriod: { from: "2026-04-01", to: "2026-04-30", label: C },
       lastDataDate: "2026-05-31", staleDays: 2, isStale: false, completenessScore: 85,
+      liveOps: { startDate: null, confirmedAt: null, basis: "unset", reason: null, lastCloseDate: null },
     },
     revenue: {
       periodRevenue: m(114_000), priorRevenue: m(110_000),
