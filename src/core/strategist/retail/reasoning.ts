@@ -34,12 +34,8 @@ export function runRetailReasoning(f: RetailBusinessFacts, opts: ReasoningOption
 }
 
 /** Reasoning over deterministic + externally-authored candidates (e.g. validated
- *  model ideas). Every candidate — whatever its source — passes the same gate. */
+ *  model ideas). Every candidate — whatever its source — passes the same gate.
+ *  This is the seam where model-authored ideas join the deterministic pipeline. */
 export function runReasoningWithCandidates(f: RetailBusinessFacts, opts: ReasoningOptions, extra: Candidate[]): IngestResult {
   return ingestCandidates([...buildDeterministicCandidates(f), ...extra], f, opts);
-}
-
-/** Diagnostic: what was rejected and why (for tests / the quality view). */
-export function reasoningDiagnostics(f: RetailBusinessFacts, opts: ReasoningOptions): IngestResult["rejected"] {
-  return ingestCandidates(buildDeterministicCandidates(f), f, { ...opts, maxRecommendations: 1000 }).rejected;
 }

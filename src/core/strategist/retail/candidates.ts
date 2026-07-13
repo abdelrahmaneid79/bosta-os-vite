@@ -35,6 +35,9 @@ export interface IngestOptions {
   reviewPeriodDays?: number;
   openDedupeKeys?: string[];
   maxRecommendations?: number;
+  /** cap recommendations touching the same product — prevents flooding one
+   *  product with overlapping advice (prefer few excellent over many shallow) */
+  maxPerProduct?: number;
 }
 
 export interface IngestResult {
@@ -68,7 +71,9 @@ function finalize(c: Candidate, f: RetailBusinessFacts, opts: IngestOptions): Re
   const reviewDate = new Date(Date.parse(opts.today) + reviewDays * 86_400_000).toISOString().slice(0, 10);
   const dedupeKey = `${c.draft.type}:${slug(c.draft.affectedProducts[0] ?? c.draft.domain)}`;
   const impactBand = c.draft.financialImpactEgp != null ? Math.min(3, Math.floor(c.draft.financialImpactEgp / 5000)) : 0;
-  const priorityScore = CONF_RANK[confidence] * 3 + TRUTH_RANK[truthLevel] + impactBand + (c.draft.missingInformation.length ? 0 : 1);
+  // a seasonal play is most relevant while its season is live — surface it above generic tweaks
+  const seasonalBoost = c.draft.domain === "seasonality" && f.season != null ? 2 : 0;
+  const priorityScore = CONF_RANK[confidence] * 3 + TRUTH_RANK[truthLevel] + impactBand + seasonalBoost + (c.draft.missingInformation.length ? 0 : 1);
 
   return {
     ...c.draft,
@@ -83,6 +88,8 @@ export function ingestCandidates(candidates: Candidate[], f: RetailBusinessFacts
   const finalized = candidates.map((c) => finalize(c, f, opts));
   const open = new Set(opts.openDedupeKeys ?? []);
   const seen = new Set<string>();
+  const perProduct = new Map<string, number>();
+  const maxPerProduct = opts.maxPerProduct ?? 2;
   const accepted: RetailRecommendation[] = [];
   const rejected: IngestResult["rejected"] = [];
   for (const r of finalized.sort((a, b) => b.priorityScore - a.priorityScore)) {
@@ -90,7 +97,10 @@ export function ingestCandidates(candidates: Candidate[], f: RetailBusinessFacts
     if (!g.ok) { rejected.push({ id: r.id, source: r.source, violations: g.violations }); continue; }
     if (isLowValue(r)) { rejected.push({ id: r.id, source: r.source, violations: ["low value"] }); continue; }
     if (open.has(r.dedupeKey) || seen.has(r.dedupeKey)) continue;
+    const key = r.affectedProducts[0] ?? r.domain;
+    if ((perProduct.get(key) ?? 0) >= maxPerProduct) { rejected.push({ id: r.id, source: r.source, violations: [`>${maxPerProduct} recommendations for ${key}`] }); continue; }
     seen.add(r.dedupeKey);
+    perProduct.set(key, (perProduct.get(key) ?? 0) + 1);
     accepted.push(r);
   }
   return { accepted: accepted.slice(0, opts.maxRecommendations ?? 8), rejected };

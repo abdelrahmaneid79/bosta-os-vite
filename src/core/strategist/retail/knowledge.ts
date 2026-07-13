@@ -192,7 +192,9 @@ const profitDriverLowSpace: KnowledgePlaybook = {
   testDesign: "Add one facing for two cheque cycles; compare profit per position.",
   minTestDurationDays: 28, successMetrics: ["profit per position up"], failureMetrics: ["no lift", "hurts neighbour"],
   confidenceCeiling: "medium", basis: "retail_heuristic", version: 1,
-  match: (p) => (p.profitSharePct ?? 0) >= 15,
+  // only when it's a top profit driver AND it's plausibly under-spaced (few or
+  // unknown facings) — never suggest adding space to an already-dominant line
+  match: (p) => (p.profitSharePct ?? 0) >= 15 && (p.facings == null || p.facings <= 2),
   build: (p, f) => {
     const knowsFacings = p.facings != null;
     return draft({
@@ -267,7 +269,17 @@ const premiumWeakPresentation: KnowledgePlaybook = {
   testDesign: "Create a small premium block at eye level for two cheque cycles.",
   minTestDurationDays: 28, successMetrics: ["premium units/revenue up"], failureMetrics: ["no change"],
   confidenceCeiling: "medium", basis: "retail_heuristic", version: 1,
-  match: (p) => p.tier === "premium",
+  // fire only when presentation is UNKNOWN or actually weak — never nag a
+  // premium product already in a strong zone/level
+  match: (p) => {
+    if (p.tier !== "premium") return false;
+    const zoneKnown = p.displayZone != null;
+    const levelKnown = p.shelfLevel != null;
+    if (!zoneKnown && !levelKnown) return true;                    // unknown → worth a look
+    const goodZone = ["premium_block", "counter", "entrance"].includes(p.displayZone ?? "");
+    const goodLevel = p.shelfLevel === "eye";
+    return !(goodZone || goodLevel);                              // weak placement only
+  },
   build: (p, f) => {
     const knowsZone = p.displayZone != null || p.shelfLevel != null;
     return draft({
@@ -469,7 +481,9 @@ const marginRecoveryReview: KnowledgePlaybook = {
   testDesign: "Test the new price (or a smaller pack) for two cheque cycles; watch units.",
   minTestDurationDays: 28, successMetrics: ["margin up, units hold"], failureMetrics: ["units fall sharply"],
   confidenceCeiling: "medium", basis: "retail_heuristic", version: 1,
-  match: (p, f) => p.marginPct != null && p.marginPct < floorOf(f) && p.revenueSharePct < 15 && p.revenueSharePct >= 1 && p.hasCost && (p.growthPct == null || p.growthPct >= -5),
+  // NOT for growing products — those get the mini-bag playbook, avoiding a
+  // duplicate pricing recommendation on the same product
+  match: (p, f) => p.marginPct != null && p.marginPct < floorOf(f) && p.revenueSharePct < 15 && p.revenueSharePct >= 1 && p.hasCost && (p.growthPct == null || (p.growthPct >= -5 && p.growthPct <= 5)),
   build: (p, f) => draft({
     title: `Test a price on ${p.name} rather than commit to one`, domain: "pricing", type: "test_smaller_pack", product: p,
     observedFacts: [`${p.name} runs a ${pct(p.marginPct)} margin, below your ${floorOf(f)}% floor, on ${pct(p.revenueSharePct)} of revenue.`],

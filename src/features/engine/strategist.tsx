@@ -40,7 +40,7 @@ import { renderRecommendation } from "@/core/strategist/retail/nlg";
 import type { RetailRecommendation } from "@/core/strategist/retail/contract";
 import { createExperiment } from "@/core/strategist/persistence/experiments";
 import { nextQuestions, interviewProgress, type PendingQuestion } from "@/core/strategist/retail/interview";
-import { assembleInterviewState, markQuestionAnswered, saveRetailContext } from "@/core/strategist/persistence/retail-context";
+import { assembleInterviewState, markQuestionAnswered, saveRetailContext, listProductsForContext, setProductContext, listPackagingFormats, createPackagingFormat, type ProductContextRow } from "@/core/strategist/persistence/retail-context";
 import { assessWithdrawalV2, assessAffordability } from "@/core/strategist/analysis/affordability";
 import { computeCalendar } from "@/core/strategist/calendar";
 import { suggestQuestions } from "@/core/strategist/questions";
@@ -152,6 +152,7 @@ export function StrategistScreen() {
 
   const [drawer, setDrawer] = useState<Finding | null>(null);
   const [tuneOpen, setTuneOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   if (!en) return <EmptyState title="Sign in to load the strategist" />;
   if (snapQ.isError) {
@@ -182,7 +183,7 @@ export function StrategistScreen() {
         onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
         onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
       <ExecutiveBriefing s={s} report={report} weekly={weekly} />
-      <OwnerInterviewCard data={interviewQ.data ?? null}
+      <OwnerInterviewCard data={interviewQ.data ?? null} onOpenSetup={() => setSetupOpen(true)}
         onMarkUnknown={async (id) => { await markQuestionAnswered(id); qc.invalidateQueries({ queryKey: ["strategist-interview"] }); }}
         onAnswerList={async (id, field, values) => { await saveRetailContext({ [field]: values } as never); await markQuestionAnswered(id); qc.invalidateQueries({ queryKey: ["strategist-interview"] }); qc.invalidateQueries({ queryKey: ["strategist-retail"] }); reportSuccess("Owner knowledge", "Saved — advice will use it"); }} />
       <RetailAdvisor result={retailQ.data ?? null} loading={retailQ.isLoading}
@@ -241,6 +242,9 @@ export function StrategistScreen() {
         brief={opsQ.data?.brief ?? null} exceptions={opsQ.data?.exceptions ?? []} />
       <DecisionMode s={s} report={report} />
 
+      <RetailSetupModal open={setupOpen} onClose={() => setSetupOpen(false)}
+        onSaved={() => { qc.invalidateQueries({ queryKey: ["strategist-interview"] }); qc.invalidateQueries({ queryKey: ["strategist-retail"] }); }}
+        onError={(e) => reportError("Stand setup", e)} />
       <EvidenceDrawer finding={drawer} onClose={() => setDrawer(null)} />
       <TuneModal open={tuneOpen} onClose={() => setTuneOpen(false)}
         onSaved={() => { qc.invalidateQueries({ queryKey: ["snapshot-v2"] }); reportSuccess("Strategist", "Settings saved — snapshot refreshed"); }}
@@ -376,10 +380,11 @@ const QUESTION_FIELD: Record<string, string> = {
   occasions: "customerOccasions", operational_constraints: "operationalConstraints",
 };
 
-function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList }: {
+function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: {
   data: { questions: PendingQuestion[]; progress: { total: number; answered: number; pct: number } } | null;
   onMarkUnknown: (id: string) => Promise<void>;
   onAnswerList: (id: string, field: string, values: string[]) => Promise<void>;
+  onOpenSetup: () => void;
 }) {
   const [draftText, setDraftText] = useState<Record<string, string>>({});
   if (!data || data.questions.length === 0) {
@@ -387,7 +392,10 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList }: {
     return (
       <DeckTile>
         <div className="th"><span className="tname">Owner knowledge</span>
-          <span style={{ marginLeft: "auto" }}><Chip text={`${data.progress.pct}% complete`} color="var(--green)" /></span>
+          <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+            <Chip text={`${data.progress.pct}% complete`} color="var(--green)" />
+            <button style={MINI} onClick={onOpenSetup}>Edit stand</button>
+          </span>
         </div>
         <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>BostaOS has the context it needs right now. Answers make merchandising and packaging advice specific to your stand.</div>
       </DeckTile>
@@ -396,7 +404,10 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList }: {
   return (
     <DeckTile>
       <div className="th"><span className="tname">A few things only you know</span>
-        <span style={{ marginLeft: "auto" }}><Chip text={`${data.progress.answered}/${data.progress.total}`} color="rgb(var(--dim))" /></span>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <Chip text={`${data.progress.answered}/${data.progress.total}`} color="rgb(var(--dim))" />
+          <button style={MINI} onClick={onOpenSetup}>Set up my stand</button>
+        </span>
       </div>
       <div style={{ fontSize: 12, color: "rgb(var(--faint))", margin: "6px 0 10px" }}>Answering these makes advice specific to your real stand — BostaOS never guesses this.</div>
       <div className="space-y-2">
@@ -424,6 +435,99 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList }: {
         })}
       </div>
     </DeckTile>
+  );
+}
+
+/* ═══ STAND SETUP — finish the interview loop (Cycle 12) ═════════════ */
+
+const SELECT_STYLE: React.CSSProperties = { background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 8, padding: "5px 7px", fontSize: 12 };
+const numOrNull = (v: string) => (v.trim() === "" ? null : Number(v));
+
+function RetailSetupModal({ open, onClose, onSaved, onError }: { open: boolean; onClose: () => void; onSaved: () => void; onError: (e: unknown) => void }) {
+  const qc = useQueryClient();
+  const prodQ = useQuery({ queryKey: ["retail-setup-products"], queryFn: listProductsForContext, enabled: open });
+  const pkgQ = useQuery({ queryKey: ["retail-setup-packaging"], queryFn: listPackagingFormats, enabled: open });
+  const [pkg, setPkg] = useState({ name: "", type: "mini_bag", packSizeG: "", packageCost: "", prepCost: "", labelSealCost: "" });
+
+  const saveProd = async (id: string, patch: Parameters<typeof setProductContext>[1]) => {
+    try { await setProductContext(id, patch); qc.invalidateQueries({ queryKey: ["retail-setup-products"] }); onSaved(); }
+    catch (e) { onError(e); }
+  };
+  const addPkg = async () => {
+    try {
+      await createPackagingFormat({
+        name: pkg.name.trim(), packagingType: pkg.type, material: null, packSizeG: numOrNull(pkg.packSizeG),
+        packageCost: numOrNull(pkg.packageCost), prepCost: numOrNull(pkg.prepCost), labelSealCost: numOrNull(pkg.labelSealCost),
+        prepMinutes: null, premiumScore: null, impulseSuitable: pkg.type === "mini_bag" || pkg.type === "grab_and_go",
+        giftingSuitable: pkg.type === "gift" || pkg.type === "pouch", shelfSpace: null, displayZone: null,
+        seasonal: false, season: null, applicableProductIds: [], active: true,
+      });
+      setPkg({ name: "", type: "mini_bag", packSizeG: "", packageCost: "", prepCost: "", labelSealCost: "" });
+      qc.invalidateQueries({ queryKey: ["retail-setup-packaging"] }); onSaved();
+    } catch (e) { onError(e); }
+  };
+
+  const products = prodQ.data ?? [];
+  return (
+    <Modal open={open} onClose={onClose} title="Set up my stand" wide>
+      <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginBottom: 12 }}>
+        Tell BostaOS how your stand is physically merchandised and packaged. Every answer makes advice specific — and it's asked only once.
+      </div>
+
+      <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "rgb(var(--faint))", marginBottom: 6 }}>Packaging formats you offer</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+        <Input placeholder="Name (e.g. 150g mini)" value={pkg.name} onChange={(e) => setPkg({ ...pkg, name: e.target.value })} style={{ maxWidth: 150 }} />
+        <select value={pkg.type} onChange={(e) => setPkg({ ...pkg, type: e.target.value })} style={SELECT_STYLE}>
+          {["weighted", "prepacked", "mini_bag", "grab_and_go", "pouch", "gift", "sampling"].map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <Input placeholder="g" value={pkg.packSizeG} onChange={(e) => setPkg({ ...pkg, packSizeG: e.target.value })} style={{ maxWidth: 60 }} />
+        <Input placeholder="pkg cost" value={pkg.packageCost} onChange={(e) => setPkg({ ...pkg, packageCost: e.target.value })} style={{ maxWidth: 80 }} />
+        <Input placeholder="prep" value={pkg.prepCost} onChange={(e) => setPkg({ ...pkg, prepCost: e.target.value })} style={{ maxWidth: 60 }} />
+        <Input placeholder="label/seal" value={pkg.labelSealCost} onChange={(e) => setPkg({ ...pkg, labelSealCost: e.target.value })} style={{ maxWidth: 80 }} />
+        <button style={MINI} disabled={!pkg.name.trim()} onClick={() => void addPkg()}>Add</button>
+      </div>
+      {(pkgQ.data ?? []).length > 0 && (
+        <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginBottom: 14 }}>
+          Offered: {(pkgQ.data ?? []).map((f) => `${f.name} (${f.packagingType})`).join(" · ")}
+        </div>
+      )}
+
+      <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "rgb(var(--faint))", margin: "6px 0" }}>Per-product stand facts</div>
+      <div style={{ maxHeight: "40vh", overflowY: "auto" }}>
+        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+          <thead><tr style={{ color: "rgb(var(--faint))", textAlign: "left" }}>
+            <th style={{ padding: "4px 6px" }}>Product</th><th>Facings</th><th>Zone</th><th>Tier</th><th>Traffic</th><th>Keep</th>
+          </tr></thead>
+          <tbody>
+            {products.map((p) => <SetupRow key={p.id} p={p} onSave={saveProd} />)}
+          </tbody>
+        </table>
+        {prodQ.isLoading && <div style={{ fontSize: 12, color: "rgb(var(--dim))", padding: 8 }}>Loading products…</div>}
+      </div>
+      <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}><Button onClick={onClose}>Done</Button></div>
+    </Modal>
+  );
+}
+
+function SetupRow({ p, onSave }: { p: ProductContextRow; onSave: (id: string, patch: Parameters<typeof setProductContext>[1]) => Promise<void> }) {
+  const [facings, setFacings] = useState(p.facings == null ? "" : String(p.facings));
+  return (
+    <tr style={{ borderTop: "1px solid var(--stroke2)" }}>
+      <td style={{ padding: "4px 6px", color: "rgb(var(--text))" }}>{p.name}</td>
+      <td><Input value={facings} onChange={(e) => setFacings(e.target.value)} onBlur={() => void onSave(p.id, { facings: numOrNull(facings) })} style={{ maxWidth: 52, padding: "4px 6px" }} /></td>
+      <td>
+        <select defaultValue={p.displayZone ?? ""} onChange={(e) => void onSave(p.id, { displayZone: e.target.value || null })} style={SELECT_STYLE}>
+          <option value="">—</option>{["entrance", "counter", "aisle", "premium_block"].map((z) => <option key={z} value={z}>{z}</option>)}
+        </select>
+      </td>
+      <td>
+        <select defaultValue={p.tier ?? ""} onChange={(e) => void onSave(p.id, { tier: (e.target.value || null) as "premium" | "standard" | "value" | null })} style={SELECT_STYLE}>
+          <option value="">—</option>{["premium", "standard", "value"].map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </td>
+      <td style={{ textAlign: "center" }}><input type="checkbox" defaultChecked={p.isTrafficDriver} onChange={(e) => void onSave(p.id, { isTrafficDriver: e.target.checked })} /></td>
+      <td style={{ textAlign: "center" }}><input type="checkbox" defaultChecked={p.doNotDiscontinue} onChange={(e) => void onSave(p.id, { doNotDiscontinue: e.target.checked })} /></td>
+    </tr>
   );
 }
 

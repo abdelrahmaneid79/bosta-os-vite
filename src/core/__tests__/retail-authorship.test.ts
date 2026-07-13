@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateModelCandidate, ingestCandidates } from "@/core/strategist/retail/candidates";
-import { runRetailReasoning } from "@/core/strategist/retail/reasoning";
+import { runRetailReasoning, runReasoningWithCandidates } from "@/core/strategist/retail/reasoning";
 import { marginIntelligence, merchandisingPackagingIntelligence } from "@/core/strategist/retail/domains";
 import { renderRecommendation } from "@/core/strategist/retail/nlg";
 import type { ProductFact, RetailBusinessFacts } from "@/core/strategist/retail/contract";
@@ -60,6 +60,18 @@ describe("authorship boundary — the model may author ideas, not truth", () => 
     expect(r.evidence[0].value).toMatch(/%/);
   });
 
+  it("a validated model idea joins deterministic recs through the shared pipeline", () => {
+    const v = validateModelCandidate({
+      title: "Cashews beside Jelly", domain: "merchandising", type: "improve_adjacency", affectedProducts: ["Cashews"],
+      proposedAction: "Trial cashews beside jelly candy", reasoning: ["Jelly drives traffic."],
+      testDesign: "Two cheque cycles.", successCriteria: ["profit per facing up"], failureCriteria: ["jelly dips"],
+    }, facts);
+    if (!v.ok) throw new Error("expected valid");
+    const { accepted } = runReasoningWithCandidates(facts, OPTS, [v.candidate]);
+    expect(accepted.some((r) => r.source === "model_reasoning")).toBe(true);
+    expect(accepted.some((r) => r.source === "deterministic_knowledge")).toBe(true); // both sources, one pipeline
+  });
+
   it("a model idea that violates a cash constraint is rejected by the same gate", () => {
     const v = validateModelCandidate({
       title: "Buy cashews now", domain: "purchase", type: "buy_now", affectedProducts: ["Cashews"],
@@ -83,7 +95,7 @@ describe("provenance labelling", () => {
 
 describe("reference domain engines", () => {
   const facts = F([
-    P({ name: "Almonds", marginPct: 16, revenueSharePct: 8, growthPct: 12, profitSharePct: 4 }),   // margin/pricing/packaging
+    P({ name: "Almonds", marginPct: 16, revenueSharePct: 8, growthPct: 0, profitSharePct: 4 }),    // margin/pricing (not growing → margin-recovery)
     P({ name: "Pecans", profitSharePct: 22, facings: 1 }),                                          // shelf
     P({ name: "Bulk Raisins", profitSharePct: 2, facings: 4 }),                                     // shelf
   ]);

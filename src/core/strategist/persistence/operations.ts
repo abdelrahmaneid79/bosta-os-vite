@@ -102,15 +102,6 @@ export async function confirmNoTradingDay(locationId: string | null, date: strin
   });
 }
 
-/** Mark completed closes stale when their underlying records changed. */
-export async function markCloseStale(locationId: string | null, date: string, reason: string): Promise<void> {
-  const q = requireEngine().from("daily_closes")
-    .update({ is_stale: true, stale_reason: reason, updated_at: new Date().toISOString() })
-    .eq("close_date", date).is("voided_at", null);
-  const { error } = await byLoc(q, locationId);
-  if (error) throw error;
-}
-
 /* ── overdue accepted actions (recommendation execution tracking) ─────── */
 
 export interface OverdueAction { id: string; title: string; screenLink: string; amount: number | null }

@@ -85,6 +85,26 @@ describe("owner category facts change the advice", () => {
   });
 });
 
+describe("recommendation quality refinements (Cycle 12)", () => {
+  it("caps recommendations per product (no flooding)", () => {
+    const recs = runRetailReasoning(F([P({ name: "Pistachios", tier: "premium", marginPct: 18, revenueSharePct: 5, growthPct: 0 })]), { ...OPTS, maxPerProduct: 1 });
+    expect(recs.filter((r) => r.affectedProducts[0] === "Pistachios").length).toBeLessThanOrEqual(1);
+  });
+  it("does not nag a premium product already well-placed", () => {
+    const recs = runRetailReasoning(F([P({ name: "Cashews", tier: "premium", displayZone: "premium_block", shelfLevel: "eye" })]), OPTS);
+    expect(pick(recs, "premium-weak-presentation")).toBeUndefined();
+  });
+  it("does not tell a profit driver with ample facings to add more", () => {
+    const recs = runRetailReasoning(F([P({ name: "Cashews", profitSharePct: 22, facings: 5 })]), OPTS);
+    expect(pick(recs, "profit-driver-low-space")).toBeUndefined();
+  });
+  it("a growing below-floor product gets the mini-bag, not a duplicate margin-recovery", () => {
+    const recs = runRetailReasoning(F([growing()]), OPTS);
+    expect(pick(recs, "growing-margin-below-floor")).toBeTruthy();
+    expect(pick(recs, "margin-recovery-review")).toBeUndefined();
+  });
+});
+
 describe("supplier + purchase-timing context playbooks", () => {
   it("quantity-break tier recommended when cover leaves room", () => {
     const r = pick(runRetailReasoning(F([P({ name: "Cashews", daysCover: 20, quantityBreaks: [{ minQty: 50, unitCost: 90 }, { minQty: 100, unitCost: 82 }] })]), OPTS), "supplier-quantity-break")!;

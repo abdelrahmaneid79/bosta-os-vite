@@ -73,6 +73,21 @@ export async function setProductContext(productId: string, p: ProductContextPatc
   if (error) throw error;
 }
 
+export interface ProductContextRow {
+  id: string; name: string; facings: number | null; displayZone: string | null;
+  tier: string | null; isTrafficDriver: boolean; doNotDiscontinue: boolean;
+}
+export async function listProductsForContext(): Promise<ProductContextRow[]> {
+  const { data, error } = await requireEngine().from("products")
+    .select("id,name_en,facings,display_zone,tier,is_traffic_driver,do_not_discontinue")
+    .eq("active", true).order("name_en");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id, name: r.name_en, facings: r.facings, displayZone: r.display_zone,
+    tier: r.tier, isTrafficDriver: r.is_traffic_driver ?? false, doNotDiscontinue: r.do_not_discontinue ?? false,
+  }));
+}
+
 /* ── packaging-format catalog ─────────────────────────────────────────── */
 
 export interface PackagingFormat {
