@@ -6,6 +6,7 @@ import { setAppSetting } from "@/core/db/mutations";
 import type { Finding } from "../analysis/types";
 import type { StrategistResponse } from "../response";
 import { planInsightSync, isDuplicateAction, type InsightLite, type InsightStatus, type ActionLite } from "./lifecycle";
+import { planOutcomeEvaluation, type ActionOutcomeRow } from "./outcomes";
 
 /* ── insights ─────────────────────────────────────────────────────────── */
 
@@ -88,6 +89,8 @@ export interface ActionRow {
   category: string; priority: string; status: string; dueDate: string | null;
   screenLink: string; expectedOutcome: string | null; completionNote: string | null;
   createdAt: string; completedAt: string | null;
+  outcomeState: string; successCriteria: string | null; reviewDate: string | null;
+  outcomeMetrics: Record<string, unknown> | null;
 }
 const mapAction = (r: Record<string, unknown>): ActionRow => ({
   id: r.id as string, title: r.title as string, description: r.description as string,
@@ -96,6 +99,10 @@ const mapAction = (r: Record<string, unknown>): ActionRow => ({
   dueDate: r.due_date as string | null, screenLink: r.screen_link as string,
   expectedOutcome: r.expected_outcome as string | null, completionNote: r.completion_note as string | null,
   createdAt: r.created_at as string, completedAt: r.completed_at as string | null,
+  outcomeState: (r.outcome_state as string) ?? "not_started",
+  successCriteria: r.success_criteria as string | null,
+  reviewDate: r.review_date as string | null,
+  outcomeMetrics: r.outcome_metrics as Record<string, unknown> | null,
 });
 
 export interface NewAction {
@@ -103,6 +110,9 @@ export interface NewAction {
   findingId?: string | null; conversationId?: string | null; category?: string;
   priority?: "high" | "medium" | "low"; dueDate?: string | null;
   screenLink?: string; expectedOutcome?: string | null; status?: "suggested" | "accepted";
+  /** the originating finding — captured as the immutable outcome baseline */
+  baselineFinding?: Finding | null;
+  reviewPeriodDays?: number;
 }
 
 /** Create an action; silently returns the existing one on a duplicate open finding. */
@@ -113,12 +123,18 @@ export async function createAction(a: NewAction): Promise<{ created: boolean }> 
     const existing: ActionLite[] = (data ?? []).map((r) => ({ id: r.id, findingId: r.finding_id, status: r.status }));
     if (isDuplicateAction(existing, a.findingId)) return { created: false };
   }
+  const f = a.baselineFinding ?? null;
+  const reviewDays = a.reviewPeriodDays ?? 14;
+  const reviewDate = new Date(Date.now() + reviewDays * 86_400_000).toISOString().slice(0, 10);
   const { error } = await sb.from("strategist_actions").insert({
     title: a.title, description: a.description ?? "", source: a.source,
     finding_id: a.findingId ?? null, conversation_id: a.conversationId ?? null,
     category: a.category ?? "general", priority: a.priority ?? "medium",
     status: a.status ?? "accepted", due_date: a.dueDate ?? null,
     screen_link: a.screenLink ?? "/health", expected_outcome: a.expectedOutcome ?? null,
+    baseline: f ? ({ period: f.evidence[0]?.period ?? "", capturedAt: new Date().toISOString(), impactEgp: f.impactEgp, evidence: f.evidence, findingId: f.id, resolutionCriteria: f.resolutionCriteria } as never) : null,
+    success_criteria: f?.resolutionCriteria ?? null,
+    review_date: f ? reviewDate : null,
   });
   if (error) {
     if (error.code === "23505") return { created: false }; // race with the unique index
@@ -194,6 +210,33 @@ export async function getMessages(conversationId: string): Promise<MessageRow[]>
     content: r.content as MessageRow["content"],
     snapshotMeta: r.snapshot_meta as MessageRow["snapshotMeta"], createdAt: r.created_at,
   }));
+}
+
+/* ── recommendation outcomes ──────────────────────────────────────────── */
+
+/** Evaluate accepted recommendations against the CURRENT engine output.
+ *  Deterministic — the LLM never judges whether a recommendation worked. */
+export async function syncOutcomes(currentFindings: Finding[], today: string, coverageOk: boolean): Promise<number> {
+  const sb = requireEngine();
+  const { data, error } = await sb.from("strategist_actions")
+    .select("id,finding_id,status,outcome_state,baseline,review_date")
+    .not("finding_id", "is", null).not("baseline", "is", null);
+  if (error) throw error;
+  const rows: ActionOutcomeRow[] = (data ?? []).map((r) => ({
+    id: r.id, findingId: r.finding_id, status: r.status,
+    outcomeState: (r.outcome_state ?? "not_started") as ActionOutcomeRow["outcomeState"],
+    baseline: r.baseline as ActionOutcomeRow["baseline"],
+    reviewDate: r.review_date,
+  }));
+  const plan = planOutcomeEvaluation(rows, currentFindings, today, coverageOk);
+  for (const u of plan) {
+    const { error: e } = await sb.from("strategist_actions").update({
+      outcome_state: u.outcomeState, outcome_metrics: u.outcomeMetrics as never,
+      evaluated_at: new Date().toISOString(),
+    }).eq("id", u.actionId);
+    if (e) throw e;
+  }
+  return plan.length;
 }
 
 /* ── feedback ─────────────────────────────────────────────────────────── */

@@ -56,10 +56,24 @@ const STATUS_LINE: Record<string, string> = {
   insufficient_data: "The books can't answer this yet",
 };
 
+function rootCauseLine(req: LanguageRequest): string | null {
+  const rc = req.report.revenueContribution;
+  if (!rc.available || (rc.positive.length === 0 && rc.negative.length === 0)) return null;
+  const dir = rc.totalChange >= 0 ? "growth" : "decline";
+  const top = (rc.totalChange >= 0 ? rc.positive : rc.negative).slice(0, 3);
+  if (!top.length) return null;
+  const drivers = top.map((d) => `${d.name} (${d.delta >= 0 ? "+" : "−"}${egp(Math.abs(d.delta))})`).join(", ");
+  const expl = rc.explainedPct != null ? ` — product detail explains ${rc.explainedPct}% of the change` : "";
+  return `Root cause of the revenue ${dir}: ${drivers}${expl}${rc.unexplained !== 0 ? `; ${egp(Math.abs(rc.unexplained))} sits on days without product detail` : ""}.`;
+}
+
 function briefing(req: LanguageRequest): StrategistResponse {
   const ex = req.report.executive;
   const parts: string[] = [ex.statusReason];
-  if (ex.mostUrgentAction) parts.push(`First move: ${ex.mostUrgentAction.action}`);
+  const rc = rootCauseLine(req);
+  if (rc) parts.push(rc);
+  if (req.weeklyPriority?.primary) parts.push(`This week's priority: ${req.weeklyPriority.primary.action}`);
+  else if (ex.mostUrgentAction) parts.push(`First move: ${ex.mostUrgentAction.action}`);
   const picked = [ex.headline, ex.topRisk, ex.topOpportunity, ex.topDataIssue]
     .filter((f): f is Finding => !!f)
     .filter((f, i, a) => a.findIndex((x) => x.id === f.id) === i)
@@ -135,8 +149,18 @@ function answerQuestion(req: LanguageRequest): StrategistResponse {
     const picked = req.findings.filter((f) =>
       (intent.ids?.includes(f.id) ?? false) || (intent.classes?.includes(f.class) ?? false)).slice(0, 4);
     if (picked.length) {
+      const extras: string[] = [];
+      if (/margin|هامش|ربح/i.test(q)) {
+        const d = req.report.decomposition;
+        if (d.available) extras.push(`Decomposition of the gross-profit change: volume ${egp(d.volumeEffect)}, price ${egp(d.priceEffect)}, mix ${egp(d.mixEffect)}, cost ${egp(d.costEffect)}, unexplained ${egp(d.residual)} (coverage ${d.coverage}%).`);
+        else if (d.reason) extras.push(`Volume/price/mix/cost split unavailable: ${d.reason}.`);
+        const pc = req.report.profitContribution;
+        if (pc.available && pc.negative.length) extras.push(`Biggest profit drags: ${pc.negative.slice(0, 3).map((x) => `${x.name} (−${egp(Math.abs(x.delta))})`).join(", ")}.`);
+      }
+      const rc = rootCauseLine(req);
+      if (/revenue|sales|drop|بتتحسن|improving/i.test(q) && rc) extras.push(rc);
       return base(req, intent.headline,
-        `Deterministic answer from the current books (${req.report.period}). Each item links to its evidence.`,
+        [`Deterministic answer from the current books (${req.report.period}). Each item links to its evidence.`, ...extras].join(" "),
         picked);
     }
     return base(req, intent.headline,
@@ -192,8 +216,23 @@ export class DeterministicProvider implements LanguageProvider {
           suggestedQuestions: ["How much can I safely withdraw this month?"],
         };
       }
-      case "product_strategy":
-        return byClasses(req, ["opportunity"], ["growth-driver", "decline-driver", "stock-risk", "missing-costs"], "Product economics — deterministic view");
+      case "product_strategy": {
+        const r = req.report;
+        const resp = byClasses(req, ["opportunity"], ["growth-driver", "decline-driver", "stock-risk", "missing-costs"], "Product economics — deterministic view");
+        const bits: string[] = [];
+        if (r.portfolio.available) {
+          const stars = r.portfolio.classifications.filter((c) => c.tags.includes("star")).map((c) => c.name);
+          const fix = r.portfolio.classifications.filter((c) => c.tags.includes("review_pricing")).map((c) => c.name);
+          const grow = r.shelf.filter((x) => x.verdict === "expand_consideration").slice(0, 3).map((x) => x.name);
+          if (stars.length) bits.push(`Carrying the portfolio: ${stars.slice(0, 4).join(", ")}.`);
+          if (fix.length) bits.push(`Pricing review queue: ${fix.slice(0, 4).join(", ")} (below your margin floor).`);
+          if (grow.length) bits.push(`Shelf-space review (relative priority — no shelf dimensions recorded): ${grow.join(", ")}.`);
+          if (r.purchaseReviews.length) bits.push(`Purchase review: ${r.purchaseReviews.slice(0, 3).map((x) => `${x.name} — ${x.kind === "no_stock_position" ? "record a count first" : x.why}`).join(" · ")}.`);
+        } else if (r.portfolio.reason) {
+          bits.push(`Portfolio classification unavailable: ${r.portfolio.reason}.`);
+        }
+        return { ...resp, conclusion: [resp.conclusion, ...bits].join(" ") };
+      }
       case "cash_review":
         return byClasses(req, [], ["profit-up-cash-low", "cash-not-tracked", "withdrawals-high"], "Cash review — deterministic view");
       case "cheque_review":

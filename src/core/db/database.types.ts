@@ -1352,33 +1352,6 @@ export type Database = {
           },
         ]
       }
-      report_extractions: {
-        Row: {
-          branch_total_net: number | null
-          created_at: string
-          lines: Json
-          model: string | null
-          sale_date: string
-          updated_at: string
-        }
-        Insert: {
-          branch_total_net?: number | null
-          created_at?: string
-          lines?: Json
-          model?: string | null
-          sale_date: string
-          updated_at?: string
-        }
-        Update: {
-          branch_total_net?: number | null
-          created_at?: string
-          lines?: Json
-          model?: string | null
-          sale_date?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       sale_items: {
         Row: {
           cogs_at_sale: number | null
@@ -1675,8 +1648,45 @@ export type Database = {
           },
         ]
       }
+      source_documents: {
+        Row: {
+          captured_at: string
+          created_at: string
+          id: string
+          kind: string
+          model: string | null
+          notes: string | null
+          raw: Json
+          ref: string
+          updated_at: string
+        }
+        Insert: {
+          captured_at?: string
+          created_at?: string
+          id?: string
+          kind: string
+          model?: string | null
+          notes?: string | null
+          raw?: Json
+          ref: string
+          updated_at?: string
+        }
+        Update: {
+          captured_at?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          model?: string | null
+          notes?: string | null
+          raw?: Json
+          ref?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       strategist_actions: {
         Row: {
+          baseline: Json | null
           category: string
           completed_at: string | null
           completion_note: string | null
@@ -1685,16 +1695,22 @@ export type Database = {
           description: string
           dismissed_at: string | null
           due_date: string | null
+          evaluated_at: string | null
           expected_outcome: string | null
           finding_id: string | null
           id: string
+          outcome_metrics: Json | null
+          outcome_state: string
           priority: string
+          review_date: string | null
           screen_link: string
           source: string
           status: string
+          success_criteria: string | null
           title: string
         }
         Insert: {
+          baseline?: Json | null
           category?: string
           completed_at?: string | null
           completion_note?: string | null
@@ -1703,16 +1719,22 @@ export type Database = {
           description?: string
           dismissed_at?: string | null
           due_date?: string | null
+          evaluated_at?: string | null
           expected_outcome?: string | null
           finding_id?: string | null
           id?: string
+          outcome_metrics?: Json | null
+          outcome_state?: string
           priority?: string
+          review_date?: string | null
           screen_link?: string
           source: string
           status?: string
+          success_criteria?: string | null
           title: string
         }
         Update: {
+          baseline?: Json | null
           category?: string
           completed_at?: string | null
           completion_note?: string | null
@@ -1721,13 +1743,18 @@ export type Database = {
           description?: string
           dismissed_at?: string | null
           due_date?: string | null
+          evaluated_at?: string | null
           expected_outcome?: string | null
           finding_id?: string | null
           id?: string
+          outcome_metrics?: Json | null
+          outcome_state?: string
           priority?: string
+          review_date?: string | null
           screen_link?: string
           source?: string
           status?: string
+          success_criteria?: string | null
           title?: string
         }
         Relationships: [

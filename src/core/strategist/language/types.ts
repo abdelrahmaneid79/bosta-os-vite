@@ -6,6 +6,7 @@ import type { Finding } from "../analysis/types";
 import type { StrategyReport } from "../analysis/report";
 import type { DecisionContext } from "../analysis/decision";
 import type { CalendarContext } from "../calendar";
+import type { WeeklyPriority } from "../analysis/priority";
 import type { StrategistResponse } from "../response";
 
 export type LanguageMode =
@@ -26,6 +27,8 @@ export interface LanguageRequest {
   history?: { role: "user" | "assistant"; content: string }[];
   /** compact owner-memory facts (behavioral, never business numbers) */
   memory?: string[];
+  /** weekly priority (needs persistence inputs, so the caller computes it) */
+  weeklyPriority?: WeeklyPriority;
 }
 
 export class StrategistAuthError extends Error {

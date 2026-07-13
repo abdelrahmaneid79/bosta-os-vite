@@ -80,5 +80,17 @@ Edge fn `business-strategist` v5 (structured) is DEPLOYED with verify_jwt; anon 
 ## Performance (measured where possible)
 Engine + report build: ~1–5 ms on realistic fixtures (test timings). Snapshot assembly (~19 paged reads) and insight sync require the owner's session — live numbers appear in Tune → Diagnostics (snapshot/engine/sync/language ms, fallback + repair counts). Optimize only if the diagnostics show pain; candidates: server-composed snapshot, memoized month readouts.
 
-## Cycle 6 candidates (Layer 2 first)
-1. Root-cause contribution analysis (per-product deltas explaining revenue/margin moves once two covered periods exist). 2. Cash-safety reasoning upgrades when the first drawer counts arrive. 3. Product portfolio classification (grow/hold/fix/drop with resolution tracking). 4. Recommendation outcome tracking (action completed → did the metric move?). 5. Purchase recommendation foundations (needs live inventory). 6. Live-provider verification + prompt tuning against real responses.
+## Cycle 6 (SHIPPED) — root-cause & product intelligence
+All in `analysis/products.ts` + `analysis/priority.ts` + `persistence/outcomes.ts`, pure and provider-independent; carried on StrategyReport:
+- **Contribution**: per-product revenue/GP deltas with share, concentration, explained vs UNEXPLAINED slice; refuses below 60% coverage. Production-validated on Apr→May 2025 (100% coverage): Δ −4,418 fully explained, broad decline led by فول اسواني (−4,365) while GP stayed ≈flat (mix shifted to candy).
+- **Decomposition**: GP change → volume/price/mix/cost effects on observed per-product prices+costs; residual stays visible; refuses under 3 comparable products.
+- **Portfolio classification**: multi-tag (star/volume/profit driver/HVLM/LVHM/weak/declining/emerging/stock-risk/cost-unknown/data-insufficient/dormant/review-*) with reason, action, resolution criteria per product; thresholds labeled owner-confirmed/system-default/derived (Tune: margin floor, dead-stock, stockout, max-cover, review period, cheque age, priority focus — confirmation dates stamped).
+- **Shelf priority**: relative score → expand/maintain/reduce/investigate/insufficient; explicit "no shelf dimensions recorded" caveat; never invents facings.
+- **Pricing reviews**: below-floor/price-inconsistency/demand-vs-margin signals; break-even + target-margin price only when cost is known; "demand response unknown — test before full rollout" always.
+- **Purchase reviews**: days-of-cover from tracked stock+velocity; stockout/excess signals; with untracked inventory (production today) → DATA-FIRST actions ("record a count for X"), never invented quantities.
+- **Outcome tracking** (migration 0034, additive on strategist_actions): baseline captured at acceptance (finding evidence verbatim + impact + resolution criteria), review date = +reviewPeriodDays; deterministic verdicts (gone→improved / +25% impact→worsened / review-due→no-change / coverage-collapse→awaiting-data / dismissed→cancelled) with the attribution caveat stored. The LLM never judges outcomes.
+- **Weekly priority**: 1 primary + ≤2 secondary; cash-safety outranks opportunities; dismissed issues stay suppressed unless materially worse; open actions become "finish the queued action"; "monitor" only when nothing actionable exists.
+- Validation script: `npx vite-node scripts/_validate_cycle6.ts <real-products.json>`.
+
+## Cycle 7 candidates
+1. Live-provider verification (credits) + prompt tuning with the enriched report. 2. Cash-safety reasoning once drawer counts exist. 3. Purchase quantities once inventory is live (units/lead-time/safety-stock policy). 4. Outcome-informed recommendations (engine learns which action types resolve fastest). 5. Seasonality-aware baselines (Ramadan-adjusted comparisons using the calendar).

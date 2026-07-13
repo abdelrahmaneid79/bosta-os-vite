@@ -22,6 +22,8 @@ import { assembleSnapshotV2 } from "@/core/strategist/snapshot-v2";
 import type { Finding } from "@/core/strategist/analysis/types";
 import type { StrategistSnapshot } from "@/core/strategist/contract";
 import { buildStrategyReport, type StrategyReport } from "@/core/strategist/analysis/report";
+import { selectWeeklyPriority } from "@/core/strategist/analysis/priority";
+import { MIN_ATTRIBUTION_COVERAGE } from "@/core/strategist/analysis/products";
 import { assessWithdrawal } from "@/core/strategist/analysis/withdrawal";
 import { computeCalendar } from "@/core/strategist/calendar";
 import { suggestQuestions } from "@/core/strategist/questions";
@@ -34,7 +36,7 @@ import {
   syncInsights, listInsights, setInsightStatus, type InsightRow,
   createAction, listActions, updateActionStatus, type ActionRow,
   createConversation, addMessage, getMessages, listConversations,
-  recordFeedback, getCachedBriefing, saveCachedBriefing, listRecentFeedback,
+  recordFeedback, getCachedBriefing, saveCachedBriefing, listRecentFeedback, syncOutcomes,
 } from "@/core/strategist/persistence/store";
 import { buildOwnerMemory } from "@/core/strategist/persistence/lifecycle";
 
@@ -89,8 +91,12 @@ export function StrategistScreen() {
     const key = `${s.meta.period.label}|${s.meta.lastDataDate}`;
     if (syncedFor.current === key) return;
     syncedFor.current = key;
-    timed("syncMs", () => syncInsights(findings, s.meta.period.label))
-      .then(() => qc.invalidateQueries({ queryKey: ["strategist-insights"] }))
+    const coverageOk = (s.products.coveragePct.value ?? 0) >= MIN_ATTRIBUTION_COVERAGE;
+    timed("syncMs", async () => {
+      await syncInsights(findings, s.meta.period.label);
+      await syncOutcomes(findings, todayCairo(), coverageOk);
+    })
+      .then(() => { qc.invalidateQueries({ queryKey: ["strategist-insights"] }); qc.invalidateQueries({ queryKey: ["strategist-actions"] }); })
       .catch(() => { syncedFor.current = null; });
   }, [s, findings, qc]);
 
@@ -109,6 +115,12 @@ export function StrategistScreen() {
 
   const insights = insightsQ.data ?? [];
   const insightByFinding = new Map(insights.map((i) => [i.findingId, i]));
+  const actions = actionsQ.data ?? [];
+  const weekly = selectWeeklyPriority(report, {
+    dismissed: insights.filter((i) => i.status === "dismissed").map((i) => ({ findingId: i.findingId, impactEgp: i.impactEgp })),
+    openActionFindingIds: actions.filter((a) => ["suggested", "accepted", "in_progress"].includes(a.status) && a.findingId).map((a) => a.findingId as string),
+    reviewPeriodDays: 14,
+  });
 
   return (
     <div className="cdk space-y-5">
@@ -116,7 +128,18 @@ export function StrategistScreen() {
         right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
 
       <FreshnessStrip s={s} />
-      <ExecutiveBriefing s={s} report={report} />
+      <ExecutiveBriefing s={s} report={report} weekly={weekly} />
+      <WeeklyPriorityCard weekly={weekly} onQueue={async (item) => {
+        const f = findings.find((x) => x.id === item.findingId);
+        const res = await createAction({
+          title: f?.action?.title ?? item.action, description: item.action, source: "finding",
+          findingId: item.findingId, category: f?.class ?? "general",
+          priority: "high", screenLink: item.screenLink, expectedOutcome: item.expectedOutcome,
+          status: "accepted", baselineFinding: f ?? null,
+        });
+        reportSuccess("Action queue", res.created ? "Queued this week's priority" : "Already queued");
+        qc.invalidateQueries({ queryKey: ["strategist-actions"] });
+      }} />
       <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
         onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
         onAccept={async (f) => {
@@ -125,10 +148,12 @@ export function StrategistScreen() {
             title: a?.title ?? f.title, description: a?.action ?? f.detail, source: "finding",
             findingId: f.id, category: f.class, priority: f.urgency === "today" ? "high" : f.urgency === "this_week" ? "medium" : "low",
             screenLink: a?.screenLink ?? "/health", expectedOutcome: a?.expectedImpact ?? null, status: "accepted",
+            baselineFinding: f,
           });
           reportSuccess("Action queue", res.created ? "Added to your action queue" : "Already in your queue");
           qc.invalidateQueries({ queryKey: ["strategist-actions"] });
         }} />
+      <ProductStrategy report={report} />
       <ActionQueue actions={actionsQ.data ?? []} onUpdate={async (id, status, note) => {
         await updateActionStatus(id, status, note); qc.invalidateQueries({ queryKey: ["strategist-actions"] });
       }} />
@@ -173,7 +198,7 @@ function FreshnessStrip({ s }: { s: StrategistSnapshot }) {
 
 /* ═══ EXECUTIVE BRIEFING ══════════════════════════════════════════════ */
 
-function ExecutiveBriefing({ s, report }: { s: StrategistSnapshot; report: StrategyReport }) {
+function ExecutiveBriefing({ s, report, weekly }: { s: StrategistSnapshot; report: StrategyReport; weekly: ReturnType<typeof selectWeeklyPriority> }) {
   const { reportError } = useUI();
   const findings = report.findings;
   const [ai, setAi] = useState<{ response: StrategistResponse; cached: boolean; snapshotLabel: string; provider?: string; fallbackReason?: string } | null>(null);
@@ -193,7 +218,7 @@ function ExecutiveBriefing({ s, report }: { s: StrategistSnapshot; report: Strat
     setAiState("loading");
     try {
       const result: LanguageResult = await generateLanguage(
-        { mode: "daily_brief", snapshot: s, report, findings, calendar: computeCalendar(todayCairo()) },
+        { mode: "daily_brief", snapshot: s, report, findings, calendar: computeCalendar(todayCairo()), weeklyPriority: weekly },
         { enhanced: true },
       );
       if (result.fallback) timings.fallbacks += 1;
@@ -264,6 +289,18 @@ function ExecutiveBriefing({ s, report }: { s: StrategistSnapshot; report: Strat
         </div>
       ) : (
         <p style={{ marginTop: 10, fontSize: 13.5, color: "rgb(var(--dim))" }}>No findings — the books look steady for {s.meta.period.label}.</p>
+      )}
+
+      {report.revenueContribution.available && (report.revenueContribution.positive.length > 0 || report.revenueContribution.negative.length > 0) && (
+        <div style={{ marginTop: 12, fontSize: 12.5, color: "rgb(var(--muted))", lineHeight: 1.55 }}>
+          <span style={{ color: "rgb(var(--faint))", fontWeight: 700, textTransform: "uppercase", fontSize: 10.5, letterSpacing: 0.5 }}>Root cause · </span>
+          {(report.revenueContribution.totalChange >= 0 ? report.revenueContribution.positive : report.revenueContribution.negative).slice(0, 3)
+            .map((d) => `${d.name} (${d.delta >= 0 ? "+" : "−"}${egp(Math.abs(d.delta))})`).join(" · ")}
+          {report.revenueContribution.explainedPct != null && <span style={{ color: "rgb(var(--dim))" }}> — explains {report.revenueContribution.explainedPct}% of the revenue change{report.revenueContribution.unexplained !== 0 ? `; ${egp(Math.abs(report.revenueContribution.unexplained))} on days without product detail` : ""}</span>}
+        </div>
+      )}
+      {!report.revenueContribution.available && report.revenueContribution.reason && (
+        <div style={{ marginTop: 12, fontSize: 12, color: "rgb(var(--dim))" }}>Root-cause attribution unavailable: {report.revenueContribution.reason}.</div>
       )}
 
       {/* deterministic status row — always shown, AI or not */}
@@ -423,7 +460,8 @@ function ActionQueue({ actions, onUpdate }: { actions: ActionRow[]; onUpdate: (i
             <div style={{ flex: 1, minWidth: 180 }}>
               <div style={{ fontSize: 13, fontWeight: 700 }}>{a.title}</div>
               {a.description && <div style={{ fontSize: 11.5, color: "rgb(var(--dim))" }}>{a.description}</div>}
-              <div style={{ fontSize: 10.5, color: "rgb(var(--faint))" }}>{a.source === "owner" ? "yours" : `from ${a.source}`} · {fmtDate(a.createdAt.slice(0, 10))}{a.dueDate ? ` · due ${fmtDate(a.dueDate)}` : ""}</div>
+              <div style={{ fontSize: 10.5, color: "rgb(var(--faint))" }}>{a.source === "owner" ? "yours" : `from ${a.source}`} · {fmtDate(a.createdAt.slice(0, 10))}{a.dueDate ? ` · due ${fmtDate(a.dueDate)}` : ""}{a.reviewDate ? ` · outcome review ${fmtDate(a.reviewDate)}` : ""}</div>
+              {a.outcomeState !== "not_started" && <div style={{ marginTop: 3 }}><Chip text={a.outcomeState.replace(/_/g, " ")} color={a.outcomeState === "improved" ? "var(--green)" : a.outcomeState === "worsened" ? "var(--red)" : "rgb(var(--dim))"} /></div>}
             </div>
             <Link to={a.screenLink} style={{ fontSize: 11.5, color: "var(--mag)", fontWeight: 700 }}>Open</Link>
             {a.status !== "in_progress" && <button style={MINI} onClick={() => void onUpdate(a.id, "in_progress")}>Start</button>}
@@ -745,6 +783,134 @@ function KV({ k, v }: { k: string; v: string }) {
   );
 }
 
+/* ═══ WEEKLY PRIORITY ═════════════════════════════════════════════════ */
+
+function WeeklyPriorityCard({ weekly, onQueue }: { weekly: ReturnType<typeof selectWeeklyPriority>; onQueue: (item: NonNullable<ReturnType<typeof selectWeeklyPriority>["primary"]>) => Promise<void> }) {
+  const [showSecondary, setShowSecondary] = useState(false);
+  const p = weekly.primary;
+  if (!p) return null;
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">This week's priority</span>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <Chip text={`${p.effort} effort`} color="rgb(var(--dim))" />
+          <Chip text={CONF_LABEL[p.confidence] ?? p.confidence} color="rgb(var(--dim))" />
+        </span>
+      </div>
+      <div className="disp" style={{ fontSize: 16, fontWeight: 700, marginTop: 8 }}>{p.action}</div>
+      <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 5, lineHeight: 1.5 }}>{p.reason}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8, fontSize: 11.5, color: "rgb(var(--dim))" }}>
+        {p.evidence.map((e, i) => <span key={i}>{e.label}: <b style={{ color: "rgb(var(--muted))" }}>{e.value}</b></span>)}
+      </div>
+      <div style={{ fontSize: 11.5, color: "rgb(var(--dim))", marginTop: 8 }}>
+        Success: {p.successCriteria} · {p.reviewTiming} · expected: {p.expectedOutcome}
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <Link to={p.screenLink} style={{ fontSize: 12, color: "var(--mag)", fontWeight: 700 }}>Open screen</Link>
+        {!p.alreadyQueued && <button className="addbtn" style={{ fontSize: 11.5, padding: "3px 10px" }} onClick={() => void onQueue(p)}>+ Queue it</button>}
+        {p.alreadyQueued && <Chip text="Already in your queue" color="rgb(var(--cyan))" />}
+        {weekly.secondary.length > 0 && (
+          <button style={MINI} onClick={() => setShowSecondary((v) => !v)}>{showSecondary ? "Hide" : `+${weekly.secondary.length} secondary`}</button>
+        )}
+      </div>
+      {showSecondary && weekly.secondary.map((sx) => (
+        <div key={sx.findingId} style={{ marginTop: 10, borderTop: "1px solid var(--stroke2)", paddingTop: 8, fontSize: 12.5 }}>
+          <b>{sx.action}</b><span style={{ color: "rgb(var(--dim))" }}> — {sx.reason}</span>
+        </div>
+      ))}
+      {weekly.note && <div style={{ fontSize: 11, color: "rgb(var(--faint))", marginTop: 8 }}>{weekly.note}</div>}
+    </DeckTile>
+  );
+}
+
+/* ═══ PRODUCT STRATEGY (progressive disclosure) ═══════════════════════ */
+
+const TAG_LABEL: Record<string, string> = {
+  star: "Star", volume_driver: "Volume driver", profit_driver: "Profit driver",
+  high_volume_low_margin: "High volume · low margin", low_volume_high_margin: "High margin · low volume",
+  weak: "Weak", declining: "Declining", emerging: "Emerging", stock_risk: "Stock risk",
+  cost_unknown: "Cost unknown", data_insufficient: "Thin data", dormant: "Dormant",
+  review_pricing: "Review pricing", review_purchasing: "Review purchasing", review_shelf_space: "Review shelf",
+};
+
+function ProductStrategy({ report }: { report: StrategyReport }) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<string | null>(null);
+  const pf = report.portfolio;
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">Product strategy</span>
+        <span className="eyebrow" style={{ marginLeft: "auto" }}>
+          {pf.available ? `${pf.classifications.length} products · ${report.pricingReviews.length} pricing · ${report.purchaseReviews.length} purchase reviews` : "unavailable"}
+        </span>
+      </div>
+      {!pf.available ? (
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>{pf.reason}</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+            {report.shelf.filter((x) => x.verdict === "expand_consideration").slice(0, 3).map((x) => <Chip key={x.name} text={`↑ ${x.name}`} color="var(--green)" />)}
+            {report.pricingReviews.slice(0, 3).map((x) => <Chip key={x.name} text={`£ ${x.name}`} color="var(--amber)" />)}
+            {report.purchaseReviews.slice(0, 3).map((x) => <Chip key={x.name} text={`⇄ ${x.name}`} color="rgb(var(--cyan))" />)}
+            <button style={{ ...MINI, marginLeft: "auto" }} onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Full analysis"}</button>
+          </div>
+          {open && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11, color: "rgb(var(--faint))", marginBottom: 8 }}>
+                Thresholds: {pf.thresholds.map((t) => `${t.name} ${t.value} (${t.basis})`).join(" · ")}
+              </div>
+              <div className="space-y-2">
+                {pf.classifications.slice(0, 20).map((c) => (
+                  <div key={c.name} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "8px 12px" }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                      <button onClick={() => setDetail(detail === c.name ? null : c.name)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{c.name}</button>
+                      {c.tags.slice(0, 3).map((t) => <Chip key={t} text={TAG_LABEL[t] ?? t} color={t === "star" || t === "emerging" ? "var(--green)" : t.startsWith("review") || t === "declining" || t === "stock_risk" ? "var(--amber)" : "rgb(var(--dim))"} />)}
+                      <span style={{ marginLeft: "auto", fontSize: 11.5, color: "rgb(var(--dim))" }} className="tnum">{egp(c.revenue)}{c.marginPct != null ? ` · ${c.marginPct}%` : " · margin unknown"}</span>
+                    </div>
+                    {detail === c.name && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: "rgb(var(--muted))", lineHeight: 1.55 }}>
+                        <div>{c.reasons.join(" · ")}</div>
+                        <div style={{ marginTop: 4, color: "rgb(var(--text))", fontWeight: 600 }}>→ {c.recommendedAction}</div>
+                        <div style={{ marginTop: 2, color: "rgb(var(--dim))" }}>Success: {c.resolutionCriteria} · sells {c.frequencyPct}% of days{c.trendPct != null ? ` · trend ${c.trendPct > 0 ? "+" : ""}${c.trendPct}%` : ""} · coverage {c.coveragePct}%</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {report.pricingReviews.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Pricing review queue</div>
+                  {report.pricingReviews.map((r) => (
+                    <div key={r.name} style={{ fontSize: 12, color: "rgb(var(--muted))", marginTop: 6, lineHeight: 1.5 }}>
+                      <b style={{ color: "rgb(var(--text))" }}>{r.name}</b> — {r.signals[0]}.
+                      {r.priceForTargetMargin != null && <> Min price for {r.targetMarginPct}% margin: <b className="tnum">{egp(r.priceForTargetMargin)}</b> (break-even {egp(r.breakEvenPrice ?? 0)}).</>}
+                      {r.missing.length > 0 && <span style={{ color: "var(--amber)" }}> Missing: {r.missing.join(", ")}.</span>}
+                      <span style={{ color: "rgb(var(--dim))" }}> {r.risk}.</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {report.purchaseReviews.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Purchase review queue</div>
+                  {report.purchaseReviews.map((r) => (
+                    <div key={r.name} style={{ fontSize: 12, color: "rgb(var(--muted))", marginTop: 6, lineHeight: 1.5 }}>
+                      <b style={{ color: "rgb(var(--text))" }}>{r.name}</b> — {r.why}. <span style={{ color: "rgb(var(--text))" }}>{r.nextStep}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {report.shelf.length > 0 && (
+                <div style={{ marginTop: 12, fontSize: 11, color: "rgb(var(--faint))" }}>{report.shelf[0].caveat}.</div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </DeckTile>
+  );
+}
+
 /* ═══ TUNE (owner context) ════════════════════════════════════════════ */
 
 function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose: () => void; onSaved: () => void; onError: (e: unknown) => void }) {
@@ -761,7 +927,17 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
   }, [open, loaded]);
 
   const save = useMutation({
-    mutationFn: async () => { await saveOwnerContext(form); await saveLanguageSettings(lang); },
+    mutationFn: async () => {
+      // stamp a confirmation date on every field the owner actually set —
+      // that's what flips its basis from "estimated default" to "confirmed"
+      const today = new Date().toISOString().slice(0, 10);
+      const confirmedAt = { ...(form.confirmedAt ?? {}) };
+      for (const [k, v] of Object.entries(form)) {
+        if (k !== "confirmedAt" && v !== undefined && v !== null && v !== "") confirmedAt[k] = confirmedAt[k] ?? today;
+      }
+      await saveOwnerContext({ ...form, confirmedAt });
+      await saveLanguageSettings(lang);
+    },
     onSuccess: () => { onSaved(); onClose(); },
     onError,
   });
@@ -770,13 +946,23 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
   return (
     <Modal open={open} onClose={onClose} title="Tune the strategist">
       <div className="space-y-3">
-        <p style={{ fontSize: 12, color: "rgb(var(--dim))" }}>Anything left empty uses a documented default — the strategist says so whenever it relies on one.</p>
+        <p style={{ fontSize: 12, color: "rgb(var(--dim))" }}>Anything left empty uses a documented default — the strategist says so whenever it relies on one. These settings drive: withdrawal verdicts (cash floor), pricing reviews (margin floor), purchase urgency (stockout/max-cover), dormant flags (dead-stock), outcome reviews (review period) and cheque chasing (overdue age).</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <Field label="Monthly revenue target (EGP)"><Input type="number" value={form.monthlyRevenueTarget ?? ""} onChange={(e) => setForm({ ...form, monthlyRevenueTarget: num(e.target.value) })} /></Field>
           <Field label="Monthly profit target (EGP)"><Input type="number" value={form.monthlyProfitTarget ?? ""} onChange={(e) => setForm({ ...form, monthlyProfitTarget: num(e.target.value) })} /></Field>
           <Field label="Cash reserve floor (EGP)"><Input type="number" placeholder="25000" value={form.cashReserveFloor ?? ""} onChange={(e) => setForm({ ...form, cashReserveFloor: num(e.target.value) })} /></Field>
           <Field label="Gross-margin floor (%)"><Input type="number" placeholder="25" value={form.grossMarginFloorPct ?? ""} onChange={(e) => setForm({ ...form, grossMarginFloorPct: num(e.target.value) })} /></Field>
           <Field label="Stockout tolerance (days)"><Input type="number" placeholder="7" value={form.stockoutToleranceDays ?? ""} onChange={(e) => setForm({ ...form, stockoutToleranceDays: num(e.target.value) })} /></Field>
+          <Field label="Max stock cover (days)"><Input type="number" placeholder="45" value={form.maxStockCoverDays ?? ""} onChange={(e) => setForm({ ...form, maxStockCoverDays: num(e.target.value) })} /></Field>
+          <Field label="Dead-stock threshold (days)"><Input type="number" placeholder="30" value={form.deadStockDays ?? ""} onChange={(e) => setForm({ ...form, deadStockDays: num(e.target.value) })} /></Field>
+          <Field label="Outcome review period (days)"><Input type="number" placeholder="14" value={form.reviewPeriodDays ?? ""} onChange={(e) => setForm({ ...form, reviewPeriodDays: num(e.target.value) })} /></Field>
+          <Field label="Cheque overdue after (days)"><Input type="number" placeholder="45" value={form.maxChequeAgeDays ?? ""} onChange={(e) => setForm({ ...form, maxChequeAgeDays: num(e.target.value) })} /></Field>
+          <Field label="Right now, what matters more?">
+            <select value={form.priorityFocus ?? "balanced"} onChange={(e) => setForm({ ...form, priorityFocus: e.target.value as OwnerContextAnswers["priorityFocus"] })}
+              style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
+              <option value="balanced">Balanced</option><option value="growth">Growth</option><option value="cash_preservation">Cash preservation</option>
+            </select>
+          </Field>
           <Field label="Strategy style">
             <select value={form.aggressiveness ?? "balanced"} onChange={(e) => setForm({ ...form, aggressiveness: e.target.value as OwnerContextAnswers["aggressiveness"] })}
               style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>

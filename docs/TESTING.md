@@ -5,7 +5,7 @@ _Updated 2026-07-13 (replaces the 2026-06 checklist — superseded sections live
 ## Gates (all must pass before push)
 ```bash
 npm run typecheck   # tsc -b (strict, noUnusedLocals)
-npm run test        # vitest — 280 tests / 23 files
+npm run test        # vitest — 311 tests / 24 files
 npm run build       # tsc -b && vite build
 ```
 (`lint` was removed — eslint was never installed/configured; typecheck is the gate.)
@@ -27,6 +27,7 @@ npm run build       # tsc -b && vite build
 ## Manual QA
 Settings → **QA checklist** (`/qa`, now reachable from nav) — interactive checklist updated 2026-07-13 to match real screen names and flows. DB-level verification queries live in `supabase/tests/`.
 
+- **Cycle 6 product intelligence** (`strategist-cycle6.test.ts`, 31 tests): contribution (growth/decline/low-coverage-refusal/missing-cost exclusion/determinism), decomposition (volume/price/cost-led + refusals), classification (all tags, thresholds labeled, stock-risk gated on tracked inventory), shelf caveats, pricing (target price, no fabricated targets, price-drift flags, owner off-switch), purchasing (data-first when untracked, days-of-cover, excess stock), weekly priority (cash outranks pricing, suppression, queued-action awareness), outcomes (improved/worsened/awaiting-data/cancelled/no-re-eval).
 - **Language layer** (`strategist-language.test.ts`, 15 tests): deterministic templates without credentials, fake-provider plug-in (proves provider independence), router fallback on throw/unavailable/invented-number/over-confidence/budget, grounding validator.
 - **Strategy report** (`strategy-report.test.ts`, 10 tests): executive status transitions, confidence-ceiling degradation, persistence eligibility, price/employee/memory-override/settlement/cash-unavailable scenarios.
 
