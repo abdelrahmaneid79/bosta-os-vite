@@ -11,6 +11,8 @@ import {
   type ContributionAnalysis, type Decomposition, type PortfolioAnalysis,
   type ShelfPriority, type PricingReview, type PurchaseReview,
 } from "./products";
+import { buildObligationCalendar, composeCashState, cashFindings, type CashState, type ObligationCalendar, type AcceptedCommitment } from "./cash";
+import { projectCash, computeRunway, type CashProjection, type RunwayResult } from "./forecast-cash";
 
 export type BusinessStatus = "healthy" | "attention" | "critical" | "insufficient_data";
 
@@ -42,14 +44,21 @@ export interface StrategyReport {
   shelf: ShelfPriority[];
   pricingReviews: PricingReview[];
   purchaseReviews: PurchaseReview[];
+  /** Cycle 7 — cash intelligence (deterministic, never one collapsed balance) */
+  cash: CashState;
+  obligations: ObligationCalendar;
+  cashProjection: CashProjection;
+  runway: RunwayResult;
   /** the highest confidence ANY consumer may claim about this report */
   maxConfidence: FindingConfidence;
 }
 
 const CONF_ORDER: FindingConfidence[] = ["low", "medium", "high"];
 
-export function buildStrategyReport(s: StrategistSnapshot): StrategyReport {
-  const findings = analyzeSnapshot(s);
+export function buildStrategyReport(s: StrategistSnapshot, accepted: AcceptedCommitment[] = []): StrategyReport {
+  const obligations = buildObligationCalendar(s, accepted);
+  const cash = composeCashState(s, obligations);
+  const findings = analyzeSnapshot(s, cashFindings(s, cash, obligations));
   const portfolio = classifyPortfolio(s);
 
   const risky = (f: Finding) => f.class === "warning" || f.class === "contradiction" || f.class === "decision_risk";
@@ -110,6 +119,10 @@ export function buildStrategyReport(s: StrategistSnapshot): StrategyReport {
     shelf: shelfPriorities(portfolio),
     pricingReviews: pricingReviews(s),
     purchaseReviews: purchaseReviews(s),
+    cash,
+    obligations,
+    cashProjection: projectCash(s, cash, obligations, 30),
+    runway: computeRunway(s, cash),
     maxConfidence,
   };
 }

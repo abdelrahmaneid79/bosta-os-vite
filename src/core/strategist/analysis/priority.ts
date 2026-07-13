@@ -93,10 +93,10 @@ export function selectWeeklyPriority(report: StrategyReport, inputs: PriorityInp
       + ((f.id === "profit-up-cash-low" || f.id === "withdrawals-high") ? 15 : 0),
   })).sort((a, b) => b.score - a.score);
 
-  const monitorFallback = report.findings.find((f) => f.id === "steady-state");
   if (scored.length === 0) {
+    const anchor = report.findings.find((f) => f.id === "steady-state") ?? report.findings[0] ?? null;
     return {
-      primary: monitorFallback ? { ...toItem(monitorFallback, false, inputs.reviewPeriodDays), action: "No action needed — the books are steady. Keep the daily totals current.", effort: "low" } : null,
+      primary: anchor ? { ...toItem(anchor, false, inputs.reviewPeriodDays), action: "No action needed — the books are steady. Keep the daily totals current.", effort: "low" } : null,
       secondary: [], suppressed,
       note: "Nothing actionable above thresholds this week.",
     };

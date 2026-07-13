@@ -288,6 +288,13 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
       priorOperatingTotal: metric(r0(i.profitCompare.operatingExpenses), "read/expenses.getOperatingExpenseTotal", C, "/expenses"),
       categories: metric(expCats, "read/expenses.getExpenseCategoryTrends", `${C} vs ${P}`, "/expenses", { basis: "calculated" }),
       spikes: metric(spikes, "read/expenses.getExpenseCategoryTrends", `${C} vs ${P}`, "/expenses", { basis: "calculated", note: ">30% and >EGP 1,000 above prior period" }),
+      recurringMonthly: metric(
+        expCats.filter((c) => c.value > 0 && c.priorValue > 0)
+          .map((c) => ({ name: c.name, avgMonthly: r0((c.value + c.priorValue) / 2), isOperating: !/inventory|stock|مخزون/i.test(c.name) }))
+          .sort((a, b) => b.avgMonthly - a.avgMonthly),
+        "read/expenses.getExpenseCategoryTrends", `${C} & ${P}`, "/expenses",
+        { basis: "calculated", confidence: "medium", note: "derived: categories present in BOTH recent periods; average of the two; inventory-like categories flagged non-operating" },
+      ),
       withdrawals: metric(r0(i.cashSummary.withdrawals), "read/money.getCashSummary", P, "/money", { note: "NEVER part of operating expenses" }),
     },
     cash: {
@@ -308,6 +315,9 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
       injections: missing("money_movements", P, "/money", "no owner injections recorded yet"),
       lastCountDate: i.latestCashCount
         ? metric(i.latestCashCount.date, "cash_reconciliations", "latest", "/money")
+        : missing("cash_reconciliations", "all-time", "/money", "never counted"),
+      countAgeDays: i.latestCashCount
+        ? metric(Math.max(0, Math.round((Date.parse(i.today) - Date.parse(i.latestCashCount.date)) / 86_400_000)), "cash_reconciliations", "latest", "/money", { basis: "calculated" })
         : missing("cash_reconciliations", "all-time", "/money", "never counted"),
       hasLiveData: cashHasData,
     },
@@ -334,6 +344,26 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
       lastChequeDate: lastCheque
         ? metric(lastCheque.date, "settlement/cheque-cycle.getChequeCycle", "latest", "/cheques")
         : missing("cheques", "all-time", "/cheques", "no cheques recorded"),
+      interChequeGapDays: (() => {
+        const dates = i.cycle.cheques.map((c) => c.date).sort();
+        if (dates.length < 4) return missing("cheques", "all-time", "/cheques", "not enough cheques to establish the rhythm");
+        const gaps = dates.slice(1).map((d, k) => Math.round((Date.parse(d) - Date.parse(dates[k])) / 86_400_000)).filter((g) => g > 0).sort((a, b) => a - b);
+        return metric(gaps[Math.floor(gaps.length / 2)], "cheques (median gap)", "all-time", "/cheques", { basis: "calculated", confidence: "medium" });
+      })(),
+      nextChequeEta: (() => {
+        const dates = i.cycle.cheques.map((c) => c.date).sort();
+        if (dates.length < 4 || !lastCheque) return missing("cheques", "all-time", "/cheques", "cannot estimate without a cheque rhythm");
+        const gaps = dates.slice(1).map((d, k) => Math.round((Date.parse(d) - Date.parse(dates[k])) / 86_400_000)).filter((g) => g > 0).sort((a, b) => a - b);
+        const gap = gaps[Math.floor(gaps.length / 2)];
+        const eta = new Date(Date.parse(lastCheque.date) + gap * 86_400_000).toISOString().slice(0, 10);
+        return metric(eta, "cheques (last + median gap)", "estimate", "/cheques", { basis: "estimated", confidence: "medium", note: "the mall pays on its own schedule — this is the historical rhythm, not a promise" });
+      })(),
+      monthlyRentDeduction: (() => {
+        const rents = i.statements.filter((st) => st.rent > 0).slice(0, 3).map((st) => st.rent);
+        return rents.length
+          ? metric(r0(rents.reduce((a, b) => a + b, 0) / rents.length), "read/settlements (recent periods)", "monthly", "/settlements", { note: "DEDUCTED from the settlement cheque by the mall — never a cash outflow" })
+          : missing("settlement_deductions", "monthly", "/settlements", "no rent deductions recorded");
+      })(),
     },
     dataQuality: {
       issues: dq,

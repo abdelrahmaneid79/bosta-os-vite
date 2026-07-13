@@ -21,6 +21,10 @@ export interface OwnerContextAnswers {
   reviewPeriodDays?: number;
   maxChequeAgeDays?: number;
   priorityFocus?: "growth" | "cash_preservation" | "balanced";
+  reserveType?: "fixed" | "days_of_costs" | "higher_of_both";
+  cashCountFreshnessDays?: number;
+  downsideSalesPct?: number;
+  allowExpectedCashForOptional?: boolean;
   /** field → ISO date the owner confirmed it (Tune stamps this) */
   confirmedAt?: Record<string, string>;
   aggressiveness?: "conservative" | "balanced" | "aggressive";
@@ -50,6 +54,10 @@ export const CONTEXT_DEFAULTS = {
   reviewPeriodDays: 14,                        // recommendation outcome review window
   maxChequeAgeDays: 45,                        // settlement older than this is overdue
   priorityFocus: "balanced" as const,
+  reserveType: "higher_of_both" as const,      // reserve = max(fixed floor, N days of operating costs)
+  cashCountFreshnessDays: 7,                   // a drawer count older than this is stale
+  downsideSalesPct: -25,                       // downside scenario: sales this much below run-rate
+  allowExpectedCashForOptional: false,         // optional spends must fit VERIFIED cash by default
   aggressiveness: "balanced" as const,
   allowPriceRecommendations: true,
   challengeOwner: true,
@@ -90,6 +98,10 @@ export function composeContext(answers: OwnerContextAnswers | null, period: stri
     reviewPeriodDays: pick(a.reviewPeriodDays, CONTEXT_DEFAULTS.reviewPeriodDays),
     maxChequeAgeDays: pick(a.maxChequeAgeDays, CONTEXT_DEFAULTS.maxChequeAgeDays),
     priorityFocus: pick<"growth" | "cash_preservation" | "balanced">(a.priorityFocus, CONTEXT_DEFAULTS.priorityFocus),
+    reserveType: pick<"fixed" | "days_of_costs" | "higher_of_both">(a.reserveType, CONTEXT_DEFAULTS.reserveType),
+    cashCountFreshnessDays: pick(a.cashCountFreshnessDays, CONTEXT_DEFAULTS.cashCountFreshnessDays),
+    downsideSalesPct: pick(a.downsideSalesPct, CONTEXT_DEFAULTS.downsideSalesPct),
+    allowExpectedCashForOptional: pick(a.allowExpectedCashForOptional, CONTEXT_DEFAULTS.allowExpectedCashForOptional),
     aggressiveness: pick<"conservative" | "balanced" | "aggressive">(a.aggressiveness, CONTEXT_DEFAULTS.aggressiveness),
     allowPriceRecommendations: pick(a.allowPriceRecommendations, CONTEXT_DEFAULTS.allowPriceRecommendations),
     challengeOwner: pick(a.challengeOwner, CONTEXT_DEFAULTS.challengeOwner),

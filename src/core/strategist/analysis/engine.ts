@@ -453,7 +453,7 @@ export function dataQualityFindings(s: StrategistSnapshot): Finding[] {
     }));
   }
 
-  if (!s.cash.hasLiveData) {
+  if (!s.cash.hasLiveData && s.cash.latestCount.value == null) {
     out.push(finding({
       id: "cash-not-tracked", class: "data_quality",
       title: "Cash is not being tracked yet",
@@ -594,13 +594,14 @@ export function rankFindings(findings: Finding[]): Finding[] {
 
 /* ═══ THE PIPELINE ════════════════════════════════════════════════════ */
 
-export function analyzeSnapshot(s: StrategistSnapshot): Finding[] {
+export function analyzeSnapshot(s: StrategistSnapshot, extraFindings: Finding[] = []): Finding[] {
   const found = [
     ...detectChanges(s),
     ...findDrivers(s),
     ...findContradictions(s),
     ...dataQualityFindings(s),
     ...findOpportunities(s),
+    ...extraFindings,
   ];
   if (found.length === 0) {
     found.push(finding({

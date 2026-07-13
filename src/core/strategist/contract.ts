@@ -155,6 +155,8 @@ export interface ExpensesBlock {
   priorOperatingTotal: Metric;
   categories: Metric<(NamedValue & { priorValue: number; changePct: number | null })[]>;
   spikes: Metric<(NamedValue & { changePct: number })[]>;
+  /** categories seen in BOTH recent periods — the recurring cash obligations */
+  recurringMonthly: Metric<{ name: string; avgMonthly: number; isOperating: boolean }[]>;
   withdrawals: Metric;         // SEPARATE — never inside operatingTotal
 }
 
@@ -167,6 +169,8 @@ export interface CashBlock {
   withdrawals: Metric;
   injections: Metric;
   lastCountDate: Metric<string>;
+  /** days since the latest count; null = never counted */
+  countAgeDays: Metric;
   hasLiveData: boolean;        // false today: no live movements/counts
 }
 
@@ -179,6 +183,12 @@ export interface ChequesBlock {
   unmatchedCheques: Metric;
   averageDelayDays: Metric;
   lastChequeDate: Metric<string>;
+  /** median days between consecutive cheques — the settlement rhythm */
+  interChequeGapDays: Metric;
+  /** deterministic ETA for the next cheque (last cheque + gap) */
+  nextChequeEta: Metric<string>;
+  /** rent is DEDUCTED FROM THE CHEQUE by the mall — never a cash outflow */
+  monthlyRentDeduction: Metric;
 }
 
 export interface DataQualityIssue { issue: string; affectedEgp: number | null; screenLink: string }
@@ -207,6 +217,10 @@ export interface BusinessContext {
   reviewPeriodDays: Metric;
   maxChequeAgeDays: Metric;
   priorityFocus: Metric<"growth" | "cash_preservation" | "balanced">;
+  reserveType: Metric<"fixed" | "days_of_costs" | "higher_of_both">;
+  cashCountFreshnessDays: Metric;
+  downsideSalesPct: Metric;
+  allowExpectedCashForOptional: Metric<boolean>;
   aggressiveness: Metric<"conservative" | "balanced" | "aggressive">;
   allowPriceRecommendations: Metric<boolean>;
   challengeOwner: Metric<boolean>;

@@ -80,18 +80,24 @@ export function makeSnapshot(over: DeepPartial<StrategistSnapshot> = {}): Strate
     expenses: {
       operatingTotal: m(21_000), priorOperatingTotal: m(20_000),
       categories: m([]), spikes: m([] as { name: string; value: number; changePct: number }[]),
+      recurringMonthly: m([
+        { name: "Salary", avgMonthly: 5_700, isOperating: true },
+        { name: "Inventory purchases", avgMonthly: 20_000, isOperating: false },
+      ]),
       withdrawals: metric(5_000, "test", P, "/money", { note: "NEVER part of operating expenses" }),
     },
     cash: {
       expectedBalance: metric(60_000, "read/money.getCashPosition", "now", "/money"), latestCount: m(59_500), unexplainedDifference: m(-500),
       inflows: m(120_000), outflows: m(70_000), withdrawals: m(5_000),
       injections: missing("test", P, "/money", "none recorded"),
-      lastCountDate: m("2026-05-30"), hasLiveData: true,
+      lastCountDate: m("2026-05-30"), countAgeDays: m(3), hasLiveData: true,
     },
     cheques: {
       totalReceived: m(2_594_202), openTabGross: m(95_000), openTabEstimatedNet: m(78_000),
       blendedDeductionPct: m(17.5), overduePeriods: m([] as string[]), unmatchedCheques: m(0),
       averageDelayDays: m(38), lastChequeDate: m("2026-05-15"),
+      interChequeGapDays: m(31), nextChequeEta: m("2026-06-15"),
+      monthlyRentDeduction: metric(15_000, "read/settlements", "monthly", "/settlements", { note: "DEDUCTED from the settlement cheque by the mall — never a cash outflow" }),
     },
     dataQuality: {
       issues: [], missingCostLines: m(0), uncoveredRevenueAllTime: m(4_000),
