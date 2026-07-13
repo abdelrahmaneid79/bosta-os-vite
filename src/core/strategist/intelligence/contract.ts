@@ -23,7 +23,7 @@ export type { Evidence, FindingConfidence, Urgency } from "../analysis/types";
 
 /** The specialist domains. One engine owns exactly one domain. */
 export type RetailDomain =
-  | "revenue" | "margin" | "pricing" | "promotion" | "inventory" | "purchase"
+  | "revenue" | "margin" | "pricing" | "promotion" | "inventory" | "purchase" | "packaging"
   | "supplier" | "category" | "shelf" | "basket" | "seasonality" | "merchandising"
   | "cash" | "cheque" | "operational" | "growth" | "risk" | "decision" | "recommendation";
 
@@ -86,7 +86,7 @@ export function contractViolations(f: Partial<DomainFinding>): string[] {
 }
 
 export const RETAIL_DOMAINS: RetailDomain[] = [
-  "revenue", "margin", "pricing", "promotion", "inventory", "purchase", "supplier",
+  "revenue", "margin", "pricing", "promotion", "inventory", "purchase", "packaging", "supplier",
   "category", "shelf", "basket", "seasonality", "merchandising", "cash", "cheque",
   "operational", "growth", "risk", "decision", "recommendation",
 ];

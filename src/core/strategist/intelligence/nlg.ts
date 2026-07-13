@@ -33,7 +33,7 @@ const REC_CONNECTORS = ["Recommended:", "The move here:", "What to do:", "Act on
 
 const DOMAIN_LABEL: Record<RetailDomain, string> = {
   revenue: "Revenue", margin: "Margin", pricing: "Pricing", promotion: "Promotion",
-  inventory: "Inventory", purchase: "Purchasing", supplier: "Supplier", category: "Category",
+  inventory: "Inventory", purchase: "Purchasing", packaging: "Packaging", supplier: "Supplier", category: "Category",
   shelf: "Shelf space", basket: "Basket", seasonality: "Seasonality", merchandising: "Merchandising",
   cash: "Cash", cheque: "Cheque", operational: "Operations", growth: "Growth", risk: "Risk",
   decision: "Decision", recommendation: "Recommendation",
