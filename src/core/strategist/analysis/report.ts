@@ -5,6 +5,12 @@ import type { StrategistSnapshot } from "../contract";
 import type { Finding, FindingConfidence } from "./types";
 import { analyzeSnapshot } from "./engine";
 import { computeDecisionContext, type DecisionContext } from "./decision";
+import {
+  analyzeContribution, decomposeChange, classifyPortfolio, shelfPriorities,
+  pricingReviews, purchaseReviews,
+  type ContributionAnalysis, type Decomposition, type PortfolioAnalysis,
+  type ShelfPriority, type PricingReview, type PurchaseReview,
+} from "./products";
 
 export type BusinessStatus = "healthy" | "attention" | "critical" | "insufficient_data";
 
@@ -28,6 +34,14 @@ export interface StrategyReport {
   contradictions: Finding[];      // subset, convenience
   dataQuality: Finding[];         // subset, convenience
   decisionContext: DecisionContext;
+  /** Cycle 6 — root-cause & product intelligence (all deterministic) */
+  revenueContribution: ContributionAnalysis;
+  profitContribution: ContributionAnalysis;
+  decomposition: Decomposition;
+  portfolio: PortfolioAnalysis;
+  shelf: ShelfPriority[];
+  pricingReviews: PricingReview[];
+  purchaseReviews: PurchaseReview[];
   /** the highest confidence ANY consumer may claim about this report */
   maxConfidence: FindingConfidence;
 }
@@ -36,6 +50,7 @@ const CONF_ORDER: FindingConfidence[] = ["low", "medium", "high"];
 
 export function buildStrategyReport(s: StrategistSnapshot): StrategyReport {
   const findings = analyzeSnapshot(s);
+  const portfolio = classifyPortfolio(s);
 
   const risky = (f: Finding) => f.class === "warning" || f.class === "contradiction" || f.class === "decision_risk";
   const topRisk = findings.find(risky) ?? null;
@@ -88,6 +103,13 @@ export function buildStrategyReport(s: StrategistSnapshot): StrategyReport {
     contradictions: findings.filter((f) => f.class === "contradiction"),
     dataQuality: findings.filter((f) => f.class === "data_quality"),
     decisionContext: computeDecisionContext(s),
+    revenueContribution: analyzeContribution(s, "revenue"),
+    profitContribution: analyzeContribution(s, "grossProfit"),
+    decomposition: decomposeChange(s),
+    portfolio,
+    shelf: shelfPriorities(portfolio),
+    pricingReviews: pricingReviews(s),
+    purchaseReviews: purchaseReviews(s),
     maxConfidence,
   };
 }

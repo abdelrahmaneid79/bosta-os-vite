@@ -102,8 +102,34 @@ export interface ProductEntry {
   marginPct: number | null;
   missingCost: boolean;
 }
+/** Full per-product period record — the contribution/classification input.
+ *  daysSold uses sale-line count (lines are per-day-per-product aggregates
+ *  from the POS daily reports, so lines ≈ trading days with a sale). */
+export interface ProductPeriodEntry extends ProductEntry {
+  cogs: number;
+  daysSold: number;
+}
+/** Live per-product position: list price, weighted cost, stock. */
+export interface ProductPositionEntry {
+  name: string;
+  sellingPrice: number | null;
+  avgCost: number;      // 0 = unknown (WAC never established)
+  hasCost: boolean;
+  onHand: number;
+  isLow: boolean;
+  vendor: string | null;
+}
 export interface ProductsBlock {
-  coveragePct: Metric;                       // % of period revenue with product lines
+  coveragePct: Metric;
+  /** full current-period product detail (all mapped products, uncapped) */
+  detail: Metric<ProductPeriodEntry[]>;
+  /** full comparison-period product detail */
+  compareDetail: Metric<ProductPeriodEntry[]>;
+  /** trading days in the period / comparison period (frequency denominators) */
+  periodDays: Metric;
+  comparePeriodDays: Metric;
+  /** live positions (price/cost/stock) for active products */
+  positions: Metric<ProductPositionEntry[]>;                       // % of period revenue with product lines
   topRevenue: Metric<ProductEntry[]>;
   topGrossProfit: Metric<ProductEntry[]>;
   highestMargin: Metric<ProductEntry[]>;
@@ -176,6 +202,11 @@ export interface BusinessContext {
   strategicProducts: Metric<string[]>;
   productsToGrow: Metric<string[]>;
   stockoutToleranceDays: Metric;
+  maxStockCoverDays: Metric;
+  deadStockDays: Metric;
+  reviewPeriodDays: Metric;
+  maxChequeAgeDays: Metric;
+  priorityFocus: Metric<"growth" | "cash_preservation" | "balanced">;
   aggressiveness: Metric<"conservative" | "balanced" | "aggressive">;
   allowPriceRecommendations: Metric<boolean>;
   challengeOwner: Metric<boolean>;

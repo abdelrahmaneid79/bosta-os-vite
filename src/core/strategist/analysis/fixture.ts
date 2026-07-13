@@ -43,6 +43,26 @@ export function makeSnapshot(over: DeepPartial<StrategistSnapshot> = {}): Strate
     },
     products: {
       coveragePct: m(96.5),
+      detail: metric([
+        { name: "سوداني", revenue: 30_000, units: 400, grossProfit: 12_000, marginPct: 40, missingCost: false, cogs: 18_000, daysSold: 26 },
+        { name: "كاجو", revenue: 22_000, units: 90, grossProfit: 11_000, marginPct: 50, missingCost: false, cogs: 11_000, daysSold: 20 },
+        { name: "بندق", revenue: 15_000, units: 60, grossProfit: 5_250, marginPct: 35, missingCost: false, cogs: 9_750, daysSold: 15 },
+        { name: "بونبون", revenue: 8_000, units: 500, grossProfit: 1_600, marginPct: 20, missingCost: false, cogs: 6_400, daysSold: 24 },
+      ], "read/products.getProductProfit", P, "/reports", { confidence: "high", completeness: 96.5 }),
+      compareDetail: metric([
+        { name: "سوداني", revenue: 27_000, units: 360, grossProfit: 10_800, marginPct: 40, missingCost: false, cogs: 16_200, daysSold: 25 },
+        { name: "كاجو", revenue: 21_000, units: 86, grossProfit: 10_500, marginPct: 50, missingCost: false, cogs: 10_500, daysSold: 19 },
+        { name: "بندق", revenue: 16_000, units: 64, grossProfit: 5_600, marginPct: 35, missingCost: false, cogs: 10_400, daysSold: 16 },
+        { name: "بونبون", revenue: 7_500, units: 470, grossProfit: 1_500, marginPct: 20, missingCost: false, cogs: 6_000, daysSold: 23 },
+      ], "read/products.getProductProfit", C, "/reports", { confidence: "high", completeness: 95 }),
+      periodDays: m(31),
+      comparePeriodDays: m(30),
+      positions: metric([
+        { name: "سوداني", sellingPrice: 75, avgCost: 45, hasCost: true, onHand: 40, isLow: false, vendor: "Nut Man" },
+        { name: "كاجو", sellingPrice: 260, avgCost: 130, hasCost: true, onHand: 12, isLow: false, vendor: "Nut Man" },
+        { name: "بندق", sellingPrice: 240, avgCost: 156, hasCost: true, onHand: 8, isLow: false, vendor: "Nut Man" },
+        { name: "بونبون", sellingPrice: 16, avgCost: 12.8, hasCost: true, onHand: 900, isLow: false, vendor: "Gamy" },
+      ], "read/stock.getStockSummary", "now", "/stock", { confidence: "high" }),
       topRevenue: metric([
         { name: "سوداني", revenue: 30_000, units: 400, grossProfit: 12_000, marginPct: 40, missingCost: false },
         { name: "كاجو", revenue: 22_000, units: 90, grossProfit: 11_000, marginPct: 50, missingCost: false },

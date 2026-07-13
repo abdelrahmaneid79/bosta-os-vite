@@ -22,7 +22,7 @@ import { requireEngine } from "@/core/db/engine";
 import { loadOwnerContext, composeContext, type OwnerContextAnswers } from "./context";
 import {
   metric, missing, type StrategistSnapshot, type DayPoint, type NamedValue,
-  type ProductEntry, type Confidence, type DataQualityIssue,
+  type ProductEntry, type ProductPeriodEntry, type Confidence, type DataQualityIssue,
 } from "./contract";
 
 const r0 = (n: number) => Math.round(n);
@@ -85,6 +85,9 @@ function toEntry(p: ProductProfit): ProductEntry {
     marginPct: p.margin == null ? null : r1(p.margin),
     missingCost: p.missingCostLines > 0,
   };
+}
+function toPeriodEntry(p: ProductProfit): ProductPeriodEntry {
+  return { ...toEntry(p), cogs: r0(p.cogs), daysSold: p.lines };
 }
 
 /** Confidence from data completeness: the honesty dial. */
@@ -185,6 +188,8 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
   const stockHasData = i.stock.positions.some((p) => p.onHand !== 0);
   const cashHasData = i.latestCashCount != null || i.cashSummary.withdrawals > 0 || i.cashPos.opening > 0;
 
+  const mappedPeriod = i.productsPeriod.filter((p) => p.productId !== "__unmapped__");
+  const mappedCompare = i.productsCompare.filter((p) => p.productId !== "__unmapped__");
   return {
     meta: {
       generatedAt: new Date().toISOString(),
@@ -241,6 +246,18 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
       ),
     },
     products: {
+      detail: metric(mappedPeriod.map(toPeriodEntry), PRODUCTS, P, "/reports", { confidence: profConf, completeness: i.profitPeriod.coveredPct }),
+      compareDetail: metric(mappedCompare.map(toPeriodEntry), PRODUCTS, C, "/reports", { confidence: coverageConfidence(i.profitCompare.coveredPct, i.profitCompare.missingCostLines), completeness: i.profitCompare.coveredPct }),
+      periodDays: metric(periodPts.length, SALES, P, "/sales"),
+      comparePeriodDays: metric(comparePts.length, SALES, C, "/sales"),
+      positions: metric(
+        i.stock.positions.filter((p) => p.active).map((p) => ({
+          name: p.nameEn, sellingPrice: p.sellingPrice, avgCost: p.avgCost,
+          hasCost: p.hasCost, onHand: p.onHand, isLow: p.isLow, vendor: p.vendor,
+        })),
+        "read/stock.getStockSummary", "now", "/stock",
+        { confidence: stockHasData ? "high" : "low", note: stockHasData ? undefined : "stock quantities are untracked (no counts/purchases recorded); price and cost fields remain valid" },
+      ),
       coveragePct: i.profitPeriod.coveredPct == null
         ? missing(PROFIT, P, "/sales/product-lines", "no product lines in period")
         : metric(r1(i.profitPeriod.coveredPct), PROFIT, P, "/sales/product-lines", { basis: "calculated" }),

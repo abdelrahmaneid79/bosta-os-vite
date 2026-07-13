@@ -16,6 +16,13 @@ export interface OwnerContextAnswers {
   strategicProducts?: string[];
   productsToGrow?: string[];
   stockoutToleranceDays?: number;
+  maxStockCoverDays?: number;
+  deadStockDays?: number;
+  reviewPeriodDays?: number;
+  maxChequeAgeDays?: number;
+  priorityFocus?: "growth" | "cash_preservation" | "balanced";
+  /** field → ISO date the owner confirmed it (Tune stamps this) */
+  confirmedAt?: Record<string, string>;
   aggressiveness?: "conservative" | "balanced" | "aggressive";
   allowPriceRecommendations?: boolean;
   challengeOwner?: boolean;
@@ -38,6 +45,11 @@ export const CONTEXT_DEFAULTS = {
   strategicProducts: [] as string[],
   productsToGrow: [] as string[],
   stockoutToleranceDays: 7,
+  maxStockCoverDays: 45,                       // beyond this, stock is "excessive" for perishable-adjacent goods
+  deadStockDays: 30,                           // no sale in this many trading days → dormant
+  reviewPeriodDays: 14,                        // recommendation outcome review window
+  maxChequeAgeDays: 45,                        // settlement older than this is overdue
+  priorityFocus: "balanced" as const,
   aggressiveness: "balanced" as const,
   allowPriceRecommendations: true,
   challengeOwner: true,
@@ -73,6 +85,11 @@ export function composeContext(answers: OwnerContextAnswers | null, period: stri
     strategicProducts: pick(a.strategicProducts, CONTEXT_DEFAULTS.strategicProducts),
     productsToGrow: pick(a.productsToGrow, CONTEXT_DEFAULTS.productsToGrow),
     stockoutToleranceDays: pick(a.stockoutToleranceDays, CONTEXT_DEFAULTS.stockoutToleranceDays),
+    maxStockCoverDays: pick(a.maxStockCoverDays, CONTEXT_DEFAULTS.maxStockCoverDays),
+    deadStockDays: pick(a.deadStockDays, CONTEXT_DEFAULTS.deadStockDays),
+    reviewPeriodDays: pick(a.reviewPeriodDays, CONTEXT_DEFAULTS.reviewPeriodDays),
+    maxChequeAgeDays: pick(a.maxChequeAgeDays, CONTEXT_DEFAULTS.maxChequeAgeDays),
+    priorityFocus: pick<"growth" | "cash_preservation" | "balanced">(a.priorityFocus, CONTEXT_DEFAULTS.priorityFocus),
     aggressiveness: pick<"conservative" | "balanced" | "aggressive">(a.aggressiveness, CONTEXT_DEFAULTS.aggressiveness),
     allowPriceRecommendations: pick(a.allowPriceRecommendations, CONTEXT_DEFAULTS.allowPriceRecommendations),
     challengeOwner: pick(a.challengeOwner, CONTEXT_DEFAULTS.challengeOwner),

@@ -41,10 +41,13 @@ export function buildNumberCorpus(req: LanguageRequest): Set<number> {
   walk(req.snapshot);
   walk(req.report);
   walk(req.decisionContext ?? null);
-  if (req.question) extractNumbers(req.question).forEach(add);
-  if (req.decision) extractNumbers(req.decision).forEach(add);
-  // derived values providers legitimately mention: k-multiples of question amounts
-  for (const n of [...corpus]) corpus.add(n * 1000);
+  // "20k"-style shorthand is only legitimate in the OWNER'S own text — add
+  // k-multiples for question/decision numbers only, never for the whole corpus
+  // (a blanket expansion would accidentally ground invented numbers).
+  for (const text of [req.question, req.decision]) {
+    if (!text) continue;
+    for (const n of extractNumbers(text)) { add(n); add(n * 1000); }
+  }
   return corpus;
 }
 
