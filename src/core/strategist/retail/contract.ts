@@ -82,6 +82,21 @@ export interface ProductFact {
   impulseType: "impulse" | "destination" | null;
   minOrderQty: number | null;
   supplierLeadDays: number | null;
+  quantityBreaks: { minQty: number; unitCost: number }[] | null;
+  // owner-confirmed category facts (from the interview) — distinct from derived
+  doNotDiscontinue: boolean;
+  ownerTrafficDriver: boolean;
+}
+
+/** A packaging format the owner has confirmed they offer + its economics. */
+export interface OfferedPackaging {
+  type: string;                 // 'mini_bag' | 'pouch' | 'gift' | 'grab_and_go' | ...
+  name: string;
+  hasCost: boolean;             // package + prep + label/seal cost recorded
+  totalUnitCost: number | null;
+  giftingSuitable: boolean;
+  impulseSuitable: boolean;
+  premiumScore: number | null;
 }
 
 /** The provider-neutral facts aggregate. Assembled from the audited snapshot +
@@ -105,6 +120,13 @@ export interface RetailBusinessFacts {
   cashForPurchases: number | null;   // verified affordable spend; null = unknown
   nextChequeEta: string | null;
   season: "ramadan" | "eid" | "gifting" | null;
+  // owner interview context
+  offeredPackaging: OfferedPackaging[];
+  allowedPromotions: string[];
+  allowedDisplayChanges: string[];
+  customerOccasions: string[];
+  operationalConstraints: string[];
+  commonlyBoughtTogether: [string, string][];
   // freshness
   isStale: boolean;
   staleDays: number | null;

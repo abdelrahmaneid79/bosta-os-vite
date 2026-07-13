@@ -1395,6 +1395,84 @@ export type Database = {
         }
         Relationships: []
       }
+      packaging_formats: {
+        Row: {
+          active: boolean
+          applicable_product_ids: string[]
+          created_at: string
+          display_zone: string | null
+          end_date: string | null
+          gifting_suitable: boolean
+          id: string
+          impulse_suitable: boolean
+          label_seal_cost: number | null
+          material: string | null
+          name: string
+          notes: string | null
+          pack_size_g: number | null
+          package_cost: number | null
+          packaging_type: string | null
+          premium_score: number | null
+          prep_cost: number | null
+          prep_minutes: number | null
+          season: string | null
+          seasonal: boolean
+          shelf_space: string | null
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          applicable_product_ids?: string[]
+          created_at?: string
+          display_zone?: string | null
+          end_date?: string | null
+          gifting_suitable?: boolean
+          id?: string
+          impulse_suitable?: boolean
+          label_seal_cost?: number | null
+          material?: string | null
+          name: string
+          notes?: string | null
+          pack_size_g?: number | null
+          package_cost?: number | null
+          packaging_type?: string | null
+          premium_score?: number | null
+          prep_cost?: number | null
+          prep_minutes?: number | null
+          season?: string | null
+          seasonal?: boolean
+          shelf_space?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          applicable_product_ids?: string[]
+          created_at?: string
+          display_zone?: string | null
+          end_date?: string | null
+          gifting_suitable?: boolean
+          id?: string
+          impulse_suitable?: boolean
+          label_seal_cost?: number | null
+          material?: string | null
+          name?: string
+          notes?: string | null
+          pack_size_g?: number | null
+          package_cost?: number | null
+          packaging_type?: string | null
+          premium_score?: number | null
+          prep_cost?: number | null
+          prep_minutes?: number | null
+          season?: string | null
+          seasonal?: boolean
+          shelf_space?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           active: boolean
@@ -1406,6 +1484,9 @@ export type Database = {
           created_at: string
           current_stock: number
           id: string
+          do_not_discontinue: boolean
+          is_traffic_driver: boolean
+          quantity_breaks: Json | null
           adjacent_product_ids: string[] | null
           display_zone: string | null
           facings: number | null
@@ -1440,6 +1521,9 @@ export type Database = {
           created_at?: string
           current_stock?: number
           id?: string
+          do_not_discontinue?: boolean
+          is_traffic_driver?: boolean
+          quantity_breaks?: Json | null
           adjacent_product_ids?: string[] | null
           display_zone?: string | null
           facings?: number | null
@@ -1474,6 +1558,9 @@ export type Database = {
           created_at?: string
           current_stock?: number
           id?: string
+          do_not_discontinue?: boolean
+          is_traffic_driver?: boolean
+          quantity_breaks?: Json | null
           adjacent_product_ids?: string[] | null
           display_zone?: string | null
           facings?: number | null

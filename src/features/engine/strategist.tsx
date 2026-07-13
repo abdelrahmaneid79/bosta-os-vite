@@ -39,6 +39,8 @@ import { assembleRetailRecommendations } from "@/core/strategist/retail-service"
 import { renderRecommendation } from "@/core/strategist/retail/nlg";
 import type { RetailRecommendation } from "@/core/strategist/retail/contract";
 import { createExperiment } from "@/core/strategist/persistence/experiments";
+import { nextQuestions, interviewProgress, type PendingQuestion } from "@/core/strategist/retail/interview";
+import { assembleInterviewState, markQuestionAnswered, saveRetailContext } from "@/core/strategist/persistence/retail-context";
 import { assessWithdrawalV2, assessAffordability } from "@/core/strategist/analysis/affordability";
 import { computeCalendar } from "@/core/strategist/calendar";
 import { suggestQuestions } from "@/core/strategist/questions";
@@ -138,6 +140,16 @@ export function StrategistScreen() {
     queryFn: () => assembleRetailRecommendations(s!, report!),
   });
 
+  // Cycle 11 — Owner Knowledge Interview: ask only what can't be derived.
+  const interviewQ = useQuery({
+    queryKey: ["strategist-interview"],
+    enabled: en,
+    queryFn: async () => {
+      const state = await assembleInterviewState();
+      return { questions: nextQuestions(state, 3), progress: interviewProgress(state) };
+    },
+  });
+
   const [drawer, setDrawer] = useState<Finding | null>(null);
   const [tuneOpen, setTuneOpen] = useState(false);
 
@@ -170,6 +182,9 @@ export function StrategistScreen() {
         onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
         onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
       <ExecutiveBriefing s={s} report={report} weekly={weekly} />
+      <OwnerInterviewCard data={interviewQ.data ?? null}
+        onMarkUnknown={async (id) => { await markQuestionAnswered(id); qc.invalidateQueries({ queryKey: ["strategist-interview"] }); }}
+        onAnswerList={async (id, field, values) => { await saveRetailContext({ [field]: values } as never); await markQuestionAnswered(id); qc.invalidateQueries({ queryKey: ["strategist-interview"] }); qc.invalidateQueries({ queryKey: ["strategist-retail"] }); reportSuccess("Owner knowledge", "Saved — advice will use it"); }} />
       <RetailAdvisor result={retailQ.data ?? null} loading={retailQ.isLoading}
         onExperiment={async (r) => {
           await createExperiment({
@@ -349,6 +364,64 @@ function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
             )}
           </div>
         ))}
+      </div>
+    </DeckTile>
+  );
+}
+
+/* ═══ OWNER KNOWLEDGE INTERVIEW (Cycle 11) ═══════════════════════════ */
+
+const QUESTION_FIELD: Record<string, string> = {
+  allowed_promotions: "allowedPromotions", allowed_display_changes: "allowedDisplayChanges",
+  occasions: "customerOccasions", operational_constraints: "operationalConstraints",
+};
+
+function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList }: {
+  data: { questions: PendingQuestion[]; progress: { total: number; answered: number; pct: number } } | null;
+  onMarkUnknown: (id: string) => Promise<void>;
+  onAnswerList: (id: string, field: string, values: string[]) => Promise<void>;
+}) {
+  const [draftText, setDraftText] = useState<Record<string, string>>({});
+  if (!data || data.questions.length === 0) {
+    if (!data) return null;
+    return (
+      <DeckTile>
+        <div className="th"><span className="tname">Owner knowledge</span>
+          <span style={{ marginLeft: "auto" }}><Chip text={`${data.progress.pct}% complete`} color="var(--green)" /></span>
+        </div>
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>BostaOS has the context it needs right now. Answers make merchandising and packaging advice specific to your stand.</div>
+      </DeckTile>
+    );
+  }
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">A few things only you know</span>
+        <span style={{ marginLeft: "auto" }}><Chip text={`${data.progress.answered}/${data.progress.total}`} color="rgb(var(--dim))" /></span>
+      </div>
+      <div style={{ fontSize: 12, color: "rgb(var(--faint))", margin: "6px 0 10px" }}>Answering these makes advice specific to your real stand — BostaOS never guesses this.</div>
+      <div className="space-y-2">
+        {data.questions.map((q) => {
+          const field = QUESTION_FIELD[q.id];
+          return (
+            <div key={q.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "rgb(var(--faint))" }}>{q.section}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "rgb(var(--text))", marginTop: 2 }}>{q.question}</div>
+              <div style={{ fontSize: 12, color: "rgb(var(--muted))", marginTop: 4 }}>{q.why}</div>
+              <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", marginTop: 3 }}>Unlocks: {q.unlocks.join(" · ")}</div>
+              <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                {field ? (
+                  <>
+                    <Input placeholder="comma-separated" value={draftText[q.id] ?? ""} onChange={(e) => setDraftText({ ...draftText, [q.id]: e.target.value })} style={{ maxWidth: 280 }} />
+                    <button style={MINI} disabled={!draftText[q.id]?.trim()} onClick={() => void onAnswerList(q.id, field, draftText[q.id].split(",").map((x) => x.trim()).filter(Boolean))}>Save</button>
+                  </>
+                ) : (
+                  <Link to={q.screenLink} style={{ ...MINI, textDecoration: "none" }}>Answer in {q.screenLink.replace("/", "")}</Link>
+                )}
+                {q.allowUnknown && <button style={MINI} onClick={() => void onMarkUnknown(q.id)}>Unknown / skip</button>}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </DeckTile>
   );

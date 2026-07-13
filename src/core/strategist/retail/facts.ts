@@ -9,6 +9,8 @@ import { requireEngine } from "@/core/db/engine";
 import type { StrategistSnapshot, ProductPeriodEntry, ProductPositionEntry } from "../contract";
 import type { StrategyReport } from "../analysis/report";
 import type { ProductFact, RetailBusinessFacts } from "./contract";
+import { loadRetailContext, listPackagingFormats } from "../persistence/retail-context";
+import { EMPTY_CONTEXT } from "./interview";
 
 export interface MerchFields {
   category: string | null;
@@ -22,6 +24,9 @@ export interface MerchFields {
   impulseType: ProductFact["impulseType"];
   minOrderQty: number | null;
   supplierLeadDays: number | null;
+  quantityBreaks: { minQty: number; unitCost: number }[] | null;
+  doNotDiscontinue: boolean;
+  ownerTrafficDriver: boolean;
 }
 
 export interface ComposeFactsInput {
@@ -46,6 +51,12 @@ export interface ComposeFactsInput {
   cashForPurchases: number | null;
   nextChequeEta: string | null;
   season: RetailBusinessFacts["season"];
+  offeredPackaging: RetailBusinessFacts["offeredPackaging"];
+  allowedPromotions: string[];
+  allowedDisplayChanges: string[];
+  customerOccasions: string[];
+  operationalConstraints: string[];
+  commonlyBoughtTogether: [string, string][];
   isStale: boolean;
   staleDays: number | null;
 }
@@ -103,6 +114,9 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
       impulseType: merch?.impulseType ?? null,
       minOrderQty: merch?.minOrderQty ?? null,
       supplierLeadDays: merch?.supplierLeadDays ?? null,
+      quantityBreaks: merch?.quantityBreaks ?? null,
+      doNotDiscontinue: merch?.doNotDiscontinue ?? false,
+      ownerTrafficDriver: merch?.ownerTrafficDriver ?? false,
     };
   });
 
@@ -118,7 +132,10 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
     coveragePct: i.coveragePct, inventoryTracked: i.inventoryTracked, stockCountAgeDays: i.stockCountAgeDays,
     cashCountFresh: i.cashCountFresh, marginFloorPct: i.marginFloorPct, maxCoverDays: i.maxCoverDays,
     deadStockDays: i.deadStockDays, strategicProducts: i.strategicProducts, cashForPurchases: i.cashForPurchases,
-    nextChequeEta: i.nextChequeEta, season: i.season, isStale: i.isStale, staleDays: i.staleDays,
+    nextChequeEta: i.nextChequeEta, season: i.season,
+    offeredPackaging: i.offeredPackaging, allowedPromotions: i.allowedPromotions, allowedDisplayChanges: i.allowedDisplayChanges,
+    customerOccasions: i.customerOccasions, operationalConstraints: i.operationalConstraints, commonlyBoughtTogether: i.commonlyBoughtTogether,
+    isStale: i.isStale, staleDays: i.staleDays,
     basisNote: basis.length ? basis.join("; ") : "full coverage",
   };
 }
@@ -126,7 +143,7 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
 /** Read the optional structured merchandising fields keyed by product name. */
 async function loadMerch(): Promise<Map<string, MerchFields>> {
   const { data, error } = await requireEngine().from("products")
-    .select("id,name_en,packaging_format,pack_size_g,packaging_cost,display_zone,shelf_level,facings,tier,impulse_type,min_order_qty,supplier_lead_days");
+    .select("id,name_en,packaging_format,pack_size_g,packaging_cost,display_zone,shelf_level,facings,tier,impulse_type,min_order_qty,supplier_lead_days,quantity_breaks,do_not_discontinue,is_traffic_driver");
   if (error) return new Map();
   const m = new Map<string, MerchFields>();
   for (const p of data ?? []) {
@@ -136,14 +153,21 @@ async function loadMerch(): Promise<Map<string, MerchFields>> {
       displayZone: p.display_zone, shelfLevel: p.shelf_level, facings: p.facings,
       tier: (p.tier as MerchFields["tier"]) ?? null, impulseType: (p.impulse_type as MerchFields["impulseType"]) ?? null,
       minOrderQty: p.min_order_qty, supplierLeadDays: p.supplier_lead_days,
+      quantityBreaks: (p.quantity_breaks as MerchFields["quantityBreaks"]) ?? null,
+      doNotDiscontinue: p.do_not_discontinue ?? false, ownerTrafficDriver: p.is_traffic_driver ?? false,
     });
   }
   return m;
 }
 
-/** Assemble the facts from the audited snapshot + report + merchandising fields. */
+/** Assemble the facts from the audited snapshot + report + merchandising fields
+ *  + the owner-interview context (packaging offered, allowed promotions, etc.). */
 export async function assembleRetailFacts(s: StrategistSnapshot, report: StrategyReport): Promise<RetailBusinessFacts> {
-  const merch = await loadMerch();
+  const [merch, ctx, packaging] = await Promise.all([loadMerch(), loadRetailContext().catch(() => EMPTY_CONTEXT), listPackagingFormats().catch(() => [])]);
+  const offeredPackaging = packaging.map((f) => {
+    const total = [f.packageCost, f.prepCost, f.labelSealCost].reduce<number | null>((s2, c) => (c == null ? s2 : (s2 ?? 0) + c), null);
+    return { type: f.packagingType ?? "custom", name: f.name, hasCost: total != null, totalUnitCost: total, giftingSuitable: f.giftingSuitable, impulseSuitable: f.impulseSuitable, premiumScore: f.premiumScore };
+  });
   const lastCount = s.inventory.lastPhysicalCount.value;
   const stockAge = lastCount ? Math.round((Date.parse(s.meta.today) - Date.parse(lastCount)) / 86_400_000) : null;
   return composeRetailFacts({
@@ -168,6 +192,12 @@ export async function assembleRetailFacts(s: StrategistSnapshot, report: Strateg
     cashForPurchases: null,                              // unknown until the drawer is counted (honest pre-live)
     nextChequeEta: s.cheques.nextChequeEta.value,
     season: null,
+    offeredPackaging,
+    allowedPromotions: ctx.allowedPromotions,
+    allowedDisplayChanges: ctx.allowedDisplayChanges,
+    customerOccasions: ctx.customerOccasions,
+    operationalConstraints: ctx.operationalConstraints,
+    commonlyBoughtTogether: ctx.commonlyBoughtTogether,
     isStale: s.meta.isStale,
     staleDays: s.meta.staleDays,
   });

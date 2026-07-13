@@ -10,13 +10,13 @@ const P = (o: Partial<ProductFact>): ProductFact => ({
   daysSold: 20, velocityPerDay: 5, revenueSharePct: 10, profitSharePct: 10, growthPct: 0, onHand: 50,
   inventoryValue: 1000, inventorySharePct: 10, daysCover: 20, sellingPrice: 10, avgCost: 6, hasCost: true,
   isLow: false, vendor: null, packagingFormat: null, packSizeG: null, packagingCost: null, displayZone: null,
-  shelfLevel: null, facings: null, tier: null, impulseType: null, minOrderQty: null, supplierLeadDays: null, ...o,
+  shelfLevel: null, facings: null, tier: null, impulseType: null, minOrderQty: null, supplierLeadDays: null, quantityBreaks: null, doNotDiscontinue: false, ownerTrafficDriver: false, ...o,
 });
 const F = (products: ProductFact[], o: Partial<RetailBusinessFacts> = {}): RetailBusinessFacts => ({
   period: "2026-05", comparePeriod: "2026-04", products, totalRevenue: 20000, totalGrossProfit: 8000,
   coveragePct: 92, inventoryTracked: true, stockCountAgeDays: 3, cashCountFresh: true, marginFloorPct: 30,
   maxCoverDays: 45, deadStockDays: 60, strategicProducts: [], cashForPurchases: 5000, nextChequeEta: "2026-05-25",
-  season: null, isStale: false, staleDays: 0, basisNote: "", ...o,
+  season: null, offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [], operationalConstraints: [], commonlyBoughtTogether: [], isStale: false, staleDays: 0, basisNote: "", ...o,
 });
 const OPTS = { today: "2026-05-15", maxRecommendations: 30 };
 const run = (f: RetailBusinessFacts) => runRetailReasoning(f, OPTS);
@@ -185,7 +185,9 @@ describe("facts composition", () => {
       stockRisk: [{ name: "A", daysCover: 12, onHand: 40 }],
       periodDays: 20, merch: new Map(), totalRevenue: 10000, totalGrossProfit: 4000, coveragePct: 90,
       inventoryTracked: true, stockCountAgeDays: 2, cashCountFresh: true, marginFloorPct: 30, maxCoverDays: 45,
-      deadStockDays: 60, strategicProducts: [], cashForPurchases: null, nextChequeEta: null, season: null, isStale: false, staleDays: 0,
+      deadStockDays: 60, strategicProducts: [], cashForPurchases: null, nextChequeEta: null, season: null,
+      offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [], operationalConstraints: [], commonlyBoughtTogether: [],
+      isStale: false, staleDays: 0,
     });
     const a = f.products[0];
     expect(a.revenueSharePct).toBe(50);

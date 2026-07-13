@@ -87,8 +87,13 @@ const deadStock: KnowledgePlaybook = {
     principles: ["Non-moving stock is a carrying cost; recover cash rather than protect it."],
     reasoning: ["On-hand with zero sales ties up cash and shelf space.", "Using it as an add-on avoids discounting a healthy product."],
     truthLevel: "measured_conclusion",
-    proposedAction: `Offer ${p.name} as a low-price add-on to a strong seller, or review for discontinuation.`,
-    implementationSteps: ["Pick a strong anchor product.", "Offer this as a small add-on for two weeks.", "If it still doesn't move, plan discontinuation."],
+    proposedAction: p.doNotDiscontinue
+      ? `Offer ${p.name} as a low-price add-on to a strong seller to move the stock. (You've flagged it do-not-discontinue, so BostaOS won't propose dropping it.)`
+      : `Offer ${p.name} as a low-price add-on to a strong seller, or review for discontinuation.`,
+    implementationSteps: p.doNotDiscontinue
+      ? ["Pick a strong anchor product.", "Offer this as a small add-on for two weeks.", "Keep presentation quality — it stays in the range."]
+      : ["Pick a strong anchor product.", "Offer this as a small add-on for two weeks.", "If it still doesn't move, plan discontinuation."],
+    contraindications: p.doNotDiscontinue ? ["Owner-flagged do-not-discontinue — clear stock, don't drop the product."] : [],
     timing: "this week", durationDays: 14, effort: "low",
     mechanism: "Attachment to a mover recovers cash without cutting a strong product's price.",
     expectedBenefitType: "cash recovery",
@@ -363,7 +368,10 @@ const growingMarginBelowFloor: KnowledgePlaybook = {
     confidence: "medium",
     contraindications: [p.packagingCost == null ? "Mini-bag profitability can't be proven until packaging cost is known." : ""].filter(Boolean),
     assumptions: ["Smaller entry price improves conversion — to be validated by the test."],
-    missingInformation: [p.packagingCost == null ? "packaging cost per mini-bag" : "", p.displayZone == null ? "current display position" : ""].filter(Boolean),
+    missingInformation: [
+      (p.packagingCost == null && !f.offeredPackaging.some((x) => x.type === "mini_bag" && x.hasCost)) ? "confirm you offer a mini-bag format and its packaging cost (Owner Interview → Packaging)" : "",
+      p.displayZone == null ? "current display position" : "",
+    ].filter(Boolean),
     evidence: [ev("Revenue growth", pct(p.growthPct), "read/products", `${f.comparePeriod}→${f.period}`, "/sales"), ev("Margin", pct(p.marginPct), "read/profit", f.period, "/health")],
     screenLink: "/stock",
     testDesign: "Mini-bag beside a traffic product for two cheque cycles; primary metric gross profit per display position; include packaging cost.",
@@ -428,14 +436,14 @@ const highVolumeLowMarginTraffic: KnowledgePlaybook = {
     title: `Protect ${p.name}'s price — fix profit through mix`, domain: "pricing", type: "avoid_price_change_mix", product: p,
     observedFacts: [
       `${p.name} is ${pct(p.revenueSharePct)} of revenue at a ${pct(p.marginPct)} margin (below your ${floorOf(f)}% floor).`,
-      "Its volume is healthy — it's pulling shoppers in.",
+      p.ownerTrafficDriver ? "You've confirmed it's a traffic driver — customers come specifically for it." : "Its volume is healthy — it's pulling shoppers in.",
     ],
     principles: ["Don't raise the price of a traffic driver; recover margin through mix and attachment."],
     reasoning: [
-      "A big revenue share at healthy volume signals a traffic product.",
+      p.ownerTrafficDriver ? "You've confirmed this is a traffic driver." : "A big revenue share at healthy volume signals a traffic product.",
       "Raising its price risks footfall; the profit issue is mix, not this product's price.",
     ],
-    truthLevel: "strong_inference",
+    truthLevel: p.ownerTrafficDriver ? "measured_conclusion" : "strong_inference",
     proposedAction: `Hold ${p.name}'s price. Pair it with a higher-margin attach and watch blended margin.`,
     implementationSteps: ["Keep the price steady.", "Offer a higher-margin add-on beside it.", "Track blended margin and traffic."],
     timing: "this month", durationDays: 28, effort: "low",
@@ -736,9 +744,103 @@ const premiumEntrySize: KnowledgePlaybook = {
   }),
 };
 
+/* ═══ SUPPLIER / PURCHASE TIMING (context-driven) ═══════════════════════ */
+
+const supplierQuantityBreak: KnowledgePlaybook = {
+  id: "supplier-quantity-break", domain: "purchase",
+  title: "Quantity-break tier worth reaching (within cover)",
+  principle: "Buy up to a quantity-break tier only when the lower unit cost doesn't push you past your cover target.",
+  rationale: "Quantity breaks cut unit cost, but over-buying to reach them converts the saving into trapped cash and waste.",
+  whenApplicable: "The product has recorded quantity-break tiers and current cover leaves room to order.",
+  whenNotApplicable: "Cover is already above target, or the break quantity would blow past the cover ceiling.",
+  conditions: "Quantity-break tiers exist for the product and cover is below the maximum.",
+  requiredEvidence: ["quantity-break tiers", "days of cover", "max-cover target"],
+  contraindications: ["cover already high", "cash unavailable"],
+  mechanism: "A lower unit cost lifts gross margin without holding excess stock.",
+  actionTypes: ["meet_qty_break", "avoid_exceed_cover"],
+  expectedBenefitType: "unit-cost saving at controlled cover",
+  risks: ["over-buying to reach the break", "cash strain"],
+  assumptions: ["the next tier's quantity fits inside the cover ceiling"],
+  kpis: ["blended unit cost", "days of cover"],
+  testDesign: "Order to the next break tier only if projected cover stays within target; compare blended unit cost.",
+  minTestDurationDays: 30, reviewCadenceDays: 30,
+  successMetrics: ["unit cost falls", "cover stays in range"], failureMetrics: ["cover exceeds target", "waste rises"],
+  relatedPrinciples: ["overstock-vs-cover", "stockout-risk-profit-driver"],
+  confidenceCeiling: "high", basis: "retail_math", version: 1,
+  match: (p, f) => p.quantityBreaks != null && p.quantityBreaks.length > 0 && p.daysCover != null && p.daysCover < coverMax(f) && f.inventoryTracked,
+  build: (p, f) => {
+    const tiers = p.quantityBreaks!;
+    const best = [...tiers].sort((a, b) => a.unitCost - b.unitCost)[0];
+    return draft({
+      title: `Consider the ${best.minQty}+ quantity break on ${p.name}`, domain: "purchase", type: "meet_qty_break", product: p,
+      observedFacts: [
+        `${p.name} has a quantity break at ${best.minQty}+ units (unit cost ${egp(best.unitCost)}).`,
+        `Current cover is ${Math.round(p.daysCover!)} days vs your ${coverMax(f)}-day target — there's room to buy.`,
+      ],
+      principles: ["Reach a quantity break only within your cover target."],
+      reasoning: ["The lower unit cost lifts margin.", "Cover is below target, so the larger order won't over-invest — provided the break quantity fits."],
+      truthLevel: "strong_inference",
+      proposedAction: `Order ${p.name} up to the ${best.minQty}+ break tier only if projected cover stays within ${coverMax(f)} days.`,
+      implementationSteps: ["Check the break quantity against your cover ceiling.", "If it fits, order to the tier.", "If it would exceed cover, stay below the break."],
+      timing: "next order", durationDays: 30, effort: "low",
+      mechanism: "Lower unit cost at controlled cover lifts blended margin.", expectedBenefitType: "unit-cost saving at controlled cover",
+      confidence: "medium",
+      contraindications: [f.cashForPurchases != null && f.cashForPurchases <= 0 ? "Cash is unavailable — time it to the cheque." : ""].filter(Boolean),
+      evidence: [ev("Quantity break", `${best.minQty}+ @ ${egp(best.unitCost)}`, "products", f.period, "/purchases"), ev("Cover", `${Math.round(p.daysCover!)}d`, "read/stock", f.period, "/stock")],
+      screenLink: "/purchases",
+      testDesign: "Order to the tier only if projected cover ≤ target; compare blended unit cost over one cycle.",
+      successCriteria: ["blended unit cost falls", "cover stays within target"], failureCriteria: ["cover exceeds target", "waste rises"],
+      stopCondition: "If the break quantity would exceed cover, don't reach for it.",
+    });
+  },
+};
+
+const chequeCyclePurchasing: KnowledgePlaybook = {
+  id: "cheque-cycle-purchasing", domain: "purchase",
+  title: "Time a restock to the cheque cycle",
+  principle: "For non-critical restocks, align purchasing with cheque settlement to protect operating liquidity.",
+  rationale: "Buying just before a cheque lands strains the drawer; timing the order to just after keeps liquidity intact.",
+  whenApplicable: "A product needs restocking soon, it isn't a top profit driver, and the next cheque timing is known.",
+  whenNotApplicable: "It's a profit driver at stockout risk (protect availability instead), or cash is confirmed ample.",
+  conditions: "Restock needed, not a top profit driver, next-cheque ETA known.",
+  requiredEvidence: ["low stock / cover", "next-cheque ETA"],
+  contraindications: ["profit driver at stockout risk", "supplier can't wait"],
+  mechanism: "Aligning outflow with the cheque inflow preserves the cash reserve.",
+  actionTypes: ["buy_after_cheque", "count_first"],
+  expectedBenefitType: "protected operating liquidity",
+  risks: ["stockout before the cheque"],
+  assumptions: ["demand holds until the cheque lands"],
+  kpis: ["reserve maintained", "no stockout"],
+  testDesign: "Delay the order to just after the next cheque; confirm no stockout in between.",
+  minTestDurationDays: 14, reviewCadenceDays: 14,
+  successMetrics: ["reserve held", "no stockout"], failureMetrics: ["stockout before cheque"],
+  relatedPrinciples: ["stockout-risk-profit-driver", "overstock-vs-cover"],
+  confidenceCeiling: "high", basis: "owner_confirmed", version: 1,
+  match: (p, f) => (p.isLow || (p.daysCover != null && p.daysCover < 10)) && (p.profitSharePct ?? 0) < 12 && f.inventoryTracked && f.nextChequeEta != null,
+  build: (p, f) => draft({
+    title: `Time the ${p.name} restock to the next cheque`, domain: "purchase", type: "buy_after_cheque", product: p,
+    observedFacts: [
+      `${p.name} is ${p.isLow ? "flagged low" : `at ${Math.round(p.daysCover ?? 0)} days cover`} but isn't a top profit driver.`,
+      `The next cheque is expected around ${f.nextChequeEta}.`,
+    ],
+    principles: ["Time non-critical restocks to the cheque cycle to protect liquidity."],
+    reasoning: ["Restocking just before a cheque strains the drawer.", "Since this isn't a profit driver at risk, the order can wait for the inflow."],
+    truthLevel: "strong_inference",
+    proposedAction: `Delay the ${p.name} restock to just after the cheque around ${f.nextChequeEta}, unless it's about to stock out.`,
+    implementationSteps: ["Confirm current stock lasts until the cheque.", "Place the order once cash lands.", "If stock won't last, order a minimal bridge quantity."],
+    timing: `around ${f.nextChequeEta}`, durationDays: 14, effort: "low",
+    mechanism: "Aligns the outflow with the cheque inflow, protecting the reserve.", expectedBenefitType: "protected operating liquidity",
+    confidence: "medium",
+    evidence: [ev("Cover", p.daysCover != null ? `${Math.round(p.daysCover)}d` : "low", "read/stock", f.period, "/stock"), ev("Next cheque", f.nextChequeEta ?? "—", "read/cheques", f.period, "/cheques")],
+    screenLink: "/purchases",
+    successCriteria: ["reserve maintained", "no stockout before the cheque"], failureCriteria: ["stockout before the cheque lands"],
+    stopCondition: "If stock will run out first, place a minimal bridge order.",
+  }),
+};
+
 /** THE LIBRARY. */
 export const KNOWLEDGE_LIBRARY: KnowledgePlaybook[] = [
-  profitBesideTraffic, premiumEntrySize,
+  profitBesideTraffic, premiumEntrySize, supplierQuantityBreak, chequeCyclePurchasing,
   highValueSlowMover, deadStock, overstockVsCover, stockoutRiskProfitDriver,
   profitDriverLowSpace, weakExcessFacings, premiumWeakPresentation, candyImpulsePlacement,
   growingMarginBelowFloor, grabAndGoOpportunity,
