@@ -59,12 +59,14 @@ describe("remaining business scenarios (deterministic language)", () => {
     expect(report.decisionContext.belowMarginFloor.some((p) => p.name === "بونبون")).toBe(true);
   });
 
-  it("employee-affordability question → honest refusal (no payroll data exists)", async () => {
+  it("employee-affordability question → deterministic answer with the assumed salary labeled", async () => {
     const s = makeSnapshot();
     const report = buildStrategyReport(s);
     const r = await deterministicProvider.generate({ mode: "question", snapshot: s, report, findings: report.findings, question: "Can I afford to hire another employee?" });
-    expect(r.headline).toContain("enhanced language service");
-    expect(r.suggestedQuestions.length).toBeGreaterThan(0);
+    expect(r.headline).toContain("new employee");
+    expect(r.headline).toContain("salary assumed");   // never invents silently
+    expect(r.conclusion).toContain("Recurring:");
+    expect(r.conclusion).toContain("extra sales");    // revenue-to-cover, no benefit assumed
   });
 
   it("memory can never override live data — answers always use the current snapshot", async () => {
@@ -95,10 +97,16 @@ describe("remaining business scenarios (deterministic language)", () => {
   });
 
   it("cash unavailable → withdrawal question refuses with 'unknowable', never a fake number", async () => {
-    const s = makeSnapshot({ cash: { hasLiveData: false, expectedBalance: missing("read/money.getCashPosition", "now", "/money", "no tracking") } });
+    const s = makeSnapshot({ cash: {
+      hasLiveData: false,
+      expectedBalance: missing("read/money.getCashPosition", "now", "/money", "no tracking"),
+      latestCount: missing("cash_reconciliations", "all-time", "/money", "never counted"),
+      lastCountDate: missing("cash_reconciliations", "all-time", "/money", "never counted"),
+      countAgeDays: missing("cash_reconciliations", "all-time", "/money", "never counted"),
+    } });
     const report = buildStrategyReport(s);
     const r = await deterministicProvider.generate({ mode: "question", snapshot: s, report, findings: report.findings, question: "Can I withdraw 20,000 EGP?" });
     expect(r.headline).toContain("cannot be verified");
-    expect(r.priorities[0].missingData).toContain("first physical cash count");
+    expect(r.priorities[0].missingData).toContain("fresh physical cash count");
   });
 });

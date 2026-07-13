@@ -92,5 +92,17 @@ All in `analysis/products.ts` + `analysis/priority.ts` + `persistence/outcomes.t
 - **Weekly priority**: 1 primary + ≤2 secondary; cash-safety outranks opportunities; dismissed issues stay suppressed unless materially worse; open actions become "finish the queued action"; "monitor" only when nothing actionable exists.
 - Validation script: `npx vite-node scripts/_validate_cycle6.ts <real-products.json>`.
 
-## Cycle 7 candidates
-1. Live-provider verification (credits) + prompt tuning with the enriched report. 2. Cash-safety reasoning once drawer counts exist. 3. Purchase quantities once inventory is live (units/lead-time/safety-stock policy). 4. Outcome-informed recommendations (engine learns which action types resolve fastest). 5. Seasonality-aware baselines (Ramadan-adjusted comparisons using the calendar).
+## Cycle 7 (SHIPPED) — cash intelligence & affordability
+`analysis/cash.ts` + `analysis/affordability.ts` + `analysis/forecast-cash.ts`, all pure, carried on StrategyReport (cash/obligations/cashProjection/runway):
+- **CashState**: strictly separated blocks — available-now (verified count under the freshness policy), expected-not-available (ledger anchor + settlement pipe + next-cheque ETA from the ~10-day median cheque rhythm), committed (obligation calendar), uncertain (explicit: no count, untracked payment methods — ALL revenue settles via mall cheques, untracked clearing, stale books), owner movements, safety (reserve = fixed / 30d-costs / higher-of-both; verified/expected/downside headroom; verdict; blockers). Never one collapsed balance.
+- **Obligations**: recurring cash costs derived from repeat categories (Salary ~5,700/mo real); RENT EXCLUDED by construction — the mall deducts it from the cheque; accepted owner actions join with dates; 7/14/30-day windows.
+- **Withdrawal V2 / affordability**: three answer levels (verified/conditional/unknowable); CASH FIRST — profit is context only; optional spends need verified cash unless Tune allows expected; recurring costs get revenue-to-cover at the measured margin with NO assumed benefit; employee hire supported with labeled salary assumptions.
+- **Projection**: 7/14/30d; known-only scenario has zero estimated sales; base/downside label every assumption (cheque delay +14d, sales −25% default); RELATIVE mode when uncounted (never fake balances); Eid/Ramadan overlap labeled.
+- **Runway**: reserve-coverage months for a cash-generative business (never infinite); withdrawals and rent excluded from burn by construction.
+- **Cash findings** ranked with everything else: cash-count-required/stale, obligations-unfunded, reserve-breach-risk, single-cheque concentration (neutral language throughout — "unexplained difference", never accusation).
+- **Production validation (2026-07-13, read-only)**: verdict UNKNOWABLE with blockers "first drawer count" + "books end 2026-05-31"; withdraw-20k/buy-30k → unknowable with count-first next steps; hire@5,700 (labeled assumption) → needs ~14,250/month extra sales at the measured 40% margin; projection relative-mode; ledger-expected = EGP 0 (anchor 2026-07-01, nothing recorded since). Every refusal correct.
+- No DB changes (justified: forecasts are never stored as facts; scenarios render live and go stale with the snapshot; obligations derive from existing records).
+- Validation script: `npx vite-node scripts/_validate_cycle7.ts`.
+
+## Cycle 8 candidates
+1. First-count onboarding flow + reconciliation-difference intelligence ON REAL COUNTS (Phase 3/4 deepen once counts exist). 2. Live-provider verification (credits). 3. Purchase quantities (inventory + lead-time policy). 4. Amounts on planned actions so accepted commitments join the obligation calendar automatically. 5. Outcome-informed action prioritization with accumulated history.

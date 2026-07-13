@@ -3,12 +3,10 @@
 import { describe, expect, it } from "vitest";
 import { planInsightSync, shouldPersistFinding, isDuplicateAction, buildOwnerMemory, type InsightLite } from "@/core/strategist/persistence/lifecycle";
 import { suggestQuestions } from "@/core/strategist/questions";
-import { assessWithdrawal } from "@/core/strategist/analysis/withdrawal";
-import { computeDecisionContext } from "@/core/strategist/analysis/decision";
 import { parseStrategistResponse } from "@/core/strategist/response";
 import { analyzeSnapshot } from "@/core/strategist/analysis/engine";
 import { makeSnapshot } from "@/core/strategist/analysis/fixture";
-import { metric, missing } from "@/core/strategist/contract";
+import { metric } from "@/core/strategist/contract";
 import type { Finding } from "@/core/strategist/analysis/types";
 
 const F = (over: Partial<Finding>): Finding => ({
@@ -88,38 +86,6 @@ describe("suggested questions", () => {
   });
 });
 
-describe("withdrawal assessment", () => {
-  it("healthy books: safe within both limits, recommends min(headroom, guideline)", () => {
-    const s = makeSnapshot();
-    const a = assessWithdrawal(s, computeDecisionContext(s), 10_000);
-    expect(a.verdict).toBe("safe");
-    expect(a.recommendedMax).toBe(13_500); // min(35k headroom, 13.5k guideline)
-    expect(a.profitContext).toContain("Profit is timing, not cash");
-  });
-
-  it("amount above cash headroom → unsafe with the exact shortfall named", () => {
-    const s = makeSnapshot();
-    const a = assessWithdrawal(s, computeDecisionContext(s), 40_000);
-    expect(a.verdict).toBe("unsafe");
-    expect(a.reasonsToWait.join(" ")).toContain("below your EGP 25,000 reserve floor");
-  });
-
-  it("profitable but cash-untracked → unknowable, low confidence, count-first advice", () => {
-    const s = makeSnapshot({ cash: { hasLiveData: false, expectedBalance: missing("t", "p", "/money", "no data") } });
-    const a = assessWithdrawal(s, computeDecisionContext(s), 10_000);
-    expect(a.verdict).toBe("unknowable");
-    expect(a.confidence).toBe("low");
-    expect(a.reasonsToWait[0]).toContain("first drawer count");
-    expect(a.headroom).toContain("Unknowable");
-  });
-
-  it("within cash headroom but above the profit guideline → tight, both limits shown", () => {
-    const s = makeSnapshot();
-    const a = assessWithdrawal(s, computeDecisionContext(s), 20_000); // headroom 35k, guideline 13.5k
-    expect(a.verdict).toBe("tight");
-    expect(a.reasonsToWait.join(" ")).toContain("guideline");
-  });
-});
 
 describe("response validation", () => {
   it("valid payload round-trips; malformed throws", () => {

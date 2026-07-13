@@ -32,8 +32,9 @@ describe("deterministic template provider", () => {
     const r = await deterministicProvider.generate(reqFor("question", { question: "Can I safely withdraw 20,000 EGP?" }));
     expect(r.headline).toContain("EGP 20,000");
     const p = r.priorities[0];
-    expect(p.explanation).toContain("Reserve floor");
+    expect(p.explanation).toContain("Reserve");
     expect(p.explanation).toContain("Profit context");
+    expect(p.explanation).toContain("Verified cash");
     expect(p.evidence.some((e) => e.label === "Net profit")).toBe(true);
   });
 

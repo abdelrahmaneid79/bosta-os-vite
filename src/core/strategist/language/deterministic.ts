@@ -4,7 +4,7 @@
  *  established: unsupported questions get an honest refusal that names what
  *  IS answerable. */
 import type { Finding } from "../analysis/types";
-import { assessWithdrawal } from "../analysis/withdrawal";
+import { assessWithdrawalV2, assessAffordability } from "../analysis/affordability";
 import { suggestQuestions } from "../questions";
 import type { StrategistResponse, ResponsePriority, PriorityType } from "../response";
 import type { LanguageProvider, LanguageRequest, ProviderHealth } from "./types";
@@ -85,17 +85,21 @@ function briefing(req: LanguageRequest): StrategistResponse {
 }
 
 function withdrawal(req: LanguageRequest, amount: number): StrategistResponse {
-  const wa = assessWithdrawal(req.snapshot, req.report.decisionContext, amount);
+  const wa = assessWithdrawalV2(req.snapshot, req.report.cash, amount);
   const VERDICT: Record<string, string> = {
-    safe: `${egp(amount)} is affordable within both your cash headroom and the profit guideline.`,
-    tight: `${egp(amount)} fits your cash headroom but exceeds the profit guideline — possible, not comfortable.`,
-    unsafe: `${egp(amount)} is not safely affordable — it breaks your reserve floor.`,
+    safe: `${egp(amount)} is affordable from verified cash with the reserve intact.`,
+    safe_reduces_flexibility: `${egp(amount)} is affordable, but it thins your buffer noticeably.`,
+    conditional: `${egp(amount)} works only if the expected money arrives on time — conditional, not verified.`,
+    tight: `${egp(amount)} is possible but leaves you tight against the reserve.`,
+    unsafe: `${egp(amount)} is not safely affordable — it breaks the reserve.`,
     unknowable: `Whether ${egp(amount)} is affordable cannot be verified yet.`,
   };
   const kv: [string, string][] = [
-    ["Cash position", wa.cashPosition], ["Reserve floor", wa.reserveFloor],
-    ["Headroom", wa.headroom], ["Profit context", wa.profitContext],
-    ["Money at the mall", wa.settlementContext], ["Freshness", wa.dataFreshness],
+    ["Verified cash", wa.verifiedCash], ["Expected money", wa.expectedMoney],
+    ["Committed", wa.committed], ["Reserve", wa.reserve],
+    ["Headroom", wa.verifiedHeadroom], ["After this draw", wa.resultingReserve],
+    ["Profit context", wa.profitContext], ["Already withdrawn", wa.withdrawalsAlready],
+    ["Freshness", wa.dataFreshness],
   ];
   const p: ResponsePriority = {
     rank: 1, type: wa.verdict === "unsafe" || wa.verdict === "unknowable" ? "risk" : "action",
@@ -106,11 +110,11 @@ function withdrawal(req: LanguageRequest, amount: number): StrategistResponse {
       { label: "Net profit", value: req.snapshot.profit.netProfit.value != null ? egp(req.snapshot.profit.netProfit.value) : "unknown (withheld)", source: req.snapshot.profit.netProfit.source, period: req.snapshot.profit.netProfit.period, screenLink: "/reconcile" },
     ],
     recommendedAction: wa.recommendedMax != null
-      ? (amount <= wa.recommendedMax ? `Proceed — and record it as a withdrawal so cash stays honest.` : `Cap this draw at ${egp(wa.recommendedMax)} or wait for the next cheque.`)
-      : "Do the first drawer count, then re-run this check.",
-    expectedImpact: wa.recommendedMax != null ? `keeps you above the reserve floor` : "unlocks cash verification",
+      ? (amount <= wa.recommendedMax ? `Proceed — and record it as a withdrawal so cash stays honest.` : `Cap this draw at ${egp(wa.recommendedMax)} — ${wa.nextStep}`)
+      : wa.nextStep,
+    expectedImpact: wa.recommendedMax != null ? `keeps the reserve intact` : "unlocks cash verification",
     urgency: "today", confidence: wa.confidence,
-    missingData: wa.verdict === "unknowable" ? ["first physical cash count"] : [],
+    missingData: wa.verdict === "unknowable" ? ["fresh physical cash count"] : [],
   };
   return {
     mode: req.mode, headline: VERDICT[wa.verdict],
@@ -121,10 +125,36 @@ function withdrawal(req: LanguageRequest, amount: number): StrategistResponse {
   };
 }
 
+function affordabilityAnswer(req: LanguageRequest, r: Parameters<typeof assessAffordability>[2]): StrategistResponse {
+  const a = assessAffordability(req.snapshot, req.report.cash, r);
+  const VERDICT: Record<string, string> = {
+    safe: "Affordable from verified cash.", safe_reduces_flexibility: "Affordable, but it thins the buffer.",
+    conditional: "Only affordable if the expected money arrives — conditional.", tight: "Possible but tight against the reserve.",
+    unsafe: "Not safely affordable.", unknowable: "Cannot be verified yet.",
+  };
+  return {
+    mode: req.mode,
+    headline: `${r.label ?? r.kind}: ${VERDICT[a.verdict]}`,
+    conclusion: [
+      `Verified cash: ${a.verifiedCash != null ? egp(a.verifiedCash) : "unknown (no fresh count)"}.`,
+      `Expected (not available): ${a.expectedUnavailable != null ? `~${egp(a.expectedUnavailable)}` : "—"}.`,
+      `Committed 30d: ${egp(a.committed30)}. Reserve: ${egp(a.requiredReserve)}.`,
+      a.recurring ? `Recurring: ${egp(a.recurring.monthly)}/month${a.recurring.revenueToCover != null ? ` → needs ~${egp(a.recurring.revenueToCover)}/month extra sales ${a.recurring.marginBasis}` : ""}.` : "",
+      ...a.reasons.map((x) => x + "."),
+    ].filter(Boolean).join(" "),
+    priorities: req.report.findings.filter((f) => ["cash-count-required", "reserve-breach-risk", "withdrawals-high"].includes(f.id)).slice(0, 2).map(findingToPriority),
+    contradictions: [],
+    dataLimitations: [...a.missing, ...a.assumptions],
+    suggestedQuestions: ["How much can I safely withdraw this month?", "What obligations are coming?"],
+  };
+}
+
 /** intent → the findings that answer it (supported deterministic questions) */
 const INTENTS: { match: RegExp; ids?: string[]; classes?: Finding["class"][]; headline: string }[] = [
   { match: /margin|هامش|profit.*(fall|drop|weak)|ربح/i, ids: ["margin-drop", "growth-weaker-economics", "uncovered-revenue", "missing-costs"], headline: "What the engine knows about margin" },
-  { match: /cash|كاش|نقد|drawer/i, ids: ["profit-up-cash-low", "cash-not-tracked", "withdrawals-high"], headline: "What the engine knows about cash" },
+  { match: /cash|كاش|نقد|drawer|where.*money|فلوسي/i, ids: ["profit-up-cash-low", "cash-not-tracked", "cash-count-required", "cash-count-stale", "withdrawals-high", "reserve-breach-risk", "cheque-concentration"], headline: "What the engine knows about cash" },
+  { match: /obligation|due|upcoming|التزام|مستحق/i, ids: ["obligations-unfunded", "reserve-breach-risk"], headline: "What's coming due" },
+  { match: /runway|how long|survive|last|tight|هيكفي/i, ids: ["reserve-breach-risk", "obligations-unfunded", "cash-count-required"], headline: "How long the cash lasts" },
   { match: /cheque|شيك|settle|mall/i, ids: ["overdue-cheques", "settlement-lag"], headline: "Where the settlement cycle stands" },
   { match: /stock|مخزون|restock|inventory/i, ids: ["stock-risk", "inventory-not-tracked"], headline: "Where stock stands" },
   { match: /fix|أصلح|first|priorit|week|matters/i, classes: ["contradiction", "decision_risk", "warning", "data_quality"], headline: "What to fix first" },
@@ -135,6 +165,22 @@ const INTENTS: { match: RegExp; ids?: string[]; classes?: Finding["class"][]; he
 
 function answerQuestion(req: LanguageRequest): StrategistResponse {
   const q = req.question ?? "";
+  // affordability: purchases and hires route to the affordability engine
+  const buy = /(?:buy|purchase|اشتري|شراء).*?([\d,.]+)\s*(k|K)?|([\d,.]+)\s*(k|K)?\s*(?:EGP|جنيه).*?(?:stock|بضاعة|مخزون)/i.exec(q);
+  if (buy) {
+    const raw = (buy[1] ?? buy[3] ?? "").replace(/[,،]/g, "");
+    let amt = Number(raw);
+    if (buy[2] || buy[4]) amt *= 1000;
+    if (Number.isFinite(amt) && amt > 0) return affordabilityAnswer(req, { kind: "purchase", upfront: amt, mandatory: false, label: "stock purchase" });
+  }
+  const hire = /(?:employee|hire|موظف|عامل).*?([\d,.]+)\s*(k|K)?|afford.*(?:employee|موظف)/i.exec(q);
+  if (hire) {
+    const raw = (hire[1] ?? "").replace(/[,،]/g, "");
+    const sal = Number(raw);
+    if (Number.isFinite(sal) && sal > 0) return affordabilityAnswer(req, { kind: "employee", upfront: 0, recurringMonthly: sal * (hire[2] ? 1000 : 1), mandatory: false, label: "new employee" });
+    return affordabilityAnswer(req, { kind: "employee", upfront: 0, recurringMonthly: (req.snapshot.expenses.recurringMonthly.value ?? []).find((r) => /salary/i.test(r.name))?.avgMonthly ?? 6_000, mandatory: false, label: "new employee (salary assumed = current salary pattern; give a number for precision)" });
+  }
+
   // withdrawal amounts: "20,000", "20000", "20k"
   const wd = /(?:withdraw|سحب|اسحب|take out).*?([\d,.]+)\s*(k|K|الف|ألف)?|([\d,.]+)\s*(k|K)?\s*(?:EGP|جنيه).*?(?:withdraw|سحب)/i.exec(q);
   if (wd) {
@@ -233,8 +279,20 @@ export class DeterministicProvider implements LanguageProvider {
         }
         return { ...resp, conclusion: [resp.conclusion, ...bits].join(" ") };
       }
-      case "cash_review":
-        return byClasses(req, [], ["profit-up-cash-low", "cash-not-tracked", "withdrawals-high"], "Cash review — deterministic view");
+      case "cash_review": {
+        const cash = req.report.cash;
+        const run = req.report.runway;
+        const resp = byClasses(req, [], ["profit-up-cash-low", "cash-not-tracked", "cash-count-required", "cash-count-stale", "withdrawals-high", "reserve-breach-risk", "obligations-unfunded"], "Where your money is — deterministic view");
+        const bits = [
+          `AVAILABLE: ${cash.available.note}.`,
+          `EXPECTED (not available): ${cash.expected.openSettlementNet != null ? `~${egp(cash.expected.openSettlementNet)} in the settlement pipe${cash.expected.nextChequeEta ? `, ETA ~${cash.expected.nextChequeEta}` : ""}` : "no measurable settlement pipe"}.`,
+          `COMMITTED (30d): ${egp(cash.committed.next30)}${cash.committed.items[0] ? ` (${cash.committed.items.slice(0, 3).map((o) => o.name).join(", ")})` : ""}.`,
+          `RESERVE: ${egp(cash.safety.requiredReserve)} — ${cash.safety.reserveBasis}.`,
+          cash.safety.verifiedHeadroom != null ? `HEADROOM: ${egp(cash.safety.verifiedHeadroom)} verified.` : `HEADROOM: unknowable — ${cash.safety.blockers[0] ?? "data missing"}.`,
+          run.available && run.verifiedCoverageMonths != null ? `Verified cash covers ~${run.verifiedCoverageMonths} months of operating costs.` : "",
+        ].filter(Boolean);
+        return { ...resp, conclusion: bits.join(" ") };
+      }
       case "cheque_review":
         return byClasses(req, [], ["overdue-cheques", "settlement-lag"], "Settlement & cheque review");
       case "data_quality_review":

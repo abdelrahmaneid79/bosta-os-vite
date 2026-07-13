@@ -16,7 +16,7 @@ Status legend: ✅ working · 🟡 partial · 🔴 broken/missing · ⬜ removed
 | 7 | Inventory | 🟡 | machinery works (ledger, WAC replay) but **no live data** — stock never counted; needs owner opening count |
 | 8 | Weighted COGS | ✅ | SQL replay + frozen sale-time snapshots; contract-tested |
 | 9 | Expenses | ✅ | import double-booking fixed (DB fingerprint dedupe) |
-| 10 | Cash | 🟡 | read-model paged + tested logic, BUT all 40 movements are voided → zero live data; needs owner cash count + history |
+| 10 | Cash | 🟡 | Cycle 7 cash intelligence: CashState/obligations/withdrawal-v2/affordability/projection/runway — deterministic and production-validated; answers correctly UNKNOWABLE until the first drawer count (the machinery upgrades itself the moment one exists) |
 | 11 | Owner withdrawals | 🟡 | typed & excluded from expenses (invariant tested); no real withdrawals recorded yet |
 | 12 | Cheques | ✅ | 56 live, reconciled to mall statement |
 | 13 | Settlement periods | ✅ | 6 stale "open" periods closed; status changes now confirmed + reversible (Reopen) |

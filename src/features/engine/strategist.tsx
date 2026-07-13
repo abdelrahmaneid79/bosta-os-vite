@@ -24,7 +24,7 @@ import type { StrategistSnapshot } from "@/core/strategist/contract";
 import { buildStrategyReport, type StrategyReport } from "@/core/strategist/analysis/report";
 import { selectWeeklyPriority } from "@/core/strategist/analysis/priority";
 import { MIN_ATTRIBUTION_COVERAGE } from "@/core/strategist/analysis/products";
-import { assessWithdrawal } from "@/core/strategist/analysis/withdrawal";
+import { assessWithdrawalV2, assessAffordability } from "@/core/strategist/analysis/affordability";
 import { computeCalendar } from "@/core/strategist/calendar";
 import { suggestQuestions } from "@/core/strategist/questions";
 import { generateLanguage, loadLanguageSettings, saveLanguageSettings, providerHealth } from "@/core/strategist/language/router";
@@ -140,6 +140,7 @@ export function StrategistScreen() {
         reportSuccess("Action queue", res.created ? "Queued this week's priority" : "Already queued");
         qc.invalidateQueries({ queryKey: ["strategist-actions"] });
       }} />
+      <CashIntelligence report={report} />
       <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
         onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
         onAccept={async (f) => {
@@ -663,7 +664,7 @@ function PriorityBlock({ p }: { p: ResponsePriority }) {
 
 /* ═══ DECISION MODE ═══════════════════════════════════════════════════ */
 
-type DecisionKind = "withdrawal" | "price" | "stock" | "other";
+type DecisionKind = "withdrawal" | "price" | "stock" | "employee" | "other";
 
 function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyReport }) {
   const { reportError } = useUI();
@@ -676,7 +677,13 @@ function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyRe
 
   const ctx = report.decisionContext;
   const amt = Number(amount) || 0;
-  const wa = useMemo(() => (kind === "withdrawal" && amt > 0 ? assessWithdrawal(s, ctx, amt) : null), [s, ctx, kind, amt]);
+  const wa = useMemo(() => (kind === "withdrawal" && amt > 0 ? assessWithdrawalV2(s, report.cash, amt) : null), [s, report, kind, amt]);
+  const [recurring, setRecurring] = useState("6000");
+  const aff = useMemo(() => {
+    if (kind === "stock" && amt > 0) return assessAffordability(s, report.cash, { kind: "purchase", upfront: amt, mandatory: false, label: "stock purchase" });
+    if (kind === "employee") return assessAffordability(s, report.cash, { kind: "employee", upfront: 0, recurringMonthly: Number(recurring) || 0, mandatory: false, label: "new employee" });
+    return null;
+  }, [s, report, kind, amt, recurring]);
 
   const askAI = async () => {
     const decision = kind === "withdrawal" ? `Withdraw ${egp(amt)} this month.` : freeText;
@@ -696,7 +703,8 @@ function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyRe
   };
 
   const VERDICT_META: Record<string, [string, string]> = {
-    safe: ["Affordable", "var(--green)"], tight: ["Possible but tight", "var(--amber)"],
+    safe: ["Affordable", "var(--green)"], safe_reduces_flexibility: ["Affordable · thins the buffer", "var(--green)"],
+    conditional: ["Conditional on expected money", "var(--amber)"], tight: ["Possible but tight", "var(--amber)"],
     unsafe: ["Not safely affordable", "var(--red)"], unknowable: ["Can't be verified yet", "rgb(var(--violet))"],
   };
 
@@ -706,7 +714,7 @@ function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyRe
         <span className="eyebrow" style={{ marginLeft: "auto" }}>deterministic numbers first · AI judgment second</span>
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-        {([["withdrawal", "Owner withdrawal"], ["price", "Price change"], ["stock", "Buy stock"], ["other", "Something else"]] as [DecisionKind, string][]).map(([k, label]) => (
+        {([["withdrawal", "Owner withdrawal"], ["stock", "Buy stock"], ["employee", "Hire employee"], ["price", "Price change"], ["other", "Something else"]] as [DecisionKind, string][]).map(([k, label]) => (
           <button key={k} style={{ ...MINI, ...(kind === k ? { borderColor: "var(--mag)", color: "var(--mag)" } : {}) }} onClick={() => { setKind(k); setAiAnswer(null); }}>{label}</button>
         ))}
       </div>
@@ -724,11 +732,14 @@ function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyRe
                 {wa.recommendedMax != null && <span style={{ fontSize: 13, fontWeight: 700 }}>Recommended max: {egp(wa.recommendedMax)}</span>}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10, marginTop: 12 }}>
-                <KV k="Cash position" v={wa.cashPosition} />
-                <KV k="Reserve floor" v={wa.reserveFloor} />
-                <KV k="Headroom above floor" v={wa.headroom} />
+                <KV k="Verified cash" v={wa.verifiedCash} />
+                <KV k="Expected (not available)" v={wa.expectedMoney} />
+                <KV k="Committed" v={wa.committed} />
+                <KV k="Reserve" v={wa.reserve} />
+                <KV k="Verified headroom" v={wa.verifiedHeadroom} />
+                <KV k="After this draw" v={wa.resultingReserve} />
                 <KV k="Profit context" v={wa.profitContext} />
-                <KV k="Money at the mall" v={wa.settlementContext} />
+                <KV k="Already withdrawn" v={wa.withdrawalsAlready} />
                 <KV k="Data freshness" v={wa.dataFreshness} />
               </div>
               {wa.reasonsToWait.length > 0 && (
@@ -738,15 +749,41 @@ function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyRe
                 </div>
               )}
               <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", marginTop: 10 }}>
-                A profitable month does not automatically mean the cash is in the drawer — profit and cash are checked separately above.
+                A profitable month does not automatically mean the cash is in the drawer — profit and cash are checked separately above. Next step: {wa.nextStep}
               </div>
+            </div>
+          )}
+        </div>
+      ) : kind === "stock" || kind === "employee" ? (
+        <div style={{ marginTop: 12 }}>
+          {kind === "stock"
+            ? <Field label="Purchase amount (EGP)"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ maxWidth: 200 }} /></Field>
+            : <Field label="Monthly salary (EGP)"><Input type="number" value={recurring} onChange={(e) => setRecurring(e.target.value)} style={{ maxWidth: 200 }} /></Field>}
+          {aff && (
+            <div style={{ marginTop: 12, border: "1px solid var(--stroke2)", borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <Chip text={VERDICT_META[aff.verdict]?.[0] ?? aff.verdict} color={VERDICT_META[aff.verdict]?.[1] ?? "rgb(var(--dim))"} />
+                <Chip text={`${aff.answerLevel} answer`} color="rgb(var(--dim))" />
+                {aff.recommendedMax != null && <span style={{ fontSize: 13, fontWeight: 700 }}>Headroom: {egp(aff.recommendedMax)}</span>}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10, marginTop: 12 }}>
+                <KV k="Verified cash" v={aff.verifiedCash != null ? egp(aff.verifiedCash) : "unknown — no fresh count"} />
+                <KV k="Expected (not available)" v={aff.expectedUnavailable != null ? `~${egp(aff.expectedUnavailable)}` : "—"} />
+                <KV k="Committed (30d)" v={egp(aff.committed30)} />
+                <KV k="Reserve" v={egp(aff.requiredReserve)} />
+                {aff.recurring && <KV k="Recurring burden" v={`${egp(aff.recurring.monthly)}/month · ${aff.recurring.revenueToCover != null ? `needs ~${egp(aff.recurring.revenueToCover)}/month extra sales ${aff.recurring.marginBasis}` : aff.recurring.marginBasis}`} />}
+                {aff.recurring?.monthsCoverableFromHeadroom != null && <KV k="Headroom covers" v={`~${aff.recurring.monthsCoverableFromHeadroom} months of this cost with zero benefit`} />}
+              </div>
+              {aff.reasons.length > 0 && <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 8 }}>{aff.reasons.map((r, i) => <div key={i}>· {r}</div>)}</div>}
+              {aff.assumptions.length > 0 && <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 6 }}>{aff.assumptions.join(" · ")}</div>}
+              <div style={{ fontSize: 12, color: "rgb(var(--text))", fontWeight: 600, marginTop: 8 }}>→ {aff.nextStep}</div>
             </div>
           )}
         </div>
       ) : (
         <div style={{ marginTop: 12 }}>
           <Field label="Describe the decision you're considering">
-            <Input placeholder={kind === "price" ? "e.g. raise كاجو price by 10%" : kind === "stock" ? "e.g. buy 30kg of سوداني before Ramadan" : "I'm considering…"}
+            <Input placeholder={kind === "price" ? "e.g. raise كاجو price by 10%" : "I'm considering…"}
               value={freeText} onChange={(e) => setFreeText(e.target.value)} />
           </Field>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10, marginTop: 12 }}>
@@ -780,6 +817,55 @@ function KV({ k, v }: { k: string; v: string }) {
       <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "rgb(var(--faint))" }}>{k}</div>
       <div style={{ fontSize: 12.5, color: "rgb(var(--text))", marginTop: 3, lineHeight: 1.45 }}>{v}</div>
     </div>
+  );
+}
+
+/* ═══ CASH INTELLIGENCE ═══════════════════════════════════════════════ */
+
+function CashIntelligence({ report }: { report: StrategyReport }) {
+  const [open, setOpen] = useState(false);
+  const cash = report.cash;
+  const proj = report.cashProjection;
+  const run = report.runway;
+  const VERDICT: Record<string, [string, string]> = {
+    comfortable: ["Comfortable", "var(--green)"], adequate: ["Adequate", "var(--green)"],
+    tight: ["Tight", "var(--amber)"], at_risk: ["At risk", "var(--red)"], unknowable: ["Unverified", "rgb(var(--violet))"],
+  };
+  const base = proj.scenarios.find((x) => x.name === "base");
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">Cash intelligence</span>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <Chip text={VERDICT[cash.safety.verdict][0]} color={VERDICT[cash.safety.verdict][1]} />
+          <button style={MINI} onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Detail"}</button>
+        </span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginTop: 10 }}>
+        <KV k="Available now (verified)" v={cash.available.totalVerified != null ? egp(cash.available.totalVerified) : cash.available.note} />
+        <KV k="Expected · not available" v={cash.expected.openSettlementNet != null ? `~${egp(cash.expected.openSettlementNet)} settlement pipe${cash.expected.nextChequeEta ? ` · ETA ~${cash.expected.nextChequeEta}` : ""}` : "no measurable pipe"} />
+        <KV k="Committed · next 30 days" v={`${egp(cash.committed.next30)}${cash.committed.items[0] ? ` (${cash.committed.items.slice(0, 2).map((o) => o.name).join(", ")}…)` : ""}`} />
+        <KV k="Reserve" v={`${egp(cash.safety.requiredReserve)} — ${cash.safety.reserveBasis}`} />
+        <KV k="Safe headroom" v={cash.safety.verifiedHeadroom != null ? egp(Math.max(0, cash.safety.verifiedHeadroom)) : `unknowable — ${cash.safety.blockers[0] ?? "data missing"}`} />
+        {run.available && <KV k="Coverage" v={run.verifiedCoverageMonths != null ? `verified cash covers ~${run.verifiedCoverageMonths} months of costs` : run.expectedCoverageMonths != null ? `expected position covers ~${run.expectedCoverageMonths} months (unverified)` : "—"} />}
+      </div>
+      {open && (
+        <div style={{ marginTop: 12, fontSize: 12, color: "rgb(var(--muted))", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>30-day outlook ({proj.mode} mode)</div>
+          <div>{proj.modeNote}. Largest inflow: {proj.largestInflow}. Largest outflow: {proj.largestOutflow}.</div>
+          {base && <div>Base scenario minimum: {proj.mode === "absolute" ? egp(base.minValue) : `${egp(base.minValue)} net movement`} on day {base.minDay}{base.reserveBreachDay != null ? ` · reserve breached around day ${base.reserveBreachDay}` : ""}.</div>}
+          {proj.seasonalNote && <div style={{ color: "var(--amber)" }}>{proj.seasonalNote}</div>}
+          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Obligations</div>
+          {cash.committed.items.slice(0, 6).map((o) => (
+            <div key={o.name}>· {o.name}: {egp(o.amount)} — {o.due.label} ({o.basis.replace("_", " ")}){o.note ? ` · ${o.note}` : ""}</div>
+          ))}
+          <div style={{ color: "rgb(var(--dim))" }}>{report.obligations.chequeDeductionsNote}</div>
+          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Owner money</div>
+          <div>{cash.owner.withdrawals > 0 ? `${egp(cash.owner.withdrawals)} withdrawn this period — ${cash.owner.vsNetProfit}` : "no withdrawals recorded this period"}</div>
+          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>What the engine can't know yet</div>
+          {cash.uncertain.slice(0, 4).map((u, i) => <div key={i} style={{ color: "rgb(var(--dim))" }}>· {u}</div>)}
+        </div>
+      )}
+    </DeckTile>
   );
 }
 
@@ -957,6 +1043,16 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
           <Field label="Dead-stock threshold (days)"><Input type="number" placeholder="30" value={form.deadStockDays ?? ""} onChange={(e) => setForm({ ...form, deadStockDays: num(e.target.value) })} /></Field>
           <Field label="Outcome review period (days)"><Input type="number" placeholder="14" value={form.reviewPeriodDays ?? ""} onChange={(e) => setForm({ ...form, reviewPeriodDays: num(e.target.value) })} /></Field>
           <Field label="Cheque overdue after (days)"><Input type="number" placeholder="45" value={form.maxChequeAgeDays ?? ""} onChange={(e) => setForm({ ...form, maxChequeAgeDays: num(e.target.value) })} /></Field>
+          <Field label="Reserve policy">
+            <select value={form.reserveType ?? "higher_of_both"} onChange={(e) => setForm({ ...form, reserveType: e.target.value as OwnerContextAnswers["reserveType"] })}
+              style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
+              <option value="higher_of_both">Higher of floor / 30d costs</option>
+              <option value="fixed">Fixed floor only</option>
+              <option value="days_of_costs">30 days of costs</option>
+            </select>
+          </Field>
+          <Field label="Cash count fresh for (days)"><Input type="number" placeholder="7" value={form.cashCountFreshnessDays ?? ""} onChange={(e) => setForm({ ...form, cashCountFreshnessDays: num(e.target.value) })} /></Field>
+          <Field label="Downside sales assumption (%)"><Input type="number" placeholder="-25" value={form.downsideSalesPct ?? ""} onChange={(e) => setForm({ ...form, downsideSalesPct: num(e.target.value) })} /></Field>
           <Field label="Right now, what matters more?">
             <select value={form.priorityFocus ?? "balanced"} onChange={(e) => setForm({ ...form, priorityFocus: e.target.value as OwnerContextAnswers["priorityFocus"] })}
               style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
@@ -977,6 +1073,10 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
         <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
           <input type="checkbox" checked={form.allowPriceRecommendations ?? true} onChange={(e) => setForm({ ...form, allowPriceRecommendations: e.target.checked })} />
           Allow price-change recommendations
+        </label>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
+          <input type="checkbox" checked={form.allowExpectedCashForOptional ?? false} onChange={(e) => setForm({ ...form, allowExpectedCashForOptional: e.target.checked })} />
+          Let OPTIONAL spending decisions use expected (uncounted) cash — off means verified cash only
         </label>
 
         <div style={{ borderTop: "1px solid var(--stroke2)", paddingTop: 12 }}>
