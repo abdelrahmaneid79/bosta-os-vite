@@ -16,6 +16,11 @@ export type { Evidence, FindingConfidence, RetailDomain } from "../intelligence/
 
 export type TruthLevel = "measured_conclusion" | "strong_inference" | "experiment_hypothesis";
 
+/** Where a recommendation came from — always shown to the owner. A model may
+ *  author a candidate, but it enters through the SAME deterministic validation
+ *  gate and can never be labelled a measured conclusion. */
+export type RecommendationSource = "deterministic_knowledge" | "bosta_experiment" | "model_reasoning";
+
 /** The specific commercial moves the engine can propose. */
 export type RecommendationType =
   // merchandising
@@ -131,6 +136,15 @@ export interface KnowledgePlaybook {
   confidenceCeiling: FindingConfidence;
   basis: KnowledgeBasis;
   version: number;
+  /** Executive-knowledge metadata (Executive Retail Knowledge Directive). Optional
+   *  so earlier playbooks stay valid; new board-level playbooks populate them. */
+  rationale?: string;                    // why this principle holds, commercially
+  whenApplicable?: string;               // the situations it fits
+  whenNotApplicable?: string;            // where it must NOT be applied
+  assumptions?: string[];
+  kpis?: string[];                       // measurable KPIs it moves
+  reviewCadenceDays?: number;            // how often to re-check
+  relatedPrinciples?: string[];          // playbook ids of related principles
   /** per-product: fires for a product when its conditions hold (pure) */
   match?: (p: ProductFact, f: RetailBusinessFacts) => boolean;
   /** per-product: builds a recommendation draft from a matched product (pure) */
@@ -180,12 +194,14 @@ export interface RetailRecommendation {
   reviewDate: string | null;
   persistEligible: boolean;
   priorityScore: number;
+  /** provenance — deterministic knowledge, a prior Bosta experiment, or model reasoning */
+  source: RecommendationSource;
 }
 
 /** What a playbook's `build` returns; the engine finalises id/dedupe/review/
  *  confidence-ceiling/priority. */
 export type RecommendationDraft = Omit<RetailRecommendation,
-  "id" | "dedupeKey" | "reviewDate" | "persistEligible" | "confidenceCeiling" | "priorityScore" | "playbookId">;
+  "id" | "dedupeKey" | "reviewDate" | "persistEligible" | "confidenceCeiling" | "priorityScore" | "playbookId" | "source">;
 
 /* ── experiments ────────────────────────────────────────────────────────── */
 

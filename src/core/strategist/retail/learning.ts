@@ -29,6 +29,7 @@ export function applyLearning(recs: RetailRecommendation[], priors: PriorExperim
     if (kept) {
       return {
         ...r,
+        source: "bosta_experiment" as const,   // provenance: a prior Bosta test now reinforces this
         reasoning: [...r.reasoning, `A prior Bosta Bites test of this exact move was kept (attribution ${kept.attribution}${kept.conclusion ? `: ${kept.conclusion}` : ""}).`],
         assumptions: r.assumptions,
         priorityScore: r.priorityScore + 2,

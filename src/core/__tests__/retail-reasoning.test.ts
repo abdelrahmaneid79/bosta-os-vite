@@ -132,7 +132,7 @@ describe("quality gate", () => {
     assumptions: [], missingInformation: [], confidence: "high", confidenceCeiling: "high",
     evidence: [{ label: "L", value: "V", source: "s", period: "p", screenLink: "/" }], screenLink: "/",
     testDesign: null, baselineMetrics: [], successCriteria: ["done"], failureCriteria: [], stopCondition: "x",
-    reviewDate: "2026-06-01", persistEligible: true, priorityScore: 5, ...o,
+    reviewDate: "2026-06-01", persistEligible: true, priorityScore: 5, source: "deterministic_knowledge", ...o,
   });
   const f = F([]);
   it("passes a well-formed recommendation", () => {

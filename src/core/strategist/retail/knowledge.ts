@@ -622,8 +622,123 @@ const eidPremiumPackaging: KnowledgePlaybook = {
   }),
 };
 
+/* ═══ CROSS-CATEGORY ADJACENCY / PREMIUM ENTRY (executive playbooks) ═════ */
+
+const profitBesideTraffic: KnowledgePlaybook = {
+  id: "profit-beside-traffic", domain: "merchandising",
+  title: "Place a profit driver beside the traffic magnet",
+  principle: "Attach your highest-profit product to the product that pulls the most shoppers.",
+  rationale: "The traffic product creates footfall it doesn't monetise well; putting a high-profit product in its shadow converts that attention into margin without extra traffic cost.",
+  whenApplicable: "The top traffic product (revenue/volume) and the top gross-profit product are different items.",
+  whenNotApplicable: "The two are the same product, or shelf adjacency is physically impossible.",
+  conditions: "A clear traffic driver and a distinct top profit driver both exist.",
+  requiredEvidence: ["per-product revenue share", "per-product gross-profit share"],
+  contraindications: ["the profit product is already adjacent", "premium product would look cheap beside the traffic product"],
+  mechanism: "Impulse attachment: shoppers drawn by the traffic product see the profit product at the decision point.",
+  actionTypes: ["improve_adjacency", "relocate"],
+  expectedBenefitType: "gross profit per facing + basket attachment",
+  risks: ["no attachment lift", "premium image dilution"],
+  assumptions: ["shoppers of the traffic product are receptive to the profit product"],
+  kpis: ["gross profit per facing", "basket attachment rate"],
+  testDesign: "Trial the adjacency for two cheque cycles; measure gross profit per facing and attachment before making it permanent.",
+  minTestDurationDays: 28, reviewCadenceDays: 28,
+  successMetrics: ["gross profit per facing up", "attachment rate up"], failureMetrics: ["no attachment lift", "traffic product sales dip"],
+  relatedPrinciples: ["profit-driver-low-space", "high-volume-low-margin-traffic"],
+  confidenceCeiling: "medium", basis: "retail_heuristic", version: 1,
+  global: (f) => {
+    const byRev = [...f.products].sort((a, b) => b.revenueSharePct - a.revenueSharePct);
+    const byProfit = [...f.products].filter((p) => p.profitSharePct != null).sort((a, b) => (b.profitSharePct ?? 0) - (a.profitSharePct ?? 0));
+    const traffic = byRev[0];
+    const profit = byProfit[0];
+    if (!traffic || !profit || traffic.name === profit.name || (profit.profitSharePct ?? 0) < 12 || traffic.revenueSharePct < 12) return [];
+    return [draft({
+      title: `Trial ${profit.name} immediately beside ${traffic.name}`, domain: "merchandising", type: "improve_adjacency",
+      affectedProducts: [profit.name, traffic.name], affectedProductIds: [], affectedCategory: profit.category,
+      observedFacts: [
+        `${traffic.name} is your traffic magnet (${pct(traffic.revenueSharePct)} of revenue) while ${profit.name} is your top profit generator (${pct(profit.profitSharePct)} of gross profit).`,
+      ],
+      principles: ["Attach the highest-profit product to the biggest traffic magnet."],
+      reasoning: [
+        `${traffic.name} creates footfall; ${profit.name} monetises it best.`,
+        "Adjacency converts that attention into margin without buying more traffic.",
+      ],
+      truthLevel: "experiment_hypothesis",
+      proposedAction: `Trial relocating ${profit.name} immediately adjacent to ${traffic.name} for two cheque cycles. Measure gross profit per facing and basket attachment before making it permanent.`,
+      implementationSteps: [`Place ${profit.name} directly beside ${traffic.name}.`, "Keep everything else fixed.", "Compare gross profit per facing and attachment vs baseline."],
+      timing: "next reset", durationDays: 28, effort: "low",
+      mechanism: "Impulse attachment at the traffic product's decision point.", expectedBenefitType: "gross profit per facing + basket attachment",
+      confidence: "medium",
+      contraindications: [profit.tier === "premium" ? "Keep the premium look — don't let it read as cheap beside a value traffic line." : ""].filter(Boolean),
+      missingInformation: [f.products.some((p) => p.facings != null) ? "" : "current facings/zone (to make the move exact)"].filter(Boolean),
+      evidence: [
+        ev("Traffic product revenue share", pct(traffic.revenueSharePct), "read/products", f.period, "/sales"),
+        ev("Profit product gross-profit share", pct(profit.profitSharePct), "read/profit", f.period, "/health"),
+      ],
+      screenLink: "/stock",
+      testDesign: "Adjacency trial for two cheque cycles; primary metric gross profit per facing, secondary basket attachment.",
+      baselineMetrics: ["gross profit per facing (both products)", "attachment rate"],
+      successCriteria: ["gross profit per facing rises", "attachment rate rises"], failureCriteria: ["no attachment lift", `${traffic.name} sales dip`],
+      stopCondition: "If the traffic product's sales dip, revert the move.",
+    })];
+  },
+};
+
+const premiumEntrySize: KnowledgePlaybook = {
+  id: "premium-entry-size", domain: "packaging",
+  title: "Lower the premium entry barrier without cutting the kilo price",
+  principle: "For a strong premium line, a smaller entry-size pack widens trial while protecting the per-kilogram price.",
+  rationale: "Discounting a premium product erodes both margin and perceived value; a smaller pack lowers the psychological entry price instead, preserving the price architecture.",
+  whenApplicable: "A premium-tier product with a healthy margin and a high price per kilo.",
+  whenNotApplicable: "Margin is below floor (fix margin first), or packaging cost is unknown so pack economics can't be proven.",
+  conditions: "Premium tier, margin at/above floor, a selling price is recorded.",
+  requiredEvidence: ["tier = premium", "margin", "selling price", "packaging cost (to prove economics)"],
+  contraindications: ["packaging cost unknown", "product already offered in a small pack"],
+  mechanism: "A lower absolute entry price recruits trial buyers while the per-kilogram price (and premium signal) is preserved.",
+  actionTypes: ["test_smaller_pack", "smaller_entry_size", "premium_pouch"],
+  expectedBenefitType: "premium trial at protected per-kg margin",
+  risks: ["packaging cost erodes the gain", "cannibalises the weighted format"],
+  assumptions: ["a smaller entry price recruits new trial buyers"],
+  kpis: ["gross profit per display position", "new-buyer trial", "per-kg price held"],
+  testDesign: "Introduce a smaller entry-size pack for two cheque cycles; include packaging cost; compare gross profit per display position; keep per-kg price unchanged.",
+  minTestDurationDays: 28, reviewCadenceDays: 28,
+  successMetrics: ["gross profit per display position up", "per-kg price preserved"], failureMetrics: ["weighted sales fall", "packaging cost eats the margin"],
+  relatedPrinciples: ["growing-margin-below-floor", "premium-weak-presentation"],
+  confidenceCeiling: "medium", basis: "retail_heuristic", version: 1,
+  match: (p, f) => p.tier === "premium" && p.marginPct != null && p.marginPct >= floorOf(f) && p.sellingPrice != null,
+  build: (p, f) => draft({
+    title: `Test a smaller entry-size pack for ${p.name}`, domain: "packaging", type: "test_smaller_pack", product: p,
+    observedFacts: [
+      `${p.name} is premium-tier with a healthy ${pct(p.marginPct)} margin${p.sellingPrice != null ? ` at ${egp(p.sellingPrice)}/unit` : ""}.`,
+      p.packagingCost == null ? "Packaging cost isn't recorded — needed to prove the pack is profitable." : `Packaging cost on file: ${egp(p.packagingCost)}.`,
+    ],
+    principles: ["Widen premium trial with a smaller pack; never discount the kilo."],
+    reasoning: [
+      "Discounting a premium line erodes margin and perceived value.",
+      "A smaller entry-size pack lowers the absolute entry price while the per-kilogram price and premium signal are preserved.",
+    ],
+    truthLevel: "experiment_hypothesis",
+    proposedAction: `Instead of discounting ${p.name}, introduce a smaller entry-size pack. Preserve the premium per-kilogram price and lower the psychological entry barrier. Include packaging cost and compare gross profit per display position.`,
+    implementationSteps: ["Cost the smaller pack (product + packaging).", "Keep the per-kg price unchanged.", "Run two cheque cycles.", "Keep it only if gross profit per display position improves without cutting weighted sales."],
+    timing: "next reset", durationDays: 28, effort: "medium",
+    mechanism: "Lower entry price recruits trial while the per-kg price protects margin and premium signal.",
+    expectedBenefitType: "premium trial at protected per-kg margin",
+    confidence: "medium",
+    contraindications: [p.packagingCost == null ? "Pack economics can't be proven until packaging cost is recorded." : ""].filter(Boolean),
+    assumptions: ["A smaller entry price recruits new trial buyers."],
+    missingInformation: [p.packagingCost == null ? "packaging cost per small pack" : "", p.displayZone == null ? "current display position" : ""].filter(Boolean),
+    evidence: [ev("Tier", "premium", "products", f.period, "/stock"), ev("Margin", pct(p.marginPct), "read/profit", f.period, "/health")],
+    screenLink: "/stock",
+    testDesign: "Smaller entry-size pack for two cheque cycles; per-kg price held; primary metric gross profit per display position; include packaging cost.",
+    baselineMetrics: ["gross profit per display position", "weighted-format weekly units"],
+    successCriteria: ["gross profit per display position improves", "weighted sales don't fall"],
+    failureCriteria: ["weighted sales fall", "packaging cost erases the margin gain"],
+    stopCondition: "If weighted sales fall or the pack loses money after packaging cost, stop.",
+  }),
+};
+
 /** THE LIBRARY. */
 export const KNOWLEDGE_LIBRARY: KnowledgePlaybook[] = [
+  profitBesideTraffic, premiumEntrySize,
   highValueSlowMover, deadStock, overstockVsCover, stockoutRiskProfitDriver,
   profitDriverLowSpace, weakExcessFacings, premiumWeakPresentation, candyImpulsePlacement,
   growingMarginBelowFloor, grabAndGoOpportunity,

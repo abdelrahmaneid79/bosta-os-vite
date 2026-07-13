@@ -13,6 +13,11 @@ const TRUTH_LABEL: Record<TruthLevel, string> = {
   experiment_hypothesis: "Experiment hypothesis",
 };
 const CONF_LABEL = { high: "High", medium: "Medium", low: "Low" } as const;
+const SOURCE_LABEL: Record<RetailRecommendation["source"], string> = {
+  deterministic_knowledge: "Deterministic retail knowledge",
+  bosta_experiment: "Prior Bosta Bites experiment",
+  model_reasoning: "Model reasoning (validated)",
+};
 
 const s = (t: string) => { const x = t.trim(); return x ? (/[.!?]$/.test(x) ? x : `${x}.`) : ""; };
 
@@ -21,6 +26,7 @@ export interface RenderedRecommendation {
   paragraphs: string[];
   classification: string;
   confidence: string;
+  sourceLabel: string;
   evidenceLine: string;
   missingLine: string | null;
   text: string;
@@ -46,6 +52,7 @@ export function renderRecommendation(r: RetailRecommendation): RenderedRecommend
 
   const classification = TRUTH_LABEL[r.truthLevel];
   const confidence = CONF_LABEL[r.confidence];
+  const sourceLabel = SOURCE_LABEL[r.source];
   const evidenceLine = r.evidence.length
     ? `Evidence: ${r.evidence.map((e) => `${e.label} ${e.value}`).join(", ")}`
     : (r.observedFacts.length ? `Evidence: ${r.observedFacts.length} observed fact(s)` : "Evidence: —");
@@ -53,11 +60,11 @@ export function renderRecommendation(r: RetailRecommendation): RenderedRecommend
 
   const text = [
     ...paragraphs,
-    `Classification: ${classification}. Confidence: ${confidence}.`,
+    `Classification: ${classification}. Confidence: ${confidence}. Source: ${sourceLabel}.`,
     evidenceLine + (missingLine ? `\n${missingLine}` : ""),
   ].join("\n\n");
 
-  return { headline: r.title, paragraphs, classification, confidence, evidenceLine, missingLine, text };
+  return { headline: r.title, paragraphs, classification, confidence, sourceLabel, evidenceLine, missingLine, text };
 }
 
 function lower(str: string): string {

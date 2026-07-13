@@ -409,6 +409,7 @@ function RetailAdvisor({ result, loading, onExperiment }: {
                     <span style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{r.title}</span>
                     <Chip text={t.label} color={t.color} />
                     <Chip text={`${r.confidence} conf`} color="rgb(var(--dim))" />
+                    <Chip text={r.source === "bosta_experiment" ? "from your test" : r.source === "model_reasoning" ? "model idea" : "knowledge"} color={r.source === "bosta_experiment" ? "var(--green)" : r.source === "model_reasoning" ? "rgb(var(--cyan))" : "rgb(var(--faint))"} />
                     <span style={{ marginLeft: "auto", fontSize: 11, color: "rgb(var(--faint))" }}>{FILTER_BUCKET[r.domain] ?? "Operations"}</span>
                   </div>
                   {!open && <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 4 }}>{prose.paragraphs[0]}</div>}
