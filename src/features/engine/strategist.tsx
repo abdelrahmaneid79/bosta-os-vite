@@ -35,6 +35,10 @@ import type { ReconciledException } from "@/core/strategist/analysis/exceptions"
 import type { DailyBrief } from "@/core/strategist/analysis/brief";
 import { detectOperationalIntent, answerOperationalQuestion, type OperationalAnswerCtx } from "@/core/strategist/analysis/operational-answers";
 import { getStaleCloses } from "@/core/read/daily-close";
+import { assembleRetailRecommendations } from "@/core/strategist/retail-service";
+import { renderRecommendation } from "@/core/strategist/retail/nlg";
+import type { RetailRecommendation } from "@/core/strategist/retail/contract";
+import { createExperiment } from "@/core/strategist/persistence/experiments";
 import { assessWithdrawalV2, assessAffordability } from "@/core/strategist/analysis/affordability";
 import { computeCalendar } from "@/core/strategist/calendar";
 import { suggestQuestions } from "@/core/strategist/questions";
@@ -127,6 +131,13 @@ export function StrategistScreen() {
     }),
   });
 
+  // Cycle 10 — Retail Reasoning: specific, grounded commercial recommendations, zero API.
+  const retailQ = useQuery({
+    queryKey: ["strategist-retail", s?.meta.generatedAt ?? null],
+    enabled: en && !!s && !!report,
+    queryFn: () => assembleRetailRecommendations(s!, report!),
+  });
+
   const [drawer, setDrawer] = useState<Finding | null>(null);
   const [tuneOpen, setTuneOpen] = useState(false);
 
@@ -159,6 +170,20 @@ export function StrategistScreen() {
         onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
         onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
       <ExecutiveBriefing s={s} report={report} weekly={weekly} />
+      <RetailAdvisor result={retailQ.data ?? null} loading={retailQ.isLoading}
+        onExperiment={async (r) => {
+          await createExperiment({
+            playbookId: r.playbookId, title: r.title, domain: r.domain, recType: r.type,
+            productIds: r.affectedProductIds, location: r.affectedLocation, changeDescription: r.proposedAction,
+            startDate: todayCairo(), endDate: r.reviewDate, baseline: null,
+            primaryMetric: r.successCriteria[0] ?? r.expectedBenefitType, secondaryMetrics: r.baselineMetrics,
+            guardrailMetrics: r.failureCriteria, minSample: null, successThreshold: r.successCriteria.join("; "),
+            failureThreshold: r.failureCriteria.join("; "), stopCondition: r.stopCondition, status: "proposed",
+            result: null, conclusion: null, attributionConfidence: null, decision: null, ownerNotes: null,
+          });
+          reportSuccess("Experiment", "Added to your test plan");
+          qc.invalidateQueries({ queryKey: ["strategist-retail"] });
+        }} />
       <WeeklyPriorityCard weekly={weekly} onQueue={async (item) => {
         const f = findings.find((x) => x.id === item.findingId);
         const res = await createAction({
@@ -326,6 +351,103 @@ function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
         ))}
       </div>
     </DeckTile>
+  );
+}
+
+/* ═══ RETAIL ADVISOR — "What I would do" (Cycle 10) ═══════════════════ */
+
+const TRUTH_META: Record<RetailRecommendation["truthLevel"], { label: string; color: string }> = {
+  measured_conclusion: { label: "Measured", color: "var(--green)" },
+  strong_inference: { label: "Inference", color: "var(--amber)" },
+  experiment_hypothesis: { label: "Test", color: "rgb(var(--cyan))" },
+};
+const FILTER_BUCKET: Record<string, string> = {
+  merchandising: "Merchandising", shelf: "Merchandising", packaging: "Packaging",
+  pricing: "Pricing", margin: "Pricing", purchase: "Purchasing", supplier: "Purchasing",
+  category: "Portfolio", growth: "Portfolio", risk: "Portfolio", recommendation: "Portfolio", decision: "Portfolio",
+  promotion: "Promotions", cash: "Cash", cheque: "Cash",
+  inventory: "Operations", operational: "Operations", revenue: "Operations", seasonality: "Operations", basket: "Operations",
+};
+
+function RetailAdvisor({ result, loading, onExperiment }: {
+  result: { recommendations: RetailRecommendation[]; facts: { basisNote: string } } | null;
+  loading: boolean;
+  onExperiment: (r: RetailRecommendation) => Promise<void>;
+}) {
+  const [filter, setFilter] = useState<string>("All");
+  const [openId, setOpenId] = useState<string | null>(null);
+  if (loading && !result) return <DeckTile><div style={{ fontSize: 13, color: "rgb(var(--dim))" }}>Reasoning over your books…</div></DeckTile>;
+  if (!result) return null;
+  const recs = result.recommendations;
+  const buckets = ["All", ...Array.from(new Set(recs.map((r) => FILTER_BUCKET[r.domain] ?? "Operations")))];
+  const shown = (filter === "All" ? recs : recs.filter((r) => (FILTER_BUCKET[r.domain] ?? "Operations") === filter));
+
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">What I would do</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "rgb(var(--faint))" }}>deterministic · {recs.length} recommendation{recs.length === 1 ? "" : "s"}</span>
+      </div>
+      {recs.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>
+          No high-quality recommendation clears the evidence bar right now{result.facts.basisNote ? ` (${result.facts.basisNote})` : ""}. BostaOS prefers silence to shallow advice.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "10px 0" }}>
+            {buckets.map((b) => (
+              <button key={b} style={{ ...MINI, ...(filter === b ? { color: "rgb(var(--text))", borderColor: "var(--mag)" } : {}) }} onClick={() => setFilter(b)}>{b}</button>
+            ))}
+          </div>
+          <div className="space-y-2">
+            {shown.map((r) => {
+              const t = TRUTH_META[r.truthLevel];
+              const open = openId === r.id;
+              const prose = renderRecommendation(r);
+              return (
+                <div key={r.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px", borderLeft: `3px solid ${t.color}` }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", cursor: "pointer" }} onClick={() => setOpenId(open ? null : r.id)}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{r.title}</span>
+                    <Chip text={t.label} color={t.color} />
+                    <Chip text={`${r.confidence} conf`} color="rgb(var(--dim))" />
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: "rgb(var(--faint))" }}>{FILTER_BUCKET[r.domain] ?? "Operations"}</span>
+                  </div>
+                  {!open && <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 4 }}>{prose.paragraphs[0]}</div>}
+                  {open && (
+                    <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(var(--muted))" }}>
+                      <AdviceBlock label="Why" lines={[...r.observedFacts, ...r.reasoning]} />
+                      <AdviceBlock label="How to execute" lines={r.implementationSteps.length ? r.implementationSteps : [r.proposedAction]} />
+                      {r.testDesign && <AdviceBlock label="How to test" lines={[r.testDesign, ...r.successCriteria.map((c) => `Success: ${c}`)]} />}
+                      <AdviceBlock label="What could make it wrong" lines={[...r.missingInformation.map((m) => `Missing: ${m}`), ...r.risks, ...r.contraindications]} />
+                      <div style={{ marginTop: 6, fontSize: 12 }}>
+                        <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}>Classification: </span><span style={{ color: t.color }}>{prose.classification}</span>
+                        <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}> · Confidence: </span>{prose.confidence}
+                      </div>
+                      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                        <Link to={r.screenLink} style={{ ...MINI, textDecoration: "none" }}>Open screen</Link>
+                        {r.truthLevel === "experiment_hypothesis" && <button style={MINI} onClick={() => void onExperiment(r)}>Add as experiment</button>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </DeckTile>
+  );
+}
+
+function AdviceBlock({ label, lines }: { label: string; lines: string[] }) {
+  const clean = lines.filter(Boolean);
+  if (!clean.length) return null;
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.3, textTransform: "uppercase", color: "rgb(var(--faint))" }}>{label}</div>
+      <ul style={{ margin: "2px 0 0", paddingLeft: 16 }}>
+        {clean.map((l, i) => <li key={i} style={{ fontSize: 12.5, color: "rgb(var(--muted))" }}>{l}</li>)}
+      </ul>
+    </div>
   );
 }
 

@@ -3,7 +3,6 @@
  *  daily_closes and the live_operations app_setting. */
 import { requireEngine } from "@/core/db/engine";
 import { setAppSetting } from "@/core/db/mutations";
-import type { DailyCloseResult } from "../analysis/operations";
 import type { AcceptedCommitment } from "../analysis/cash";
 
 /* ── live-operations start date ───────────────────────────────────────── */
@@ -18,16 +17,6 @@ export async function proposeLiveStart(startDate: string): Promise<void> {
 }
 
 /* ── daily closes ─────────────────────────────────────────────────────── */
-
-export async function saveDailyClose(locationId: string | null, result: DailyCloseResult, keyNumbers?: Record<string, unknown>): Promise<void> {
-  const { error } = await requireEngine().from("daily_closes").upsert({
-    location_id: locationId, close_date: result.date, status: result.status,
-    completeness: result.completeness, checklist: result.checklist as never,
-    key_numbers: (keyNumbers ?? null) as never, unresolved: result.unresolved as never,
-    next_action: result.nextAction, updated_at: new Date().toISOString(),
-  }, { onConflict: "location_id,close_date" });
-  if (error) throw error;
-}
 
 export interface DailyCloseRow { date: string; status: string; completeness: number; nextAction: string | null; version: number; isStale: boolean }
 export async function getRecentCloses(limit = 14): Promise<DailyCloseRow[]> {
