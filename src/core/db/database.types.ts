@@ -130,6 +130,7 @@ export type Database = {
           difference: number | null
           expected_balance: number
           id: string
+          idempotency_key: string | null
           is_opening_baseline: boolean
           notes: string | null
           opening_difference: number | null
@@ -147,6 +148,7 @@ export type Database = {
           difference?: number | null
           expected_balance: number
           id?: string
+          idempotency_key?: string | null
           is_opening_baseline?: boolean
           notes?: string | null
           opening_difference?: number | null
@@ -164,6 +166,7 @@ export type Database = {
           difference?: number | null
           expected_balance?: number
           id?: string
+          idempotency_key?: string | null
           is_opening_baseline?: boolean
           notes?: string | null
           opening_difference?: number | null
@@ -214,6 +217,7 @@ export type Database = {
           edited_at: string | null
           expected_amount: number
           id: string
+          idempotency_key: string | null
           notes: string | null
           received_date: string | null
           settlement_period_id: string
@@ -230,6 +234,7 @@ export type Database = {
           edited_at?: string | null
           expected_amount: number
           id?: string
+          idempotency_key?: string | null
           notes?: string | null
           received_date?: string | null
           settlement_period_id: string
@@ -246,6 +251,7 @@ export type Database = {
           edited_at?: string | null
           expected_amount?: number
           id?: string
+          idempotency_key?: string | null
           notes?: string | null
           received_date?: string | null
           settlement_period_id?: string
@@ -273,53 +279,83 @@ export type Database = {
       }
       daily_closes: {
         Row: {
+          auto_detected: Json
           checklist: Json
           close_date: string
           closed_by: string | null
           completeness: number
+          confidence: string
+          confirmations: Json
           created_at: string
           id: string
+          is_stale: boolean
           key_numbers: Json | null
           location_id: string | null
           next_action: string | null
           notes: string | null
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+          source_data_at: string | null
+          stale_reason: string | null
           status: string
           unresolved: Json
           updated_at: string
+          version: number
           void_reason: string | null
           voided_at: string | null
         }
         Insert: {
+          auto_detected?: Json
           checklist?: Json
           close_date: string
           closed_by?: string | null
           completeness?: number
+          confidence?: string
+          confirmations?: Json
           created_at?: string
           id?: string
+          is_stale?: boolean
           key_numbers?: Json | null
           location_id?: string | null
           next_action?: string | null
           notes?: string | null
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          source_data_at?: string | null
+          stale_reason?: string | null
           status?: string
           unresolved?: Json
           updated_at?: string
+          version?: number
           void_reason?: string | null
           voided_at?: string | null
         }
         Update: {
+          auto_detected?: Json
           checklist?: Json
           close_date?: string
           closed_by?: string | null
           completeness?: number
+          confidence?: string
+          confirmations?: Json
           created_at?: string
           id?: string
+          is_stale?: boolean
           key_numbers?: Json | null
           location_id?: string | null
           next_action?: string | null
           notes?: string | null
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          source_data_at?: string | null
+          stale_reason?: string | null
           status?: string
           unresolved?: Json
           updated_at?: string
+          version?: number
           void_reason?: string | null
           voided_at?: string | null
         }
@@ -519,6 +555,7 @@ export type Database = {
           employee_id: string | null
           expense_date: string
           id: string
+          idempotency_key: string | null
           is_estimated: boolean
           location_id: string
           notes: string | null
@@ -540,6 +577,7 @@ export type Database = {
           employee_id?: string | null
           expense_date: string
           id?: string
+          idempotency_key?: string | null
           is_estimated?: boolean
           location_id: string
           notes?: string | null
@@ -561,6 +599,7 @@ export type Database = {
           employee_id?: string | null
           expense_date?: string
           id?: string
+          idempotency_key?: string | null
           is_estimated?: boolean
           location_id?: string
           notes?: string | null
@@ -1042,6 +1081,7 @@ export type Database = {
           created_at: string
           edited_at: string | null
           id: string
+          idempotency_key: string | null
           location_id: string | null
           movement_date: string
           movement_type: Database["public"]["Enums"]["money_movement_type"]
@@ -1061,6 +1101,7 @@ export type Database = {
           created_at?: string
           edited_at?: string | null
           id?: string
+          idempotency_key?: string | null
           location_id?: string | null
           movement_date: string
           movement_type: Database["public"]["Enums"]["money_movement_type"]
@@ -1080,6 +1121,7 @@ export type Database = {
           created_at?: string
           edited_at?: string | null
           id?: string
+          idempotency_key?: string | null
           location_id?: string | null
           movement_date?: string
           movement_type?: Database["public"]["Enums"]["money_movement_type"]
@@ -1109,6 +1151,80 @@ export type Database = {
           },
         ]
       }
+      operational_exceptions: {
+        Row: {
+          acknowledged_at: string | null
+          dismiss_reason: string | null
+          dismissed_at: string | null
+          first_seen_at: string
+          id: string
+          last_amount: number | null
+          last_seen_at: string
+          last_severity_rank: number
+          linked_action_id: string | null
+          owner_note: string | null
+          recurrence_count: number
+          reopened_at: string | null
+          resolved_at: string | null
+          severity: string
+          status: string
+          suppressed_until: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          dismiss_reason?: string | null
+          dismissed_at?: string | null
+          first_seen_at?: string
+          id: string
+          last_amount?: number | null
+          last_seen_at?: string
+          last_severity_rank?: number
+          linked_action_id?: string | null
+          owner_note?: string | null
+          recurrence_count?: number
+          reopened_at?: string | null
+          resolved_at?: string | null
+          severity: string
+          status?: string
+          suppressed_until?: string | null
+          title?: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          dismiss_reason?: string | null
+          dismissed_at?: string | null
+          first_seen_at?: string
+          id?: string
+          last_amount?: number | null
+          last_seen_at?: string
+          last_severity_rank?: number
+          linked_action_id?: string | null
+          owner_note?: string | null
+          recurrence_count?: number
+          reopened_at?: string | null
+          resolved_at?: string | null
+          severity?: string
+          status?: string
+          suppressed_until?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_exceptions_linked_action_id_fkey"
+            columns: ["linked_action_id"]
+            isOneToOne: false
+            referencedRelation: "strategist_actions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       physical_counts: {
         Row: {
           avg_cost_at_count: number | null
@@ -1118,6 +1234,7 @@ export type Database = {
           difference: number
           expected_qty: number
           id: string
+          idempotency_key: string | null
           is_opening_baseline: boolean
           location_id: string | null
           notes: string | null
@@ -1138,6 +1255,7 @@ export type Database = {
           difference: number
           expected_qty: number
           id?: string
+          idempotency_key?: string | null
           is_opening_baseline?: boolean
           location_id?: string | null
           notes?: string | null
@@ -1158,6 +1276,7 @@ export type Database = {
           difference?: number
           expected_qty?: number
           id?: string
+          idempotency_key?: string | null
           is_opening_baseline?: boolean
           location_id?: string | null
           notes?: string | null
@@ -1788,6 +1907,10 @@ export type Database = {
           finding_id: string | null
           funding_status: string
           id: string
+          accepted_at: string | null
+          started_at: string | null
+          overdue_notified_at: string | null
+          linked_exception_id: string | null
           latest_date: string | null
           outcome_metrics: Json | null
           outcome_state: string
@@ -1818,6 +1941,10 @@ export type Database = {
           finding_id?: string | null
           funding_status?: string
           id?: string
+          accepted_at?: string | null
+          started_at?: string | null
+          overdue_notified_at?: string | null
+          linked_exception_id?: string | null
           latest_date?: string | null
           outcome_metrics?: Json | null
           outcome_state?: string
@@ -1848,6 +1975,10 @@ export type Database = {
           finding_id?: string | null
           funding_status?: string
           id?: string
+          accepted_at?: string | null
+          started_at?: string | null
+          overdue_notified_at?: string | null
+          linked_exception_id?: string | null
           latest_date?: string | null
           outcome_metrics?: Json | null
           outcome_state?: string
