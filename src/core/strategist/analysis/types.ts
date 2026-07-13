@@ -40,10 +40,21 @@ export interface Finding {
   /** Estimated EGP at stake; null when honestly unquantifiable. */
   impactEgp: number | null;
   urgency: Urgency;
+  /** This IS the confidence CEILING — no language provider may exceed it. */
   confidence: FindingConfidence;
   actionable: boolean;
   action: ActionCandidate | null;
+  /** A weaker fallback move when the primary action isn't possible yet. */
+  alternativeAction: string | null;
   missingData: string[];
+  /** What (deterministically) drove this — product names, categories, days. */
+  drivers: string[];
+  /** Assumptions the finding rests on (e.g. an unconfirmed default target). */
+  assumptions: string[];
+  /** How the engine will consider this resolved (drives auto-resolve). */
+  resolutionCriteria: string;
+  /** Whether this finding qualifies for persistent insight tracking. */
+  persistEligible: boolean;
   /** filled by rankFindings */
   score: number;
   rank: number;

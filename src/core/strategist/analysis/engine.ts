@@ -26,8 +26,27 @@ export function ev(label: string, m: Metric<unknown>, format?: (v: unknown) => s
   return { label, value, source: m.source, period: m.period, screenLink: m.screenLink };
 }
 
-function finding(f: Omit<Finding, "score" | "rank">): Finding {
-  return { ...f, score: 0, rank: 0 };
+type FindingSeed = Omit<Finding, "score" | "rank" | "drivers" | "assumptions" | "resolutionCriteria" | "alternativeAction" | "persistEligible"> &
+  Partial<Pick<Finding, "drivers" | "assumptions" | "resolutionCriteria" | "alternativeAction">>;
+
+function finding(f: FindingSeed): Finding {
+  return {
+    drivers: [], assumptions: [], alternativeAction: null,
+    resolutionCriteria: "the engine stops raising this finding on a newer snapshot",
+    ...f,
+    persistEligible: false, // set by rankFindings via the persistence rule
+    score: 0, rank: 0,
+  };
+}
+
+/** Persistence eligibility — the ENGINE owns this rule; the persistence layer
+ *  only executes it. Not every transient observation deserves memory. */
+export function shouldPersistFinding(f: Pick<Finding, "class" | "urgency" | "impactEgp">): boolean {
+  if (f.class === "contradiction" || f.class === "decision_risk") return true;
+  if (f.urgency === "today") return true;
+  if ((f.impactEgp ?? 0) >= 5_000) return true;
+  if (f.class === "data_quality" && f.urgency !== "monitor") return true;
+  return false;
 }
 
 function action(a: Partial<ActionCandidate> & Pick<ActionCandidate, "title" | "action" | "rationale" | "screenLink">): ActionCandidate {
@@ -75,6 +94,8 @@ export function detectChanges(s: StrategistSnapshot): Finding[] {
         impactEgp: Math.abs(rev.periodRevenue.value - rev.priorRevenue.value),
         urgency: up ? "monitor" : "this_week",
         confidence: "high",
+        drivers: (up ? s.products.fastestGrowing.value : s.products.fastestDeclining.value ?? [])?.slice(0, 3).map((p) => `${p.name} (${pct(p.changePct)})`) ?? [],
+        resolutionCriteria: "period revenue within 10% of the comparison period on a newer snapshot",
         actionable: !up,
         action: up ? null : action({
           title: "Find the revenue leak",
@@ -102,6 +123,8 @@ export function detectChanges(s: StrategistSnapshot): Finding[] {
       impactEgp: Math.round((pts / 100) * covered),
       urgency: drop ? "this_week" : "monitor",
       confidence: m.confidence === "high" ? "high" : "medium",
+      drivers: (s.products.highVolumeLowMargin.value ?? []).slice(0, 3).map((p) => p.name),
+      resolutionCriteria: `gross margin back within 2 points of the prior period (${pct(mp.value)})`,
       actionable: drop,
       action: drop ? action({
         title: "Trace the margin erosion",
@@ -128,6 +151,8 @@ export function detectChanges(s: StrategistSnapshot): Finding[] {
         evidence: [ev("Period revenue", rev.periodRevenue), ev("Target basis", s.context.monthlyRevenueTarget, () => egp(baseline))],
         impactEgp: Math.round(baseline - rev.periodRevenue.value),
         urgency: "this_week", confidence: target != null ? "high" : "medium",
+        assumptions: target == null ? ["baseline = trailing-3-month average (no owner target confirmed)"] : [],
+        resolutionCriteria: "period revenue within 10% of the baseline",
         actionable: true,
         action: action({
           title: "Close the gap to plan",
@@ -344,6 +369,8 @@ export function findContradictions(s: StrategistSnapshot): Finding[] {
         evidence: [ev("Withdrawals", s.expenses.withdrawals), ev("Net profit", prof.netProfit), ev("Rule", s.context.withdrawalRule, (v) => String(v))],
         impactEgp: Math.round(wd - limit),
         urgency: "this_week", confidence: "high",
+        resolutionCriteria: "period withdrawals back under 50% of the same period's net profit",
+        alternativeAction: "If this draw was planned (e.g. a personal commitment), note it in Tune so the strategist stops flagging it this month.",
         actionable: true,
         action: action({
           title: "Pace the draws",
@@ -469,6 +496,8 @@ export function dataQualityFindings(s: StrategistSnapshot): Finding[] {
       detail: `The last recorded sale is ${s.meta.lastDataDate}. Every "current" number is really as of that date.`,
       evidence: [ev("Period revenue", s.revenue.periodRevenue)],
       impactEgp: null, urgency: "today", confidence: "high",
+      resolutionCriteria: "last recorded sale within 3 days of today",
+      alternativeAction: "If the shop was genuinely closed, record zero-days so the gap is explained.",
       actionable: true,
       action: action({
         title: "Bring the books current",
@@ -550,6 +579,7 @@ export function rankFindings(findings: Finding[]): Finding[] {
   const maxImpact = Math.max(1, ...findings.map((f) => f.impactEgp ?? 0));
   const scored = findings.map((f) => ({
     ...f,
+    persistEligible: shouldPersistFinding(f),
     score: Math.round(1000 * (
       (0.40 * ((f.impactEgp ?? maxImpact * 0.15) / maxImpact)) +
       (0.25 * URGENCY_W[f.urgency]) +

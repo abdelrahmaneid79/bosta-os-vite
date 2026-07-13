@@ -8,18 +8,14 @@
  *    appears after dismissed  → stay silent (the owner said stop)
  *    engine stops emitting it → auto-resolve (evidence-based, not manual) */
 import type { Finding } from "../analysis/types";
+import { shouldPersistFinding } from "../analysis/engine";
 
 export type InsightStatus = "active" | "acknowledged" | "resolved" | "dismissed" | "reopened";
 export interface InsightLite { id: string; findingId: string; status: InsightStatus }
 
-/** Persist only what deserves memory — not every transient observation. */
-export function shouldPersistFinding(f: Finding): boolean {
-  if (f.class === "contradiction" || f.class === "decision_risk") return true;
-  if (f.urgency === "today") return true;
-  if ((f.impactEgp ?? 0) >= 5_000) return true;
-  if (f.class === "data_quality" && f.urgency !== "monitor") return true;
-  return false;
-}
+/** The persistence rule is OWNED by the strategy engine (Layer 2); re-exported
+ *  here so persistence callers keep one import site. */
+export { shouldPersistFinding };
 
 export interface InsightSyncPlan {
   inserts: Finding[];

@@ -14,7 +14,9 @@ import type { Finding } from "@/core/strategist/analysis/types";
 const F = (over: Partial<Finding>): Finding => ({
   id: "x", class: "warning", title: "t", detail: "d", evidence: [], impactEgp: null,
   urgency: "monitor", confidence: "medium", actionable: false, action: null,
-  missingData: [], score: 0, rank: 1, ...over,
+  alternativeAction: null, missingData: [], drivers: [], assumptions: [],
+  resolutionCriteria: "engine stops raising it", persistEligible: false,
+  score: 0, rank: 1, ...over,
 });
 
 describe("insight lifecycle", () => {
