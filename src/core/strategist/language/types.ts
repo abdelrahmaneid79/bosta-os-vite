@@ -28,6 +28,12 @@ export interface LanguageRequest {
   memory?: string[];
 }
 
+export class StrategistAuthError extends Error {
+  constructor() { super("Sign in to use the strategist."); }
+}
+/** Provider down / timed out / out of credits — templates take over. */
+export class ProviderUnavailableError extends Error {}
+
 export interface ProviderHealth {
   id: string;
   available: boolean;

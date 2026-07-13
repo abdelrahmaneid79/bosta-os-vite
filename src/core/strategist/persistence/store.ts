@@ -209,6 +209,30 @@ export async function recordFeedback(
   if (error) throw error;
 }
 
+/** Recent negative feedback with the answer headline it targeted — feeds the
+ *  owner-memory block so future answers avoid repeated mistakes. */
+export async function listRecentFeedback(limit = 10): Promise<{ verdict: string; reason: string | null; subjectTitle: string | null }[]> {
+  const sb = requireEngine();
+  const { data, error } = await sb.from("strategist_feedback")
+    .select("verdict,reason,subject_type,subject_id")
+    .in("verdict", ["incorrect", "not_useful"])
+    .order("created_at", { ascending: false }).limit(limit);
+  if (error) throw error;
+  const msgIds = (data ?? []).filter((r) => r.subject_type === "message" && r.subject_id).map((r) => r.subject_id as string);
+  const titles = new Map<string, string>();
+  if (msgIds.length) {
+    const { data: msgs } = await sb.from("strategist_messages").select("id,content").in("id", msgIds);
+    for (const m of msgs ?? []) {
+      const c = m.content as { headline?: string } | null;
+      if (c?.headline) titles.set(m.id, c.headline);
+    }
+  }
+  return (data ?? []).map((r) => ({
+    verdict: r.verdict, reason: r.reason,
+    subjectTitle: r.subject_id ? titles.get(r.subject_id) ?? null : null,
+  }));
+}
+
 /* ── cached AI briefing (app_settings) ────────────────────────────────── */
 
 export interface CachedBriefing {

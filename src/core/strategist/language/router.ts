@@ -11,7 +11,8 @@ import { requireEngine } from "@/core/db/engine";
 import { setAppSetting } from "@/core/db/mutations";
 import type { StrategistResponse } from "../response";
 import { deterministicProvider } from "./deterministic";
-import { anthropicProvider, StrategistAuthError } from "./anthropic";
+import { anthropicProvider } from "./anthropic";
+import { StrategistAuthError } from "./types";
 import { validateResponse } from "./validate";
 import {
   DEFAULT_LANGUAGE_SETTINGS,

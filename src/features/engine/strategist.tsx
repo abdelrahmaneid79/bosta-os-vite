@@ -19,21 +19,22 @@ import { fmtDate } from "@/core/utils/date";
 import { useUI } from "@/store/ui";
 import { todayCairo } from "@/core/time";
 import { assembleSnapshotV2 } from "@/core/strategist/snapshot-v2";
-import { analyzeSnapshot } from "@/core/strategist/analysis/engine";
 import type { Finding } from "@/core/strategist/analysis/types";
 import type { StrategistSnapshot } from "@/core/strategist/contract";
-import { computeDecisionContext } from "@/core/strategist/analysis/decision";
+import { buildStrategyReport, type StrategyReport } from "@/core/strategist/analysis/report";
 import { assessWithdrawal } from "@/core/strategist/analysis/withdrawal";
 import { computeCalendar } from "@/core/strategist/calendar";
 import { suggestQuestions } from "@/core/strategist/questions";
-import { askStrategistV2, StrategistAuthError, StrategistUnavailableError, type StrategistMode } from "@/core/strategist/client-v2";
+import { generateLanguage, loadLanguageSettings, saveLanguageSettings, providerHealth } from "@/core/strategist/language/router";
+import { type LanguageMode, type LanguageResult, type LanguageSettings, type ProviderHealth, DEFAULT_LANGUAGE_SETTINGS } from "@/core/strategist/language/types";
+import { timings, timed, timedSync } from "@/core/strategist/diagnostics";
 import type { StrategistResponse, ResponsePriority } from "@/core/strategist/response";
 import { loadOwnerContext, saveOwnerContext, type OwnerContextAnswers } from "@/core/strategist/context";
 import {
   syncInsights, listInsights, setInsightStatus, type InsightRow,
   createAction, listActions, updateActionStatus, type ActionRow,
   createConversation, addMessage, getMessages, listConversations,
-  recordFeedback, getCachedBriefing, saveCachedBriefing,
+  recordFeedback, getCachedBriefing, saveCachedBriefing, listRecentFeedback,
 } from "@/core/strategist/persistence/store";
 import { buildOwnerMemory } from "@/core/strategist/persistence/lifecycle";
 
@@ -76,9 +77,10 @@ export function StrategistScreen() {
   const qc = useQueryClient();
   const { reportError, reportSuccess } = useUI();
 
-  const snapQ = useQuery({ queryKey: ["snapshot-v2"], queryFn: assembleSnapshotV2, enabled: en, staleTime: 5 * 60_000 });
+  const snapQ = useQuery({ queryKey: ["snapshot-v2"], queryFn: () => timed("snapshotMs", assembleSnapshotV2), enabled: en, staleTime: 5 * 60_000 });
   const s = snapQ.data;
-  const findings = useMemo(() => (s ? analyzeSnapshot(s) : []), [s]);
+  const report = useMemo(() => (s ? timedSync("engineMs", () => buildStrategyReport(s)) : null), [s]);
+  const findings = report?.findings ?? [];
 
   // persist qualifying findings once per snapshot (evidence-based lifecycle)
   const syncedFor = useRef<string | null>(null);
@@ -87,7 +89,7 @@ export function StrategistScreen() {
     const key = `${s.meta.period.label}|${s.meta.lastDataDate}`;
     if (syncedFor.current === key) return;
     syncedFor.current = key;
-    syncInsights(findings, s.meta.period.label)
+    timed("syncMs", () => syncInsights(findings, s.meta.period.label))
       .then(() => qc.invalidateQueries({ queryKey: ["strategist-insights"] }))
       .catch(() => { syncedFor.current = null; });
   }, [s, findings, qc]);
@@ -103,7 +105,7 @@ export function StrategistScreen() {
     const msg = String((snapQ.error as Error)?.message ?? "");
     return <ErrorState message={`The snapshot could not be assembled — ${msg}. The strategist needs the read-model to work; reload to retry.`} />;
   }
-  if (snapQ.isLoading || !s) return <div className="cdk"><SkeletonRows rows={8} /></div>;
+  if (snapQ.isLoading || !s || !report) return <div className="cdk"><SkeletonRows rows={8} /></div>;
 
   const insights = insightsQ.data ?? [];
   const insightByFinding = new Map(insights.map((i) => [i.findingId, i]));
@@ -114,7 +116,7 @@ export function StrategistScreen() {
         right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
 
       <FreshnessStrip s={s} />
-      <ExecutiveBriefing s={s} findings={findings} />
+      <ExecutiveBriefing s={s} report={report} />
       <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
         onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
         onAccept={async (f) => {
@@ -130,8 +132,8 @@ export function StrategistScreen() {
       <ActionQueue actions={actionsQ.data ?? []} onUpdate={async (id, status, note) => {
         await updateActionStatus(id, status, note); qc.invalidateQueries({ queryKey: ["strategist-actions"] });
       }} />
-      <AskStrategist s={s} findings={findings} actions={actionsQ.data ?? []} insights={insights} />
-      <DecisionMode s={s} findings={findings} />
+      <AskStrategist s={s} report={report} actions={actionsQ.data ?? []} insights={insights} />
+      <DecisionMode s={s} report={report} />
 
       <EvidenceDrawer finding={drawer} onClose={() => setDrawer(null)} />
       <TuneModal open={tuneOpen} onClose={() => setTuneOpen(false)}
@@ -171,10 +173,11 @@ function FreshnessStrip({ s }: { s: StrategistSnapshot }) {
 
 /* ═══ EXECUTIVE BRIEFING ══════════════════════════════════════════════ */
 
-function ExecutiveBriefing({ s, findings }: { s: StrategistSnapshot; findings: Finding[] }) {
+function ExecutiveBriefing({ s, report }: { s: StrategistSnapshot; report: StrategyReport }) {
   const { reportError } = useUI();
-  const [ai, setAi] = useState<{ response: StrategistResponse; cached: boolean; snapshotLabel: string } | null>(null);
-  const [aiState, setAiState] = useState<"idle" | "loading" | "unavailable">("idle");
+  const findings = report.findings;
+  const [ai, setAi] = useState<{ response: StrategistResponse; cached: boolean; snapshotLabel: string; provider?: string; fallbackReason?: string } | null>(null);
+  const [aiState, setAiState] = useState<"idle" | "loading">("idle");
   const loadedCache = useRef(false);
 
   // load a cached briefing once (no API spend); label it with its snapshot
@@ -189,15 +192,26 @@ function ExecutiveBriefing({ s, findings }: { s: StrategistSnapshot; findings: F
   const generate = async () => {
     setAiState("loading");
     try {
-      const response = await askStrategistV2({ mode: "daily_brief", snapshot: s, findings, calendar: computeCalendar(todayCairo()) });
+      const result: LanguageResult = await generateLanguage(
+        { mode: "daily_brief", snapshot: s, report, findings, calendar: computeCalendar(todayCairo()) },
+        { enhanced: true },
+      );
+      if (result.fallback) timings.fallbacks += 1;
+      timings.lastLanguageMs = result.latencyMs;
+      timings.validationRepairs += result.validation.repaired.length;
       const meta = { generatedAt: new Date().toISOString(), period: s.meta.period.label, lastDataDate: s.meta.lastDataDate };
-      setAi({ response, cached: false, snapshotLabel: `${meta.period} · books to ${meta.lastDataDate ?? "—"}` });
+      setAi({
+        response: result.response, cached: false,
+        snapshotLabel: `${meta.period} · books to ${meta.lastDataDate ?? "—"}`,
+        provider: result.provider, fallbackReason: result.fallbackReason,
+      });
       setAiState("idle");
-      await saveCachedBriefing({ response, snapshotMeta: meta, generatedAt: meta.generatedAt });
+      if (!result.fallback && result.provider !== "deterministic") {
+        await saveCachedBriefing({ response: result.response, snapshotMeta: meta, generatedAt: meta.generatedAt });
+      }
     } catch (e) {
-      setAiState("unavailable");
-      if (e instanceof StrategistAuthError) reportError("Strategist", e);
-      // Unavailable / timeout / invalid response: stay deterministic, no auto-retry.
+      setAiState("idle");
+      reportError("Strategist", e); // only auth errors reach here — everything else falls back
     }
   };
 
@@ -215,16 +229,18 @@ function ExecutiveBriefing({ s, findings }: { s: StrategistSnapshot; findings: F
       <div className="th">
         <span className="tname">Executive briefing</span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          {ai ? <Chip text={ai.cached ? "AI · cached" : "AI-enhanced"} color="rgb(var(--cyan))" /> : <Chip text="Deterministic" color="rgb(var(--violet))" />}
+          {ai && ai.provider !== "deterministic" && !ai.fallbackReason
+            ? <Chip text={ai.cached ? "Enhanced · cached" : "Enhanced"} color="rgb(var(--cyan))" />
+            : <Chip text="BostaOS analysis" color="rgb(var(--violet))" />}
           <Button onClick={() => void generate()} disabled={aiState === "loading"}>
-            {aiState === "loading" ? "Thinking…" : ai ? "Refresh AI briefing" : "Generate AI briefing"}
+            {aiState === "loading" ? "Working…" : ai ? "Refresh enhanced briefing" : "Enhanced briefing"}
           </Button>
         </span>
       </div>
 
-      {aiState === "unavailable" && (
+      {ai?.fallbackReason && (
         <div style={{ margin: "10px 0", fontSize: 12.5, color: "var(--amber)", fontWeight: 600 }}>
-          The AI is unavailable right now (likely API credits or a timeout). Everything below is the deterministic engine — fully trustworthy, just less narrative. No automatic retries.
+          Language service unavailable — this briefing was written by BostaOS templates instead. ({ai.fallbackReason}) Nothing retries automatically.
         </div>
       )}
       {ai && cacheIsStale && (
@@ -432,23 +448,24 @@ function ActionQueue({ actions, onUpdate }: { actions: ActionRow[]; onUpdate: (i
 
 /* ═══ ASK THE STRATEGIST ══════════════════════════════════════════════ */
 
-function AskStrategist({ s, findings, actions, insights }: {
-  s: StrategistSnapshot; findings: Finding[]; actions: ActionRow[]; insights: InsightRow[];
+function AskStrategist({ s, report, actions, insights }: {
+  s: StrategistSnapshot; report: StrategyReport; actions: ActionRow[]; insights: InsightRow[];
 }) {
   const { reportError } = useUI();
   const qc = useQueryClient();
+  const findings = report.findings;
   const [input, setInput] = useState("");
   const [convId, setConvId] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
-  const [aiDown, setAiDown] = useState(false);
 
   const suggestions = useMemo(() => suggestQuestions(s, findings), [s, findings]);
+  const negFeedbackQ = useQuery({ queryKey: ["strategist-feedback-recent"], queryFn: () => listRecentFeedback(6), enabled: en });
   const convsQ = useQuery({ queryKey: ["strategist-convs"], queryFn: () => listConversations(6), enabled: en });
   const msgsQ = useQuery({ queryKey: ["strategist-msgs", convId], queryFn: () => getMessages(convId!), enabled: en && !!convId });
 
-  const ask = async (text: string, mode: StrategistMode = "question") => {
+  const ask = async (text: string, mode: LanguageMode = "question") => {
     if (!text.trim() || pending) return;
-    setPending(text); setAiDown(false); setInput("");
+    setPending(text); setInput("");
     try {
       let cid = convId;
       if (!cid) { cid = await createConversation(mode, text.slice(0, 100)); setConvId(cid); qc.invalidateQueries({ queryKey: ["strategist-convs"] }); }
@@ -456,26 +473,27 @@ function AskStrategist({ s, findings, actions, insights }: {
       await addMessage(cid, "user", { text }, meta);
       qc.invalidateQueries({ queryKey: ["strategist-msgs", cid] });
 
-      // owner memory (decisions, rejections) — behavioral context only, never numbers
+      // owner memory (decisions, rejections, corrections) — behavioral context only
       const memory = buildOwnerMemory({
         completedActions: actions.filter((a) => a.status === "completed").map((a) => ({ title: a.title, completionNote: a.completionNote, completedAt: a.completedAt })),
-        rejectedFeedback: [],
+        rejectedFeedback: negFeedbackQ.data ?? [],
         dismissedInsights: insights.filter((i) => i.status === "dismissed").map((i) => ({ title: i.title, ownerNote: i.ownerNote })),
       });
       const priorTurns = (msgsQ.data ?? []).slice(-4).map((m) => ({
         role: m.role,
         content: m.role === "user" ? ((m.content as { text?: string }).text ?? "") : ((m.content as StrategistResponse).conclusion ?? ""),
       })).filter((m) => m.content);
-      const history = memory.length
-        ? [{ role: "user" as const, content: `OWNER MEMORY (behavioral context, never business data): ${memory.join(" | ")}` }, ...priorTurns]
-        : priorTurns;
 
-      const response = await askStrategistV2({ mode, snapshot: s, findings, calendar: computeCalendar(todayCairo()), question: text, history });
-      await addMessage(cid, "assistant", response, meta);
+      const result = await generateLanguage(
+        { mode, snapshot: s, report, findings, calendar: computeCalendar(todayCairo()), question: text, history: priorTurns, memory },
+        { enhanced: true },
+      );
+      if (result.fallback) timings.fallbacks += 1;
+      timings.lastLanguageMs = result.latencyMs;
+      await addMessage(cid, "assistant", result.response, { ...meta, provider: result.provider, fallbackReason: result.fallbackReason } as never);
       qc.invalidateQueries({ queryKey: ["strategist-msgs", cid] });
     } catch (e) {
-      if (e instanceof StrategistUnavailableError) setAiDown(true);
-      else reportError("Ask the strategist", e);
+      reportError("Ask the strategist", e); // only auth errors reach here
     } finally {
       setPending(null);
     }
@@ -502,12 +520,6 @@ function AskStrategist({ s, findings, actions, insights }: {
         ))}
       </div>
 
-      {aiDown && (
-        <div style={{ marginTop: 10, fontSize: 12.5, color: "var(--amber)", fontWeight: 600 }}>
-          The AI can't answer right now (credits or timeout). Your question wasn't lost — the deterministic findings above still stand. Retry whenever you choose; nothing retries by itself.
-        </div>
-      )}
-
       <div className="space-y-3" style={{ marginTop: 12 }}>
         {messages.map((m) => m.role === "user" ? (
           <div key={m.id} style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>
@@ -531,7 +543,7 @@ function AskStrategist({ s, findings, actions, insights }: {
 }
 
 /* structured answer card — renders the VALIDATED schema, never raw markdown */
-function AnswerCard({ r, messageId, snapshotMeta }: { r: StrategistResponse; messageId: string; snapshotMeta: { period?: string; lastDataDate?: string | null } | null }) {
+function AnswerCard({ r, messageId, snapshotMeta }: { r: StrategistResponse; messageId: string; snapshotMeta: { period?: string; lastDataDate?: string | null; provider?: string; fallbackReason?: string } | null }) {
   const { reportSuccess, reportError } = useUI();
   const [fb, setFb] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -547,6 +559,9 @@ function AnswerCard({ r, messageId, snapshotMeta }: { r: StrategistResponse; mes
 
   return (
     <div style={{ border: "1px solid var(--stroke)", borderRadius: 12, padding: "12px 14px", background: "var(--surface2)" }}>
+      {snapshotMeta?.fallbackReason && (
+        <div style={{ fontSize: 11.5, color: "var(--amber)", fontWeight: 600, marginBottom: 6 }}>Answered by BostaOS templates — language service unavailable.</div>
+      )}
       <div className="disp" style={{ fontSize: 14.5, fontWeight: 700 }}>{r.headline}</div>
       <p style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 6, lineHeight: 1.55 }}>{r.conclusion}</p>
 
@@ -612,15 +627,16 @@ function PriorityBlock({ p }: { p: ResponsePriority }) {
 
 type DecisionKind = "withdrawal" | "price" | "stock" | "other";
 
-function DecisionMode({ s, findings }: { s: StrategistSnapshot; findings: Finding[] }) {
+function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyReport }) {
   const { reportError } = useUI();
+  const findings = report.findings;
   const [kind, setKind] = useState<DecisionKind>("withdrawal");
   const [amount, setAmount] = useState("20000");
   const [freeText, setFreeText] = useState("");
-  const [aiAnswer, setAiAnswer] = useState<StrategistResponse | null>(null);
-  const [aiState, setAiState] = useState<"idle" | "loading" | "down">("idle");
+  const [aiAnswer, setAiAnswer] = useState<{ r: StrategistResponse; note?: string } | null>(null);
+  const [aiState, setAiState] = useState<"idle" | "loading">("idle");
 
-  const ctx = useMemo(() => computeDecisionContext(s), [s]);
+  const ctx = report.decisionContext;
   const amt = Number(amount) || 0;
   const wa = useMemo(() => (kind === "withdrawal" && amt > 0 ? assessWithdrawal(s, ctx, amt) : null), [s, ctx, kind, amt]);
 
@@ -629,11 +645,15 @@ function DecisionMode({ s, findings }: { s: StrategistSnapshot; findings: Findin
     if (!decision.trim()) return;
     setAiState("loading");
     try {
-      const r = await askStrategistV2({ mode: "decision_support", snapshot: s, findings, calendar: computeCalendar(todayCairo()), decision, decisionContext: ctx });
-      setAiAnswer(r); setAiState("idle");
+      const result = await generateLanguage(
+        { mode: "decision_support", snapshot: s, report, findings, calendar: computeCalendar(todayCairo()), decision, decisionContext: ctx },
+        { enhanced: true },
+      );
+      if (result.fallback) timings.fallbacks += 1;
+      setAiAnswer({ r: result.response, note: result.fallbackReason ? `Language service unavailable — BostaOS templates answered. (${result.fallbackReason})` : undefined });
+      setAiState("idle");
     } catch (e) {
-      if (e instanceof StrategistUnavailableError) setAiState("down");
-      else { setAiState("idle"); reportError("Decision support", e); }
+      setAiState("idle"); reportError("Decision support", e);
     }
   };
 
@@ -705,9 +725,13 @@ function DecisionMode({ s, findings }: { s: StrategistSnapshot; findings: Findin
         <Button onClick={() => void askAI()} disabled={aiState === "loading"}>
           {aiState === "loading" ? "Assessing…" : "Get the strategist's judgment"}
         </Button>
-        {aiState === "down" && <span style={{ fontSize: 12, color: "var(--amber)", fontWeight: 600 }}>AI unavailable — the deterministic numbers above still hold.</span>}
       </div>
-      {aiAnswer && <div style={{ marginTop: 12 }}><AnswerCard r={aiAnswer} messageId={crypto.randomUUID()} snapshotMeta={{ period: s.meta.period.label, lastDataDate: s.meta.lastDataDate }} /></div>}
+      {aiAnswer && (
+        <div style={{ marginTop: 12 }}>
+          {aiAnswer.note && <div style={{ fontSize: 12, color: "var(--amber)", fontWeight: 600, marginBottom: 8 }}>{aiAnswer.note}</div>}
+          <AnswerCard r={aiAnswer.r} messageId={crypto.randomUUID()} snapshotMeta={{ period: s.meta.period.label, lastDataDate: s.meta.lastDataDate }} />
+        </div>
+      )}
     </DeckTile>
   );
 }
@@ -725,14 +749,19 @@ function KV({ k, v }: { k: string; v: string }) {
 
 function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose: () => void; onSaved: () => void; onError: (e: unknown) => void }) {
   const [form, setForm] = useState<OwnerContextAnswers>({});
+  const [lang, setLang] = useState<LanguageSettings>(DEFAULT_LANGUAGE_SETTINGS);
+  const [health, setHealth] = useState<ProviderHealth[]>([]);
+  const [showDiag, setShowDiag] = useState(false);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     if (!open || loaded) return;
-    loadOwnerContext().then((a) => { setForm(a ?? {}); setLoaded(true); }).catch(() => setLoaded(true));
+    Promise.all([loadOwnerContext(), loadLanguageSettings(), providerHealth()])
+      .then(([a, l, h]) => { setForm(a ?? {}); setLang(l); setHealth(h); setLoaded(true); })
+      .catch(() => setLoaded(true));
   }, [open, loaded]);
 
   const save = useMutation({
-    mutationFn: () => saveOwnerContext(form),
+    mutationFn: async () => { await saveOwnerContext(form); await saveLanguageSettings(lang); },
     onSuccess: () => { onSaved(); onClose(); },
     onError,
   });
@@ -763,6 +792,33 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
           <input type="checkbox" checked={form.allowPriceRecommendations ?? true} onChange={(e) => setForm({ ...form, allowPriceRecommendations: e.target.checked })} />
           Allow price-change recommendations
         </label>
+
+        <div style={{ borderTop: "1px solid var(--stroke2)", paddingTop: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "rgb(var(--faint))", marginBottom: 8 }}>Language service</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Field label="Enhanced explanations">
+              <select value={lang.provider} onChange={(e) => setLang({ ...lang, provider: e.target.value as LanguageSettings["provider"] })}
+                style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
+                <option value="anthropic">On (external service)</option>
+                <option value="deterministic">Off — BostaOS templates only</option>
+              </select>
+            </Field>
+            <Field label="Max enhanced calls / day"><Input type="number" value={lang.maxCallsPerDay} onChange={(e) => setLang({ ...lang, maxCallsPerDay: Number(e.target.value) || 0 })} /></Field>
+          </div>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 8 }}>
+            <input type="checkbox" checked={lang.allowEnhanced} onChange={(e) => setLang({ ...lang, allowEnhanced: e.target.checked })} />
+            Allow enhanced briefings and answers (each call costs money; nothing runs automatically)
+          </label>
+          <button style={{ ...MINI, marginTop: 10 }} onClick={() => setShowDiag((v) => !v)}>{showDiag ? "Hide diagnostics" : "Diagnostics"}</button>
+          {showDiag && (
+            <div style={{ marginTop: 8, fontSize: 11.5, color: "rgb(var(--dim))", lineHeight: 1.7 }}>
+              {health.map((h) => <div key={h.id}>{h.id}: {h.available ? "available" : "unavailable"} — {h.detail}{h.lastLatencyMs ? ` · ${h.lastLatencyMs}ms` : ""}</div>)}
+              <div>snapshot {timings.snapshotMs ?? "—"}ms · engine {timings.engineMs ?? "—"}ms · insight sync {timings.syncMs ?? "—"}ms · last language {timings.lastLanguageMs ?? "—"}ms</div>
+              <div>fallbacks this session: {timings.fallbacks} · validation repairs: {timings.validationRepairs}</div>
+            </div>
+          )}
+        </div>
+
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button style={MINI} onClick={onClose}>Cancel</button>
           <Button onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>

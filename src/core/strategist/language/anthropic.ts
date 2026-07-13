@@ -6,13 +6,7 @@
 import { requireEngine } from "@/core/db/engine";
 import { getSession } from "@/core/db/session";
 import { parseStrategistResponse, type StrategistResponse } from "../response";
-import type { LanguageProvider, LanguageRequest, ProviderHealth } from "./types";
-
-export class StrategistAuthError extends Error {
-  constructor() { super("Sign in to use the strategist."); }
-}
-/** Provider down / timed out / out of credits — templates take over. */
-export class ProviderUnavailableError extends Error {}
+import { StrategistAuthError, ProviderUnavailableError, type LanguageProvider, type LanguageRequest, type ProviderHealth } from "./types";
 
 let lastHealth: { latencyMs?: number; error?: string } = {};
 
