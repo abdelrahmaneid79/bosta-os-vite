@@ -1406,6 +1406,17 @@ export type Database = {
           created_at: string
           current_stock: number
           id: string
+          adjacent_product_ids: string[] | null
+          display_zone: string | null
+          facings: number | null
+          impulse_type: string | null
+          min_order_qty: number | null
+          pack_size_g: number | null
+          packaging_cost: number | null
+          packaging_format: string | null
+          shelf_level: string | null
+          supplier_lead_days: number | null
+          tier: string | null
           low_stock_threshold: number | null
           market_code: string | null
           name_ar: string | null
@@ -1429,6 +1440,17 @@ export type Database = {
           created_at?: string
           current_stock?: number
           id?: string
+          adjacent_product_ids?: string[] | null
+          display_zone?: string | null
+          facings?: number | null
+          impulse_type?: string | null
+          min_order_qty?: number | null
+          pack_size_g?: number | null
+          packaging_cost?: number | null
+          packaging_format?: string | null
+          shelf_level?: string | null
+          supplier_lead_days?: number | null
+          tier?: string | null
           low_stock_threshold?: number | null
           market_code?: string | null
           name_ar?: string | null
@@ -1452,6 +1474,17 @@ export type Database = {
           created_at?: string
           current_stock?: number
           id?: string
+          adjacent_product_ids?: string[] | null
+          display_zone?: string | null
+          facings?: number | null
+          impulse_type?: string | null
+          min_order_qty?: number | null
+          pack_size_g?: number | null
+          packaging_cost?: number | null
+          packaging_format?: string | null
+          shelf_level?: string | null
+          supplier_lead_days?: number | null
+          tier?: string | null
           low_stock_threshold?: number | null
           market_code?: string | null
           name_ar?: string | null
@@ -1638,6 +1671,99 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      retail_experiments: {
+        Row: {
+          attribution_confidence: string | null
+          baseline: Json | null
+          change_description: string
+          conclusion: string | null
+          created_at: string
+          decision: string | null
+          domain: string
+          end_date: string | null
+          failure_threshold: string | null
+          guardrail_metrics: Json
+          id: string
+          location: string | null
+          min_sample: string | null
+          owner_notes: string | null
+          playbook_id: string | null
+          primary_metric: string
+          product_ids: string[]
+          rec_type: string
+          result: Json | null
+          secondary_metrics: Json
+          start_date: string | null
+          status: string
+          stop_condition: string | null
+          success_threshold: string | null
+          title: string
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          attribution_confidence?: string | null
+          baseline?: Json | null
+          change_description: string
+          conclusion?: string | null
+          created_at?: string
+          decision?: string | null
+          domain: string
+          end_date?: string | null
+          failure_threshold?: string | null
+          guardrail_metrics?: Json
+          id?: string
+          location?: string | null
+          min_sample?: string | null
+          owner_notes?: string | null
+          playbook_id?: string | null
+          primary_metric: string
+          product_ids?: string[]
+          rec_type: string
+          result?: Json | null
+          secondary_metrics?: Json
+          start_date?: string | null
+          status?: string
+          stop_condition?: string | null
+          success_threshold?: string | null
+          title: string
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          attribution_confidence?: string | null
+          baseline?: Json | null
+          change_description?: string
+          conclusion?: string | null
+          created_at?: string
+          decision?: string | null
+          domain?: string
+          end_date?: string | null
+          failure_threshold?: string | null
+          guardrail_metrics?: Json
+          id?: string
+          location?: string | null
+          min_sample?: string | null
+          owner_notes?: string | null
+          playbook_id?: string | null
+          primary_metric?: string
+          product_ids?: string[]
+          rec_type?: string
+          result?: Json | null
+          secondary_metrics?: Json
+          start_date?: string | null
+          status?: string
+          stop_condition?: string | null
+          success_threshold?: string | null
+          title?: string
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Relationships: []
       }
       sales: {
         Row: {
