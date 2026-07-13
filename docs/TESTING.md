@@ -5,7 +5,7 @@ _Updated 2026-07-13 (replaces the 2026-06 checklist — superseded sections live
 ## Gates (all must pass before push)
 ```bash
 npm run typecheck   # tsc -b (strict, noUnusedLocals)
-npm run test        # vitest — 334 tests / 25 files
+npm run test        # vitest — 366 tests / 26 files
 npm run build       # tsc -b && vite build
 ```
 (`lint` was removed — eslint was never installed/configured; typecheck is the gate.)
@@ -27,6 +27,7 @@ npm run build       # tsc -b && vite build
 ## Manual QA
 Settings → **QA checklist** (`/qa`, now reachable from nav) — interactive checklist updated 2026-07-13 to match real screen names and flows. DB-level verification queries live in `supabase/tests/`.
 
+- **Cycle 8 activation** (`strategist-activation.test.ts`, 32 tests): activation checklist + readiness states, opening baseline (gap ≠ expense/loss/withdrawal), interval reconciliation (cheque ≠ drawer cash, unknown-payment lowers confidence), neutral difference classification, daily close (blocks complete when required missing, no-trading), sales-gap detection (recent-first, never zero), opening stock count (value-unknown for missing cost, NOT a purchase), count variance (unit-mismatch blocks, never theft), purchase quantities (reliable qty, count-first refusal, unaffordable, excess), planned-action amounts → obligations, live health (historical gaps don't tank live), missing-data grouping (Activate > Historical).
 - **Cycle 7 cash intelligence** (`strategist-cash.test.ts`, 23 tests): obligation calendar (rent excluded as cheque-deducted), CashState (never-counted→null-not-zero, stale counts, reserve policies, cheques never available), withdrawal v2 (unknowable/illiquid-profitable/reserve-breach/prior-draws), affordability (employee revenue-to-cover with no assumed benefit, expected-cash Tune gate, mandatory-vs-optional), projection (relative mode, known-only zero sales, downside delay, breach day), runway (coverage months, downside flip, withdrawals excluded), cash priorities.
 - **Cycle 6 product intelligence** (`strategist-cycle6.test.ts`, 31 tests): contribution (growth/decline/low-coverage-refusal/missing-cost exclusion/determinism), decomposition (volume/price/cost-led + refusals), classification (all tags, thresholds labeled, stock-risk gated on tracked inventory), shelf caveats, pricing (target price, no fabricated targets, price-drift flags, owner off-switch), purchasing (data-first when untracked, days-of-cover, excess stock), weekly priority (cash outranks pricing, suppression, queued-action awareness), outcomes (improved/worsened/awaiting-data/cancelled/no-re-eval).
 - **Language layer** (`strategist-language.test.ts`, 15 tests): deterministic templates without credentials, fake-provider plug-in (proves provider independence), router fallback on throw/unavailable/invented-number/over-confidence/budget, grounding validator.

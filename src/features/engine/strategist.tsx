@@ -24,6 +24,9 @@ import type { StrategistSnapshot } from "@/core/strategist/contract";
 import { buildStrategyReport, type StrategyReport } from "@/core/strategist/analysis/report";
 import { selectWeeklyPriority } from "@/core/strategist/analysis/priority";
 import { MIN_ATTRIBUTION_COVERAGE } from "@/core/strategist/analysis/products";
+import type { ActivationChecklist } from "@/core/strategist/analysis/activation";
+import { composeDailyClose } from "@/core/strategist/analysis/operations";
+import { confirmLiveStart, saveDailyClose, getRecentCloses, loadAcceptedCommitments } from "@/core/strategist/persistence/operations";
 import { assessWithdrawalV2, assessAffordability } from "@/core/strategist/analysis/affordability";
 import { computeCalendar } from "@/core/strategist/calendar";
 import { suggestQuestions } from "@/core/strategist/questions";
@@ -80,8 +83,9 @@ export function StrategistScreen() {
   const { reportError, reportSuccess } = useUI();
 
   const snapQ = useQuery({ queryKey: ["snapshot-v2"], queryFn: () => timed("snapshotMs", assembleSnapshotV2), enabled: en, staleTime: 5 * 60_000 });
+  const commitmentsQ = useQuery({ queryKey: ["strategist-commitments"], queryFn: loadAcceptedCommitments, enabled: en });
   const s = snapQ.data;
-  const report = useMemo(() => (s ? timedSync("engineMs", () => buildStrategyReport(s)) : null), [s]);
+  const report = useMemo(() => (s ? timedSync("engineMs", () => buildStrategyReport(s, commitmentsQ.data ?? [])) : null), [s, commitmentsQ.data]);
   const findings = report?.findings ?? [];
 
   // persist qualifying findings once per snapshot (evidence-based lifecycle)
@@ -128,6 +132,8 @@ export function StrategistScreen() {
         right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
 
       <FreshnessStrip s={s} />
+      <ActivationTile checklist={report.activation} liveHealth={report.liveHealth}
+        onConfirmStart={async (d) => { await confirmLiveStart(d); qc.invalidateQueries({ queryKey: ["snapshot-v2"] }); reportSuccess("Activation", "Live start date confirmed"); }} />
       <ExecutiveBriefing s={s} report={report} weekly={weekly} />
       <WeeklyPriorityCard weekly={weekly} onQueue={async (item) => {
         const f = findings.find((x) => x.id === item.findingId);
@@ -141,6 +147,7 @@ export function StrategistScreen() {
         qc.invalidateQueries({ queryKey: ["strategist-actions"] });
       }} />
       <CashIntelligence report={report} />
+      <DailyCloseTile lastDataDate={s.meta.lastDataDate} onError={(e) => reportError("Daily close", e)} onSaved={() => reportSuccess("Daily close", "Recorded")} />
       <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
         onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
         onAccept={async (f) => {
@@ -820,6 +827,142 @@ function KV({ k, v }: { k: string; v: string }) {
   );
 }
 
+/* ═══ ACTIVATION ══════════════════════════════════════════════════════ */
+
+const READINESS_META: Record<string, [string, string]> = {
+  historical_only: ["Historical only", "rgb(var(--violet))"],
+  activation_incomplete: ["Activation incomplete", "var(--amber)"],
+  live_partial: ["Live · partially verified", "var(--amber)"],
+  live_operational: ["Live & operational", "var(--green)"],
+  live_verified: ["Live & verified", "var(--green)"],
+};
+
+function ActivationTile({ checklist, liveHealth, onConfirmStart }: {
+  checklist: ActivationChecklist;
+  liveHealth: StrategyReport["liveHealth"];
+  onConfirmStart: (date: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(checklist.readiness !== "live_verified" && checklist.readiness !== "live_operational");
+  const [startDate, setStartDate] = useState(todayCairo());
+  // once fully operational, this collapses to a thin confirmation line
+  if (checklist.readiness === "live_verified") {
+    return (
+      <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "8px 14px", border: "1px solid rgb(var(--good))", background: "rgba(66,226,154,.06)", borderRadius: 12, fontSize: 12.5 }}>
+        <Chip text={READINESS_META[checklist.readiness][0]} color={READINESS_META[checklist.readiness][1]} />
+        <span style={{ color: "rgb(var(--muted))" }}>{checklist.readinessReason}</span>
+      </div>
+    );
+  }
+  const [meta1, meta2] = READINESS_META[checklist.readiness];
+  return (
+    <DeckTile style={{ borderColor: meta2 }}>
+      <div className="th"><span className="tname">Activate BostaOS</span>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <Chip text={meta1} color={meta2} />
+          <button style={MINI} onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Steps"}</button>
+        </span>
+      </div>
+      <div style={{ fontSize: 13, color: "rgb(var(--muted))", marginTop: 8, lineHeight: 1.5 }}>{checklist.readinessReason}</div>
+      {checklist.nextStep && (
+        <div style={{ marginTop: 10, borderLeft: "3px solid var(--mag)", paddingLeft: 10 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Do this next · {checklist.nextStep.effort} effort</div>
+          <div className="disp" style={{ fontSize: 15, fontWeight: 700, marginTop: 3 }}>{checklist.nextStep.title}</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 3 }}>{checklist.nextStep.why}</div>
+          <div style={{ fontSize: 11.5, color: "rgb(var(--cyan))", marginTop: 4 }}>Unlocks: {checklist.nextStep.unlocks.join(", ")}</div>
+          {checklist.nextStep.key === "live_start" ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ maxWidth: 170 }} />
+              <Button onClick={() => void onConfirmStart(startDate)}>Confirm start date</Button>
+            </div>
+          ) : (
+            <Link to={checklist.nextStep.screenLink} style={{ display: "inline-block", marginTop: 8, fontSize: 12, color: "var(--mag)", fontWeight: 700 }}>Go to {checklist.nextStep.title.toLowerCase()} →</Link>
+          )}
+        </div>
+      )}
+      {open && (
+        <div className="space-y-2" style={{ marginTop: 12 }}>
+          {checklist.steps.map((step) => (
+            <div key={step.key} style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 12.5 }}>
+              <span style={{ width: 16, color: step.status === "done" ? "var(--green)" : "rgb(var(--faint))" }}>{step.status === "done" ? "✓" : "○"}</span>
+              <span style={{ flex: 1, color: step.status === "done" ? "rgb(var(--dim))" : "rgb(var(--text))", textDecoration: step.status === "done" ? "line-through" : "none" }}>{step.title}{!step.required && <span style={{ color: "rgb(var(--faint))" }}> · optional</span>}</span>
+              {step.status !== "done" && <Link to={step.screenLink} style={{ fontSize: 11.5, color: "var(--mag)" }}>open</Link>}
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: "rgb(var(--faint))", marginTop: 8 }}>
+            Live completeness {liveHealth.liveCompleteness}% · cash confidence {liveHealth.cashConfidence} · inventory {liveHealth.inventoryConfidence}. Historical gaps don't count against you.
+          </div>
+        </div>
+      )}
+    </DeckTile>
+  );
+}
+
+/* ═══ DAILY CLOSE ═════════════════════════════════════════════════════ */
+
+function DailyCloseTile({ lastDataDate, onSaved, onError }: { lastDataDate: string | null; onSaved: () => void; onError: (e: unknown) => void }) {
+  const closesQ = useQuery({ queryKey: ["daily-closes"], queryFn: () => getRecentCloses(7), enabled: en });
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(lastDataDate ?? todayCairo());
+  const [chk, setChk] = useState({ sales: false, lines: false, expenses: false, purchases: false, cheque: false, cash: false });
+  const [status, setStatus] = useState<"complete" | "partial" | "no_trading">("partial");
+
+  const preview = useMemo(() => composeDailyClose({
+    date, salesRecorded: chk.sales, productLinesRecordedOrMarked: chk.lines, expensesConsidered: chk.expenses,
+    purchasesConsidered: chk.purchases, chequeUpdatedIfRelevant: chk.cheque, cashCountRecordedIfRequired: chk.cash,
+    noUnresolvedCashDifference: true, noImportsAwaitingApproval: true, noMissingProductMappings: true,
+    requestedStatus: status,
+  }), [date, chk, status]);
+
+  const save = async () => {
+    try { await saveDailyClose(null, preview); onSaved(); setOpen(false); qc.invalidateQueries({ queryKey: ["daily-closes"] }); }
+    catch (e) { onError(e); }
+  };
+  const recent = closesQ.data ?? [];
+  const ITEMS: [keyof typeof chk, string, boolean][] = [["sales", "Sales recorded", true], ["lines", "Product lines recorded / marked", false], ["expenses", "Expenses entered (or none)", true], ["purchases", "Purchases entered (or none)", false], ["cheque", "Cheque updated if relevant", false], ["cash", "Cash counted (if policy requires)", true]];
+
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">Daily close</span>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          {recent[0] && <Chip text={`last ${fmtDate(recent[0].date)} · ${recent[0].status}`} color="rgb(var(--dim))" />}
+          <button style={MINI} onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Run close"}</button>
+        </span>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 160 }} />
+            <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}
+              style={{ background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
+              <option value="complete">Complete</option><option value="partial">Partial</option><option value="no_trading">No trading</option>
+            </select>
+          </div>
+          {status !== "no_trading" && (
+            <div className="space-y-1" style={{ marginTop: 10 }}>
+              {ITEMS.map(([k, label, req]) => (
+                <label key={k} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
+                  <input type="checkbox" checked={chk[k]} onChange={(e) => setChk({ ...chk, [k]: e.target.checked })} />
+                  {label}{req && <span style={{ color: "rgb(var(--faint))" }}> · required</span>}
+                </label>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: preview.blockedFromComplete ? "var(--amber)" : "rgb(var(--dim))", marginTop: 8 }}>
+            {preview.blockedFromComplete ? preview.blockReason : `Will save as ${preview.status} · ${preview.completeness}% complete`}
+          </div>
+          <div style={{ marginTop: 10 }}><Button onClick={() => void save()}>Save close</Button></div>
+        </div>
+      )}
+      {!open && recent.length > 0 && (
+        <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 8 }}>
+          Recent: {recent.slice(0, 5).map((c) => `${fmtDate(c.date)} ${c.status === "complete" ? "✓" : c.status === "no_trading" ? "—" : "·"}`).join("  ")}
+        </div>
+      )}
+    </DeckTile>
+  );
+}
+
 /* ═══ CASH INTELLIGENCE ═══════════════════════════════════════════════ */
 
 function CashIntelligence({ report }: { report: StrategyReport }) {
@@ -976,15 +1119,22 @@ function ProductStrategy({ report }: { report: StrategyReport }) {
                   ))}
                 </div>
               )}
-              {report.purchaseReviews.length > 0 && (
+              {report.purchasePlan.available && report.purchasePlan.recommendations.filter((r) => r.verdict !== "maintain").length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Purchase review queue</div>
-                  {report.purchaseReviews.map((r) => (
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Purchase plan (cash-aware)</div>
+                  {report.purchasePlan.recommendations.filter((r) => r.verdict !== "maintain").slice(0, 6).map((r) => (
                     <div key={r.name} style={{ fontSize: 12, color: "rgb(var(--muted))", marginTop: 6, lineHeight: 1.5 }}>
-                      <b style={{ color: "rgb(var(--text))" }}>{r.name}</b> — {r.why}. <span style={{ color: "rgb(var(--text))" }}>{r.nextStep}</span>
+                      <b style={{ color: "rgb(var(--text))" }}>{r.name}</b> — {r.verdict.replace(/_/g, " ")}
+                      {r.recommendedQty != null && <> · buy ~{r.recommendedQty}{r.estimatedCost != null ? ` (${egp(r.estimatedCost)})` : ""}</>}
+                      {r.daysCover != null && <> · {r.daysCover}d cover</>}
+                      <span style={{ color: r.combined === "unsafe" || r.combined === "count_first" ? "var(--amber)" : "rgb(var(--dim))" }}> · {r.affordabilityNote}</span>
                     </div>
                   ))}
+                  {report.purchasePlan.assumptions.length > 0 && <div style={{ fontSize: 11, color: "rgb(var(--faint))", marginTop: 6 }}>{report.purchasePlan.assumptions.join(" · ")}</div>}
                 </div>
+              )}
+              {!report.purchasePlan.available && report.purchasePlan.reason && (
+                <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 10 }}>Purchase quantities: {report.purchasePlan.reason}.</div>
               )}
               {report.shelf.length > 0 && (
                 <div style={{ marginTop: 12, fontSize: 11, color: "rgb(var(--faint))" }}>{report.shelf[0].caveat}.</div>

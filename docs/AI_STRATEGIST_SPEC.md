@@ -104,5 +104,18 @@ All in `analysis/products.ts` + `analysis/priority.ts` + `persistence/outcomes.t
 - No DB changes (justified: forecasts are never stored as facts; scenarios render live and go stale with the snapshot; obligations derive from existing records).
 - Validation script: `npx vite-node scripts/_validate_cycle7.ts`.
 
-## Cycle 8 candidates
-1. First-count onboarding flow + reconciliation-difference intelligence ON REAL COUNTS (Phase 3/4 deepen once counts exist). 2. Live-provider verification (credits). 3. Purchase quantities (inventory + lead-time policy). 4. Amounts on planned actions so accepted commitments join the obligation calendar automatically. 5. Outcome-informed action prioritization with accumulated history.
+## Cycle 8 (SHIPPED) — operational activation
+The bridge from historical books to trustworthy live operations. Migration 0035 (applied, RLS verified): baseline flags + verification/bank/opening_difference on cash_reconciliations, is_opening_baseline on physical_counts, structured amount fields on strategist_actions, new daily_closes table.
+- **activation.ts** — 8-step checklist (status/why/action/effort/unlocks/required), readiness state machine (historical_only → activation_incomplete → live_partial → live_operational → live_verified), activation findings that outrank product optimisation until operational and never nag once live.
+- **reconciliation.ts** — opening-baseline classification (gap vs ledger is an OPENING DIFFERENCE, never expense/loss/withdrawal), interval reconciliation between count pairs (cheque revenue never counted as drawer cash), neutral difference classification (never theft — "unexplained difference").
+- **inventory-count.ts** — opening stock baseline (a baseline adjustment, NOT a purchase/sale, no profit impact; missing cost → quantity-known/value-unknown), count variance (unit mismatch blocks, neutral candidates).
+- **purchase-qty.ts** — quantity engine gated on units + live stock + velocity + lead time (assumed 7d, confirm w/ vendor); cash-aware combined verdicts (needed_and_affordable / needed_but_cash_constrained / wait_for_cheque / count_first / supplier_data_required / unsafe) — never bypasses cash safety, never auto-creates a purchase.
+- **operations.ts** — daily close (blocks "complete" when required items missing, never fabricates), sales-gap detection (recent-first, never assumes zero), action-oriented missing-data grouping (Activate always outranks Historical cleanup), live health (historical vs live completeness split).
+- **Persistence**: recordCashCount baseline-aware (opening difference does NOT post an adjustment movement); createAction carries amounts → obligation calendar; operations store (daily closes, live-start confirm, accepted commitments).
+- **UI**: Activation tile (readiness + steps + inline live-start confirm), Daily Close tile, first-cash-count opening-baseline flow (auto-detected as the first count, bank field), cash-aware purchase plan in Product Strategy. Provider answers activation questions with zero API.
+- **Production validation (read-only, 2026-07-13)**: readiness=historical_only, next step "confirm live start date", cheques already ✓, live 0% / historical 85% (gaps don't tank live), Activate group ranks above Historical cleanup. 55 active products, 0 missing units, sales to 2026-05-31, 0 counts — exactly the valid pre-live state.
+- Three states distinguished: not-built / built-awaiting-activation / activated-with-real-data. The reconciliation-interval and count-variance engines are built + tested but their dedicated investigation UI activates once count pairs exist (they can't be exercised without them).
+- Validation script pattern (temp, removed): the durable artifact is `strategist-activation.test.ts` (32 tests).
+
+## Cycle 9 candidates
+1. Difference-investigation + count-variance UI once the owner has recorded count pairs. 2. Live-provider verification (credits). 3. Denomination breakdown on cash counts. 4. Estimated status + bulk navigation polish on sales catch-up. 5. Outcome learning that surfaces which action types resolve fastest from accumulated real history.

@@ -7,7 +7,7 @@ import { egp } from "@/core/utils/format";
 import { requireEngine } from "@/core/db/engine";
 import { getProducts, getLocations, getChannels } from "@/core/read/common";
 import { getExpenseCategories } from "@/core/read/expenses";
-import { getMoneyAccounts } from "@/core/read/money";
+import { getMoneyAccounts, countCashReconciliations } from "@/core/read/money";
 import { ProductPicker } from "@/components/ProductPicker";
 import type { Tables, Enums } from "@/core/db/tables";
 import type { SaleLine } from "@/core/read/sales";
@@ -383,21 +383,28 @@ export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void
   const ctx = mode === "count" ? "Cash count" : mode === "withdraw" ? "Withdrawal" : mode === "in" ? "Cash in" : "Cash out";
   const w = useWrite(ctx, onDone);
   const accounts = useQuery({ queryKey: ["money-accounts"], queryFn: getMoneyAccounts });
+  const priorCounts = useQuery({ queryKey: ["cash-count-exists"], queryFn: countCashReconciliations, enabled: mode === "count" });
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayCairo());
   const [notes, setNotes] = useState("");
+  const [bank, setBank] = useState("");
+  // the first-ever count is an OPENING BASELINE: its gap vs the ledger is an
+  // opening difference, never an expense/withdrawal. Default on when no prior count.
+  const isFirstCount = mode === "count" && (priorCounts.data ?? 0) === 0;
+  const [baseline, setBaseline] = useState(true);
+  const useBaseline = isFirstCount && baseline;
   const acc = accounts.data?.[0];
   const m = useMutation({
     mutationFn: async () => {
       const amt = num(amount) ?? 0;
-      if (mode === "count") return recordCashCount(acc!.id, amt, date, notes || null); // returns difference
+      if (mode === "count") return recordCashCount(acc!.id, amt, date, notes || null, useBaseline ? { openingBaseline: true, bankBalance: num(bank) ?? null } : { bankBalance: num(bank) ?? null }); // returns difference
       if (mode === "withdraw") { await recordWithdrawal(acc!.id, amt, date, notes || null); return null; }
       await createMovement({ accountId: acc!.id, type: mode === "in" ? "owner_injection" : "cash_expense", amount: amt, date, notes: notes || null });
       return null;
     },
     onSuccess: (diff) => {
       const amt = num(amount) ?? 0;
-      if (mode === "count") w.ok(diff === 0 ? "Cash count matched expected · balance confirmed" : `Cash count saved · adjustment ${egp(diff ?? 0)} posted to match reality`);
+      if (mode === "count") w.ok(useBaseline ? `Opening cash baseline set to ${egp(amt)} · the ${egp(diff ?? 0)} gap vs the ledger is an opening difference, not an expense` : diff === 0 ? "Cash count matched expected · balance confirmed" : `Cash count saved · adjustment ${egp(diff ?? 0)} posted to match reality`);
       else if (mode === "withdraw") w.ok(`Cash −${egp(amt)} · balance recalculated · profit unaffected (not an expense)`);
       else if (mode === "in") w.ok(`Cash +${egp(amt)} · balance recalculated · profit unaffected`);
       else w.ok(`Cash −${egp(amt)} · balance recalculated · profit unaffected`);
@@ -415,8 +422,20 @@ export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void
       {mode === "in" && <p className="text-[11px] text-dim">Cash entering the drawer (owner top-up, change float). Affects cash only — never counted as revenue.</p>}
       {mode === "out" && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Cash leaving the drawer <b>only</b> — a deposit, transfer, or change. This does <b>not</b> affect profit. To record a business cost that should reduce profit, use <b>Spend → Add expense</b> instead.</p>}
       {mode === "withdraw" && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Owner taking cash out. Reduces cash <b>only</b> — never counted against profit and never an expense.</p>}
-      {mode === "count" && <p className="text-[11px] text-dim">We compare to the expected balance and post a voidable adjustment for any difference.</p>}
-      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : mode === "count" ? "Save count" : "Save"}</Button>
+      {mode === "count" && (
+        <>
+          <Field label="Bank / other liquid balance (optional)"><Input type="number" step="any" value={bank} onChange={(e) => setBank(e.target.value)} placeholder="Leave blank if all cash is in the drawer" /></Field>
+          {isFirstCount ? (
+            <label className="flex items-start gap-2 rounded-lg bg-panel2 px-3 py-2 text-[11px] text-muted">
+              <input type="checkbox" checked={baseline} onChange={(e) => setBaseline(e.target.checked)} className="mt-0.5" />
+              <span>This is the <b>opening baseline</b> — the first verified count. Any gap versus the historical ledger is an <b>opening difference</b> (not an expense, loss or withdrawal). Reconciliation starts fresh from here. {isFirstCount ? "" : ""}</span>
+            </label>
+          ) : (
+            <p className="text-[11px] text-dim">We compare to the expected balance and post a voidable adjustment for any difference.</p>
+          )}
+        </>
+      )}
+      <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : mode === "count" ? (useBaseline ? "Set opening baseline" : "Save count") : "Save"}</Button>
     </form>
   );
 }

@@ -13,7 +13,7 @@ Status legend: ✅ working · 🟡 partial · 🔴 broken/missing · ⬜ removed
 | 4 | Goods / Products | ✅ | picker now excludes inactive products |
 | 5 | Product aliases | ✅ | unique-indexed, used by importers |
 | 6 | Purchases | ✅ | **void path added** (was irreversible in-app); opening counts no longer dilute WAC |
-| 7 | Inventory | 🟡 | machinery works (ledger, WAC replay) but **no live data** — stock never counted; needs owner opening count |
+| 7 | Inventory | 🟡 | Cycle 8: first-count baseline + variance + purchase-quantity engine built & tested; activation checklist guides the owner. Awaits the owner opening count to go live |
 | 8 | Weighted COGS | ✅ | SQL replay + frozen sale-time snapshots; contract-tested |
 | 9 | Expenses | ✅ | import double-booking fixed (DB fingerprint dedupe) |
 | 10 | Cash | 🟡 | Cycle 7 cash intelligence: CashState/obligations/withdrawal-v2/affordability/projection/runway — deterministic and production-validated; answers correctly UNKNOWABLE until the first drawer count (the machinery upgrades itself the moment one exists) |
@@ -29,6 +29,7 @@ Status legend: ✅ working · 🟡 partial · 🔴 broken/missing · ⬜ removed
 | 20 | Imports | ✅ | dedupe (sales days, expense fingerprints, line keys), per-row failure reasons, day headers honest with unmapped rows |
 | 21 | OCR/import preview | ✅ | preview → approve everywhere; nothing auto-saves |
 | 22 | Activity feed | ✅ | |
+| 36 | Activation / daily close | ✅ | Cycle 8: activation checklist, live-start date, first-count baselines, daily close, missing-data centre, live-health — all deterministic, production-validated in pre-live state |
 | 23 | Ask Bosta / Strategist | ✅ | Three-layer architecture + Cycle 6 product intelligence: root-cause contribution, PVM+cost decomposition, portfolio classification, pricing/purchase queues, shelf priority, weekly priority, recommendation outcome tracking — all deterministic, production-validated on Apr→May 2025. Live model verification still pending credit top-up |
 | 24 | Settings | ✅ | fake Light/System theme control removed (dark-only by design) |
 | 25 | System check | ✅ | fake "Write mode: Fully operational" row removed; honest not-configured state |

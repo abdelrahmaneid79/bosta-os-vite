@@ -138,3 +138,11 @@ export async function getCashSummary(range: DateRange): Promise<CashSummary> {
   }
   return { balance: pos.onHand, inflow: r2(inflow), outflow: r2(outflow), withdrawals: r2(withdrawals), opening: pos.opening, since: pos.since };
 }
+
+/** How many cash counts exist — 0 means the next one is the opening baseline. */
+export async function countCashReconciliations(): Promise<number> {
+  const { count, error } = await requireEngine()
+    .from("cash_reconciliations").select("id", { count: "exact", head: true }).is("voided_at", null);
+  if (error) throw error;
+  return count ?? 0;
+}
