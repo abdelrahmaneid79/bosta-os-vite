@@ -137,6 +137,7 @@ export async function createAction(a: NewAction): Promise<{ created: boolean }> 
     finding_id: a.findingId ?? null, conversation_id: a.conversationId ?? null,
     category: a.category ?? "general", priority: a.priority ?? "medium",
     status: a.status ?? "accepted", due_date: a.dueDate ?? null,
+    accepted_at: (a.status ?? "accepted") === "accepted" ? new Date().toISOString() : null,
     screen_link: a.screenLink ?? "/health", expected_outcome: a.expectedOutcome ?? null,
     baseline: f ? ({ period: f.evidence[0]?.period ?? "", capturedAt: new Date().toISOString(), impactEgp: f.impactEgp, evidence: f.evidence, findingId: f.id, resolutionCriteria: f.resolutionCriteria } as never) : null,
     success_criteria: f?.resolutionCriteria ?? null,
@@ -163,10 +164,22 @@ export async function listActions(): Promise<ActionRow[]> {
 }
 
 export async function updateActionStatus(id: string, status: string, completionNote?: string): Promise<void> {
+  const now = new Date().toISOString();
   const patch: Record<string, unknown> = { status };
-  if (status === "completed") { patch.completed_at = new Date().toISOString(); if (completionNote) patch.completion_note = completionNote; }
-  if (status === "dismissed") patch.dismissed_at = new Date().toISOString();
+  // Cycle 9 — execution timestamps so recommendation follow-through is measurable
+  if (status === "accepted") patch.accepted_at = now;
+  if (status === "in_progress") patch.started_at = now;
+  if (status === "completed") { patch.completed_at = now; if (completionNote) patch.completion_note = completionNote; }
+  if (status === "dismissed") patch.dismissed_at = now;
   const { error } = await requireEngine().from("strategist_actions").update(patch as never).eq("id", id);
+  if (error) throw error;
+}
+
+/** Link an accepted action to the operational exception it resolves, so
+ *  execution tracking can tell whether the issue actually cleared. */
+export async function linkActionException(actionId: string, exceptionId: string): Promise<void> {
+  const { error } = await requireEngine().from("strategist_actions")
+    .update({ linked_exception_id: exceptionId } as never).eq("id", actionId);
   if (error) throw error;
 }
 

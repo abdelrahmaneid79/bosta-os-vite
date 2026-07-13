@@ -15,6 +15,7 @@ import type { Enums } from "@/core/db/tables";
 import type { Database } from "@/core/db/database.types";
 import { signMoney, type MoneyType } from "@/core/money/sign";
 import { getCashPosition } from "@/core/read/money";
+import { isIdempotentDuplicate } from "@/core/db/idempotency";
 
 type ChequeStatus = Enums<"cheque_status">;
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -269,17 +270,18 @@ export interface ExpenseInput {
   date: string; categoryId: string; amount: number;
   paymentMethod: Enums<"payment_method">; notes: string | null; locationId: string;
 }
-export async function addExpense(i: ExpenseInput): Promise<void> {
+export async function addExpense(i: ExpenseInput, idempotencyKey?: string): Promise<void> {
   const { error } = await requireEngine().from("expenses").insert({
     expense_date: i.date, location_id: i.locationId, category_id: i.categoryId,
     amount: i.amount, payment_method: i.paymentMethod, notes: i.notes,
     verification: "verified", is_estimated: false, source_type: "manual",
+    idempotency_key: idempotencyKey ?? null,
   });
-  if (error) throw error;
+  if (error && !(idempotencyKey && isIdempotentDuplicate(error))) throw error;
 }
-export async function voidExpense(id: string): Promise<void> {
+export async function voidExpense(id: string, reason?: string): Promise<void> {
   const { error } = await requireEngine().from("expenses")
-    .update({ voided_at: new Date().toISOString(), void_reason: "Voided by owner" })
+    .update({ voided_at: new Date().toISOString(), void_reason: reason?.trim() || "Voided by owner" })
     .eq("id", id).is("voided_at", null);
   if (error) throw error;
 }
@@ -305,7 +307,7 @@ export interface MovementInput {
   accountId: string; type: MoneyType; amount: number; // positive magnitude
   date: string; direction?: "in" | "out"; notes: string | null;
 }
-export async function createMovement(i: MovementInput): Promise<void> {
+export async function createMovement(i: MovementInput, idempotencyKey?: string): Promise<void> {
   // Cheques live ONLY in the cheques table — cash reads sum BOTH sources, so a
   // manual cheque_inflow movement would double-count the same money.
   if (i.type === "cheque_inflow") throw new Error("Record cheques on the Cheques screen — they already count as cash inflow.");
@@ -313,18 +315,22 @@ export async function createMovement(i: MovementInput): Promise<void> {
   const { error } = await sb.from("money_movements").insert({
     account_id: i.accountId, movement_date: i.date, movement_type: i.type,
     amount: signMoney(i.type, i.amount, i.direction), notes: i.notes, source_type: "manual",
+    idempotency_key: idempotencyKey ?? null,
   });
-  if (error) throw error;
+  if (error) {
+    if (idempotencyKey && isIdempotentDuplicate(error)) return;  // already saved — no double recalc
+    throw error;
+  }
   await recalcMoneyAccount(i.accountId);
 }
 /** Owner withdrawal — forced to personal_withdrawal so it can never be an expense. */
-export async function recordWithdrawal(accountId: string, amount: number, date: string, notes: string | null): Promise<void> {
-  await createMovement({ accountId, type: "personal_withdrawal", amount, date, notes });
+export async function recordWithdrawal(accountId: string, amount: number, date: string, notes: string | null, idempotencyKey?: string): Promise<void> {
+  await createMovement({ accountId, type: "personal_withdrawal", amount, date, notes }, idempotencyKey);
 }
-export async function voidMovement(id: string, accountId: string): Promise<void> {
+export async function voidMovement(id: string, accountId: string, reason?: string): Promise<void> {
   const sb = requireEngine();
   const { error } = await sb.from("money_movements")
-    .update({ voided_at: new Date().toISOString(), void_reason: "Voided by owner" })
+    .update({ voided_at: new Date().toISOString(), void_reason: reason?.trim() || "Voided by owner" })
     .eq("id", id).is("voided_at", null);
   if (error) throw error;
   await recalcMoneyAccount(accountId);
@@ -337,6 +343,7 @@ export interface CashCountOptions {
   bankBalance?: number | null;
   verification?: "verified" | "estimated";
   source?: string;
+  idempotencyKey?: string;
 }
 export async function recordCashCount(accountId: string, counted: number, date: string, notes: string | null, opts: CashCountOptions = {}): Promise<number> {
   const sb = requireEngine();
@@ -354,9 +361,14 @@ export async function recordCashCount(accountId: string, counted: number, date: 
       bank_balance: opts.bankBalance ?? null,
       // the opening difference is recorded for the record, never actioned
       opening_difference: baseline ? difference : null,
+      idempotency_key: opts.idempotencyKey ?? null,
     })
     .select("id").single();
-  if (recon.error) throw recon.error;
+  if (recon.error) {
+    // a retry of the SAME count already saved — return its difference, don't double-post
+    if (opts.idempotencyKey && isIdempotentDuplicate(recon.error)) return difference;
+    throw recon.error;
+  }
   // A NON-baseline count reconciles from the prior baseline forward, so a
   // real difference posts an adjustment. The opening baseline does NOT —
   // its gap vs the historical ledger is informational only.
@@ -391,7 +403,7 @@ export interface ChequeInput {
   periodId: string; expected: number; received: number | null;
   receivedDate: string | null; status: ChequeStatus; notes: string | null;
 }
-export async function recordCheque(i: ChequeInput): Promise<void> {
+export async function recordCheque(i: ChequeInput, idempotencyKey?: string): Promise<void> {
   const received = (["received", "deposited", "cleared", "reconciled"] as ChequeStatus[]).includes(i.status);
   if (received && (i.received == null || !i.receivedDate)) {
     throw new Error("A received cheque needs an amount received and a received date.");
@@ -399,17 +411,18 @@ export async function recordCheque(i: ChequeInput): Promise<void> {
   const { error } = await requireEngine().from("cheques").insert({
     settlement_period_id: i.periodId, status: i.status, expected_amount: i.expected,
     amount_received: i.received, received_date: i.receivedDate, notes: i.notes,
+    idempotency_key: idempotencyKey ?? null,
   });
-  if (error) throw error;
+  if (error && !(idempotencyKey && isIdempotentDuplicate(error))) throw error;
 }
 export async function reconcileCheque(id: string): Promise<void> {
   const { error } = await requireEngine().from("cheques")
     .update({ status: "reconciled", edited_at: new Date().toISOString() }).eq("id", id);
   if (error) throw error;
 }
-export async function voidCheque(id: string): Promise<void> {
+export async function voidCheque(id: string, reason?: string): Promise<void> {
   const { error } = await requireEngine().from("cheques")
-    .update({ voided_at: new Date().toISOString(), void_reason: "Voided by owner" })
+    .update({ voided_at: new Date().toISOString(), void_reason: reason?.trim() || "Voided by owner" })
     .eq("id", id).is("voided_at", null);
   if (error) throw error;
 }

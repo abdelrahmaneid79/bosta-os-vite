@@ -6,7 +6,7 @@
 import { requireEngine } from "@/core/db/engine";
 import { todayCairo, isoDaysAgo } from "@/core/time";
 
-export type ActivityKind = "sale" | "purchase" | "expense" | "cash" | "withdrawal" | "cheque";
+export type ActivityKind = "sale" | "purchase" | "expense" | "cash" | "withdrawal" | "cheque" | "count" | "close" | "exception";
 export interface ActivityEvent {
   id: string;
   kind: ActivityKind;
@@ -30,7 +30,7 @@ export async function getActivityFeed(windowDays = 30, limit = 40, range?: { fro
   const today = range?.to ?? todayCairo();
   const from = range?.from ?? isoDaysAgo(today, windowDays - 1);
 
-  const [sales, purchases, expenses, movements, cheques, products, cats] = await Promise.all([
+  const [sales, purchases, expenses, movements, cheques, products, cats, closes, cashCounts, stockCounts, exceptions] = await Promise.all([
     sb.from("sales").select("id,sale_date,total_amount,created_at").is("voided_at", null).gte("sale_date", from).lte("sale_date", today),
     sb.from("purchase_batches").select("id,purchase_date,product_id,total_cost,created_at").is("voided_at", null).gte("purchase_date", from).lte("purchase_date", today),
     sb.from("expenses").select("id,expense_date,category_id,amount,created_at").is("voided_at", null).gte("expense_date", from).lte("expense_date", today),
@@ -38,8 +38,13 @@ export async function getActivityFeed(windowDays = 30, limit = 40, range?: { fro
     sb.from("cheques").select("id,received_date,amount_received,created_at").is("voided_at", null).not("received_date", "is", null).gte("received_date", from).lte("received_date", today),
     sb.from("products").select("id,name_en"),
     sb.from("expense_categories").select("id,name"),
+    // Cycle 9 audit-trail: operational events (closes, counts, exception lifecycle)
+    sb.from("daily_closes").select("id,close_date,status,version,updated_at,created_at").is("voided_at", null).gte("close_date", from).lte("close_date", today),
+    sb.from("cash_reconciliations").select("id,count_date,counted_amount,is_opening_baseline,created_at").is("voided_at", null).gte("count_date", from).lte("count_date", today),
+    sb.from("physical_counts").select("id,count_date,is_opening_baseline,created_at").is("voided_at", null).gte("count_date", from).lte("count_date", today),
+    sb.from("operational_exceptions").select("id,title,status,updated_at,resolved_at").in("status", ["resolved", "acknowledged", "dismissed"]).gte("updated_at", `${from}T00:00:00Z`),
   ]);
-  for (const r of [sales, purchases, expenses, movements, cheques, products, cats]) if (r.error) throw r.error;
+  for (const r of [sales, purchases, expenses, movements, cheques, products, cats, closes, cashCounts, stockCounts, exceptions]) if (r.error) throw r.error;
 
   const pname = new Map((products.data ?? []).map((p) => [p.id, p.name_en]));
   const cname = new Map((cats.data ?? []).map((c) => [c.id, c.name]));
@@ -58,6 +63,19 @@ export async function getActivityFeed(windowDays = 30, limit = 40, range?: { fro
   }
   for (const c of cheques.data!) ev.push({ id: c.id, kind: "cheque", date: c.received_date!, ts: c.created_at ?? c.received_date!,
     label: "Cheque received", amount: Number(c.amount_received ?? 0), route: "/cheques" });
+
+  // ── operational audit-trail events (Cycle 9) ────────────────────────────
+  for (const c of closes.data ?? []) ev.push({ id: `close-${c.id}`, kind: "close", date: c.close_date, ts: c.updated_at ?? c.created_at ?? c.close_date,
+    label: `Daily close ${c.status}${(c.version ?? 1) > 1 ? ` (v${c.version})` : ""}`, amount: 0, route: "/health" });
+  for (const c of cashCounts.data ?? []) ev.push({ id: `ccount-${c.id}`, kind: "count", date: c.count_date, ts: c.created_at ?? c.count_date,
+    label: c.is_opening_baseline ? "Cash opening baseline set" : "Cash counted", amount: 0, route: "/money" });
+  for (const c of stockCounts.data ?? []) ev.push({ id: `scount-${c.id}`, kind: "count", date: c.count_date, ts: c.created_at ?? c.count_date,
+    label: c.is_opening_baseline ? "Stock opening baseline set" : "Stock counted", amount: 0, route: "/settings/opening" });
+  for (const x of exceptions.data ?? []) {
+    const d = (x.resolved_at ?? x.updated_at ?? today).slice(0, 10);
+    ev.push({ id: `exc-${x.id}`, kind: "exception", date: d, ts: x.updated_at ?? `${d}T00:00:00Z`,
+      label: `Exception ${x.status}: ${x.title}`, amount: 0, route: "/health" });
+  }
 
   return mergeActivity(ev, limit);
 }
