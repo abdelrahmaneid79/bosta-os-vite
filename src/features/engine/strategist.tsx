@@ -25,8 +25,16 @@ import { buildStrategyReport, type StrategyReport } from "@/core/strategist/anal
 import { selectWeeklyPriority } from "@/core/strategist/analysis/priority";
 import { MIN_ATTRIBUTION_COVERAGE } from "@/core/strategist/analysis/products";
 import type { ActivationChecklist } from "@/core/strategist/analysis/activation";
-import { composeDailyClose } from "@/core/strategist/analysis/operations";
-import { confirmLiveStart, saveDailyClose, getRecentCloses, loadAcceptedCommitments } from "@/core/strategist/persistence/operations";
+import { detectCloseState, type CloseEvaluation } from "@/core/strategist/analysis/daily-close";
+import { assembleCloseFacts, closeSourceDataAt, type CloseSignals } from "@/core/read/daily-close";
+import { confirmLiveStart, saveClose, reopenDailyClose, confirmNoTradingDay, getRecentCloses, loadAcceptedCommitments } from "@/core/strategist/persistence/operations";
+import { refreshOperationalExceptions } from "@/core/strategist/exceptions-service";
+import { acknowledgeException, dismissException } from "@/core/strategist/persistence/exceptions";
+import { assembleDailyBrief } from "@/core/strategist/brief-service";
+import type { ReconciledException } from "@/core/strategist/analysis/exceptions";
+import type { DailyBrief } from "@/core/strategist/analysis/brief";
+import { detectOperationalIntent, answerOperationalQuestion, type OperationalAnswerCtx } from "@/core/strategist/analysis/operational-answers";
+import { getStaleCloses } from "@/core/read/daily-close";
 import { assessWithdrawalV2, assessAffordability } from "@/core/strategist/analysis/affordability";
 import { computeCalendar } from "@/core/strategist/calendar";
 import { suggestQuestions } from "@/core/strategist/questions";
@@ -107,6 +115,18 @@ export function StrategistScreen() {
   const insightsQ = useQuery({ queryKey: ["strategist-insights"], queryFn: listInsights, enabled: en });
   const actionsQ = useQuery({ queryKey: ["strategist-actions"], queryFn: listActions, enabled: en });
 
+  // Cycle 9 — canonical operational exceptions + deterministic daily brief.
+  // refreshOperationalExceptions composes → reconciles lifecycle → persists.
+  const opsQ = useQuery({
+    queryKey: ["strategist-ops", s?.meta.generatedAt ?? null],
+    enabled: en && !!s && !!report,
+    queryFn: () => timed("exceptionMs", async () => {
+      const { visible } = await refreshOperationalExceptions({ snapshot: s!, report: report! });
+      const brief = await assembleDailyBrief(s!, report!, visible);
+      return { exceptions: visible, brief };
+    }),
+  });
+
   const [drawer, setDrawer] = useState<Finding | null>(null);
   const [tuneOpen, setTuneOpen] = useState(false);
 
@@ -132,8 +152,12 @@ export function StrategistScreen() {
         right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
 
       <FreshnessStrip s={s} />
+      <DailyBriefCard brief={opsQ.data?.brief ?? null} loading={opsQ.isLoading} />
       <ActivationTile checklist={report.activation} liveHealth={report.liveHealth}
         onConfirmStart={async (d) => { await confirmLiveStart(d); qc.invalidateQueries({ queryKey: ["snapshot-v2"] }); reportSuccess("Activation", "Live start date confirmed"); }} />
+      <OperationalExceptionsPanel exceptions={opsQ.data?.exceptions ?? []} loading={opsQ.isLoading}
+        onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
+        onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
       <ExecutiveBriefing s={s} report={report} weekly={weekly} />
       <WeeklyPriorityCard weekly={weekly} onQueue={async (item) => {
         const f = findings.find((x) => x.id === item.findingId);
@@ -147,7 +171,15 @@ export function StrategistScreen() {
         qc.invalidateQueries({ queryKey: ["strategist-actions"] });
       }} />
       <CashIntelligence report={report} />
-      <DailyCloseTile lastDataDate={s.meta.lastDataDate} onError={(e) => reportError("Daily close", e)} onSaved={() => reportSuccess("Daily close", "Recorded")} />
+      <DailyCloseTile lastDataDate={s.meta.lastDataDate}
+        signals={{
+          cashCountRequired: report.activation.liveStartConfirmed && s.cash.hasLiveData,
+          cashDifferenceUnresolved: s.cash.hasLiveData && (s.cash.unexplainedDifference.value ?? 0) !== 0,
+          chequeNeedsUpdate: (s.cheques.overduePeriods.value ?? []).length > 0,
+          inventoryAlertsToAck: (s.products.stockRisk.value ?? []).length,
+          criticalActionsOpen: report.findings.filter((f) => (f.class === "warning" || f.class === "contradiction") && f.urgency === "today").length,
+        }}
+        onError={(e) => reportError("Daily close", e)} onSaved={() => reportSuccess("Daily close", "Recorded")} />
       <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
         onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
         onAccept={async (f) => {
@@ -165,7 +197,8 @@ export function StrategistScreen() {
       <ActionQueue actions={actionsQ.data ?? []} onUpdate={async (id, status, note) => {
         await updateActionStatus(id, status, note); qc.invalidateQueries({ queryKey: ["strategist-actions"] });
       }} />
-      <AskStrategist s={s} report={report} actions={actionsQ.data ?? []} insights={insights} />
+      <AskStrategist s={s} report={report} actions={actionsQ.data ?? []} insights={insights}
+        brief={opsQ.data?.brief ?? null} exceptions={opsQ.data?.exceptions ?? []} />
       <DecisionMode s={s} report={report} />
 
       <EvidenceDrawer finding={drawer} onClose={() => setDrawer(null)} />
@@ -201,6 +234,98 @@ function FreshnessStrip({ s }: { s: StrategistSnapshot }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* ═══ DAILY OWNER BRIEF (Cycle 9) ═════════════════════════════════════ */
+
+const HEALTH_META: Record<DailyBrief["health"], { label: string; color: string }> = {
+  healthy: { label: "Healthy", color: "var(--green)" },
+  attention: { label: "Attention", color: "var(--amber)" },
+  critical: { label: "Critical", color: "var(--red)" },
+  activating: { label: "Activating", color: "rgb(var(--violet))" },
+  stale: { label: "Books stale", color: "var(--amber)" },
+};
+
+function DailyBriefCard({ brief, loading }: { brief: DailyBrief | null; loading: boolean }) {
+  if (loading && !brief) return <DeckTile><div style={{ fontSize: 13, color: "rgb(var(--dim))" }}>Composing today's brief…</div></DeckTile>;
+  if (!brief) return null;
+  const hm = HEALTH_META[brief.health];
+  const Col = ({ title, lines }: { title: string; lines: string[] }) => (
+    <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.3, textTransform: "uppercase", color: "rgb(var(--faint))", marginBottom: 6 }}>{title}</div>
+      <div className="space-y-1">{lines.map((l, i) => <div key={i} style={{ fontSize: 12.5, color: "rgb(var(--muted))" }}>{l}</div>)}</div>
+    </div>
+  );
+  return (
+    <DeckTile>
+      <div className="th">
+        <span className="tname">Daily brief</span>
+        <span style={{ marginLeft: "auto" }}><Chip text={hm.label} color={hm.color} /></span>
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: "rgb(var(--text))", margin: "8px 0 12px" }}>{brief.headline}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+        <Col title={`Yesterday${brief.yesterday.date ? ` · ${fmtDate(brief.yesterday.date)}` : ""}`} lines={brief.yesterday.lines} />
+        <Col title="Today" lines={brief.today.lines} />
+        <Col title="Trust" lines={brief.trust.lines} />
+      </div>
+      {brief.today.primaryAction && (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--stroke2)", fontSize: 12.5 }}>
+          <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}>Most important: </span>
+          <Link to={brief.today.primaryAction.screenLink} style={{ color: "var(--mag)", fontWeight: 700 }}>{brief.today.primaryAction.title}</Link>
+          <span style={{ color: "rgb(var(--muted))" }}> — {brief.today.primaryAction.action}</span>
+        </div>
+      )}
+    </DeckTile>
+  );
+}
+
+/* ═══ OPERATIONAL EXCEPTIONS (Cycle 9 — canonical model) ══════════════ */
+
+const EXC_COLOR: Record<string, string> = { critical: "var(--red)", high: "var(--amber)", medium: "rgb(var(--violet))", low: "rgb(var(--dim))", info: "rgb(var(--dim))" };
+
+function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
+  exceptions: ReconciledException[]; loading: boolean;
+  onAck: (id: string) => Promise<void>; onDismiss: (id: string, reason: string) => Promise<void>;
+}) {
+  const [dismissing, setDismissing] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  if (loading && !exceptions.length) return null;
+  if (!exceptions.length) {
+    return <DeckTile><div className="th"><span className="tname">Operational exceptions</span><span style={{ marginLeft: "auto" }}><Chip text="all clear" color="var(--green)" /></span></div>
+      <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>No open operational issues. This is the one canonical list — the alert bell and daily brief read from it too.</div></DeckTile>;
+  }
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">Operational exceptions</span>
+        <span style={{ marginLeft: "auto" }}><Chip text={`${exceptions.length} open`} color={EXC_COLOR[exceptions[0].severity]} /></span>
+      </div>
+      <div className="space-y-2" style={{ marginTop: 10 }}>
+        {exceptions.map((e) => (
+          <div key={e.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px", borderLeft: `3px solid ${EXC_COLOR[e.severity]}` }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{e.title}</span>
+              <Chip text={e.severity} color={EXC_COLOR[e.severity]} />
+              {e.status !== "open" && <Chip text={e.status} color="rgb(var(--dim))" />}
+              {e.recurrenceCount > 1 && <Chip text={`×${e.recurrenceCount}`} color="rgb(var(--dim))" />}
+              <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                <Link to={e.screenLink} style={{ ...MINI, textDecoration: "none" }}>Fix</Link>
+                {e.status === "open" && <button style={MINI} onClick={() => void onAck(e.id)}>Ack</button>}
+                <button style={MINI} onClick={() => { setDismissing(dismissing === e.id ? null : e.id); setReason(""); }}>Dismiss</button>
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: "rgb(var(--muted))", marginTop: 4 }}>{e.detail}</div>
+            <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 3 }}>→ {e.resolutionAction}</div>
+            {dismissing === e.id && (
+              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                <Input placeholder="Reason (required)" value={reason} onChange={(ev) => setReason(ev.target.value)} style={{ maxWidth: 260 }} />
+                <button style={MINI} disabled={!reason.trim()} onClick={async () => { await onDismiss(e.id, reason.trim()); setDismissing(null); }}>Confirm</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </DeckTile>
   );
 }
 
@@ -494,8 +619,9 @@ function ActionQueue({ actions, onUpdate }: { actions: ActionRow[]; onUpdate: (i
 
 /* ═══ ASK THE STRATEGIST ══════════════════════════════════════════════ */
 
-function AskStrategist({ s, report, actions, insights }: {
+function AskStrategist({ s, report, actions, insights, brief, exceptions }: {
   s: StrategistSnapshot; report: StrategyReport; actions: ActionRow[]; insights: InsightRow[];
+  brief: DailyBrief | null; exceptions: ReconciledException[];
 }) {
   const { reportError } = useUI();
   const qc = useQueryClient();
@@ -503,6 +629,35 @@ function AskStrategist({ s, report, actions, insights }: {
   const [input, setInput] = useState("");
   const [convId, setConvId] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+
+  /** Deterministic operational answer — the engine answers, NO model call.
+   *  Returns a StrategistResponse or null when the question isn't operational. */
+  const deterministicAnswer = async (text: string): Promise<StrategistResponse | null> => {
+    const intent = detectOperationalIntent(text);
+    if (!intent || !brief) return null;
+    const staleCloses = await getStaleCloses().catch(() => []);
+    const ctx: OperationalAnswerCtx = {
+      brief,
+      exceptions: exceptions.map((e) => ({ title: e.title, detail: e.detail, resolutionAction: e.resolutionAction, type: e.type, screenLink: e.screenLink })),
+      close: null,
+      activationReadiness: report.activation.readiness,
+      activationNext: report.activation.nextStep ? { title: report.activation.nextStep.title, action: report.activation.nextStep.action, screenLink: report.activation.nextStep.screenLink } : null,
+      cashDifferenceCandidates: [],
+      stockVariances: [],
+      overdueActions: actions.filter((a) => ["accepted", "in_progress"].includes(a.status) && a.dueDate && a.dueDate < todayCairo()).map((a) => ({ title: a.title, screenLink: "/health" })),
+      staleCloses,
+    };
+    const ans = answerOperationalQuestion(intent, ctx);
+    return {
+      mode: "question", headline: ans.headline, conclusion: ans.headline,
+      priorities: ans.points.length ? [{
+        rank: 1, type: "action", title: ans.headline, explanation: ans.points.join("\n"),
+        evidence: [], recommendedAction: ans.points[0] ?? "", expectedImpact: "",
+        urgency: "this_week", confidence: "high", missingData: [],
+      }] : [],
+      contradictions: [], dataLimitations: [], suggestedQuestions: [], model: "deterministic-engine",
+    };
+  };
 
   const suggestions = useMemo(() => suggestQuestions(s, findings), [s, findings]);
   const negFeedbackQ = useQuery({ queryKey: ["strategist-feedback-recent"], queryFn: () => listRecentFeedback(6), enabled: en });
@@ -529,6 +684,16 @@ function AskStrategist({ s, report, actions, insights }: {
         role: m.role,
         content: m.role === "user" ? ((m.content as { text?: string }).text ?? "") : ((m.content as StrategistResponse).conclusion ?? ""),
       })).filter((m) => m.content);
+
+      // NEW DIRECTION: the deterministic engine answers operational questions
+      // itself — no external model is consulted. The LLM is polish-only, for
+      // open-ended questions the engine has no canonical answer for.
+      const det = await deterministicAnswer(text);
+      if (det) {
+        await addMessage(cid, "assistant", det, { ...meta, provider: "deterministic-engine" } as never);
+        qc.invalidateQueries({ queryKey: ["strategist-msgs", cid] });
+        return;
+      }
 
       const result = await generateLanguage(
         { mode, snapshot: s, report, findings, calendar: computeCalendar(todayCairo()), question: text, history: priorTurns, memory },
@@ -899,33 +1064,59 @@ function ActivationTile({ checklist, liveHealth, onConfirmStart }: {
 
 /* ═══ DAILY CLOSE ═════════════════════════════════════════════════════ */
 
-function DailyCloseTile({ lastDataDate, onSaved, onError }: { lastDataDate: string | null; onSaved: () => void; onError: (e: unknown) => void }) {
+const KIND_GLYPH: Record<CloseEvaluation["items"][number]["kind"], string> = { auto: "✓", confirm: "◻", blocked: "⛔", unresolved: "⚠", optional: "·" };
+const KIND_COLOR: Record<CloseEvaluation["items"][number]["kind"], string> = { auto: "var(--green)", confirm: "rgb(var(--muted))", blocked: "var(--red)", unresolved: "var(--amber)", optional: "rgb(var(--dim))" };
+
+/** Auto-detecting daily close (Cycle 9): BostaOS derives the checklist from
+ *  records; the owner attests only to what it can't read. */
+function DailyCloseTile({ lastDataDate, signals, onSaved, onError }: { lastDataDate: string | null; signals: CloseSignals; onSaved: () => void; onError: (e: unknown) => void }) {
   const closesQ = useQuery({ queryKey: ["daily-closes"], queryFn: () => getRecentCloses(7), enabled: en });
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(lastDataDate ?? todayCairo());
-  const [chk, setChk] = useState({ sales: false, lines: false, expenses: false, purchases: false, cheque: false, cash: false });
-  const [status, setStatus] = useState<"complete" | "partial" | "no_trading">("partial");
+  const [conf, setConf] = useState({ expensesNone: false, purchasesNone: false, cashSkip: "" });
 
-  const preview = useMemo(() => composeDailyClose({
-    date, salesRecorded: chk.sales, productLinesRecordedOrMarked: chk.lines, expensesConsidered: chk.expenses,
-    purchasesConsidered: chk.purchases, chequeUpdatedIfRelevant: chk.cheque, cashCountRecordedIfRequired: chk.cash,
-    noUnresolvedCashDifference: true, noImportsAwaitingApproval: true, noMissingProductMappings: true,
-    requestedStatus: status,
-  }), [date, chk, status]);
+  const factsQ = useQuery({
+    queryKey: ["close-facts", date, signals],
+    enabled: en && open,
+    queryFn: () => assembleCloseFacts(date, signals),
+  });
+  const evalr = useMemo(() => factsQ.data ? detectCloseState(factsQ.data, {
+    expensesNone: conf.expensesNone, purchasesNone: conf.purchasesNone,
+    cashSkip: conf.cashSkip.trim() ? { reason: conf.cashSkip.trim() } : null,
+  }) : null, [factsQ.data, conf]);
 
-  const save = async () => {
-    try { await saveDailyClose(null, preview); onSaved(); setOpen(false); qc.invalidateQueries({ queryKey: ["daily-closes"] }); }
+  const saveComplete = async () => {
+    if (!evalr) return;
+    try {
+      const src = await closeSourceDataAt(date);
+      await saveClose({
+        locationId: null, date, status: evalr.recommendedStatus,
+        completeness: evalr.completeness, confidence: evalr.confidence,
+        autoDetected: evalr.items, confirmations: { ...conf },
+        unresolved: [...evalr.blocked, ...evalr.unresolved].map((i) => i.label),
+        nextAction: evalr.nextAction, sourceDataAt: src,
+      });
+      onSaved(); setOpen(false); qc.invalidateQueries({ queryKey: ["daily-closes"] }); qc.invalidateQueries({ queryKey: ["strategist-ops"] });
+    } catch (e) { onError(e); }
+  };
+  const saveNoTrading = async () => {
+    try { await confirmNoTradingDay(null, date); onSaved(); setOpen(false); qc.invalidateQueries({ queryKey: ["daily-closes"] }); }
+    catch (e) { onError(e); }
+  };
+  const reopen = async (d: string) => {
+    const reason = window.prompt("Reason for reopening this close?")?.trim();
+    if (!reason) return;
+    try { await reopenDailyClose(null, d, reason); qc.invalidateQueries({ queryKey: ["daily-closes"] }); }
     catch (e) { onError(e); }
   };
   const recent = closesQ.data ?? [];
-  const ITEMS: [keyof typeof chk, string, boolean][] = [["sales", "Sales recorded", true], ["lines", "Product lines recorded / marked", false], ["expenses", "Expenses entered (or none)", true], ["purchases", "Purchases entered (or none)", false], ["cheque", "Cheque updated if relevant", false], ["cash", "Cash counted (if policy requires)", true]];
 
   return (
     <DeckTile>
       <div className="th"><span className="tname">Daily close</span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          {recent[0] && <Chip text={`last ${fmtDate(recent[0].date)} · ${recent[0].status}`} color="rgb(var(--dim))" />}
+          {recent[0] && <Chip text={`last ${fmtDate(recent[0].date)} · ${recent[0].status}${recent[0].isStale ? " · stale" : ""}`} color={recent[0].isStale ? "var(--amber)" : "rgb(var(--dim))"} />}
           <button style={MINI} onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Run close"}</button>
         </span>
       </div>
@@ -933,30 +1124,56 @@ function DailyCloseTile({ lastDataDate, onSaved, onError }: { lastDataDate: stri
         <div style={{ marginTop: 10 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 160 }} />
-            <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}
-              style={{ background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
-              <option value="complete">Complete</option><option value="partial">Partial</option><option value="no_trading">No trading</option>
-            </select>
+            <span style={{ fontSize: 12, color: "rgb(var(--faint))" }}>BostaOS auto-detects what it can read.</span>
           </div>
-          {status !== "no_trading" && (
-            <div className="space-y-1" style={{ marginTop: 10 }}>
-              {ITEMS.map(([k, label, req]) => (
-                <label key={k} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
-                  <input type="checkbox" checked={chk[k]} onChange={(e) => setChk({ ...chk, [k]: e.target.checked })} />
-                  {label}{req && <span style={{ color: "rgb(var(--faint))" }}> · required</span>}
-                </label>
-              ))}
-            </div>
+          {factsQ.isLoading && <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 10 }}>Detecting…</div>}
+          {evalr && (
+            <>
+              <div className="space-y-1" style={{ marginTop: 10 }}>
+                {evalr.items.map((it) => (
+                  <div key={it.key} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 12.5 }}>
+                    <span style={{ color: KIND_COLOR[it.kind], fontWeight: 800, width: 14 }}>{KIND_GLYPH[it.kind]}</span>
+                    <span style={{ color: it.ok ? "rgb(var(--muted))" : KIND_COLOR[it.kind] }}>{it.label}
+                      <span style={{ color: "rgb(var(--faint))" }}> — {it.detail}</span></span>
+                  </div>
+                ))}
+              </div>
+              {/* owner attestations for what can't be derived */}
+              <div className="space-y-1" style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--stroke2)" }}>
+                {evalr.confirmRequired.some((c) => c.key === "expenses") && (
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
+                    <input type="checkbox" checked={conf.expensesNone} onChange={(e) => setConf({ ...conf, expensesNone: e.target.checked })} /> Confirm: no expenses occurred today</label>
+                )}
+                {evalr.confirmRequired.some((c) => c.key === "purchases") && (
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
+                    <input type="checkbox" checked={conf.purchasesNone} onChange={(e) => setConf({ ...conf, purchasesNone: e.target.checked })} /> Confirm: no purchase was made today</label>
+                )}
+                {evalr.confirmRequired.some((c) => c.key === "cash_count") && (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 12.5, color: "rgb(var(--muted))" }}>Skip cash count — reason:</span>
+                    <Input value={conf.cashSkip} onChange={(e) => setConf({ ...conf, cashSkip: e.target.value })} placeholder="e.g. drawer untouched" style={{ maxWidth: 220 }} />
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: evalr.canComplete ? "rgb(var(--dim))" : "var(--amber)", marginTop: 8 }}>
+                {evalr.canComplete ? `Ready — will save as ${evalr.recommendedStatus} · ${evalr.completeness}% · confidence ${evalr.confidence}` : evalr.blockReason}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <Button onClick={() => void saveComplete()}>{evalr.canComplete ? "Complete close" : "Save partial"}</Button>
+                <button style={MINI} onClick={() => void saveNoTrading()}>No trading today</button>
+              </div>
+            </>
           )}
-          <div style={{ fontSize: 12, color: preview.blockedFromComplete ? "var(--amber)" : "rgb(var(--dim))", marginTop: 8 }}>
-            {preview.blockedFromComplete ? preview.blockReason : `Will save as ${preview.status} · ${preview.completeness}% complete`}
-          </div>
-          <div style={{ marginTop: 10 }}><Button onClick={() => void save()}>Save close</Button></div>
         </div>
       )}
       {!open && recent.length > 0 && (
-        <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 8 }}>
-          Recent: {recent.slice(0, 5).map((c) => `${fmtDate(c.date)} ${c.status === "complete" ? "✓" : c.status === "no_trading" ? "—" : "·"}`).join("  ")}
+        <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {recent.slice(0, 5).map((c) => (
+            <span key={c.date}>
+              {fmtDate(c.date)} {c.status === "complete" ? "✓" : c.status === "no_trading" ? "—" : "·"}
+              {c.isStale && <button style={{ ...MINI, marginLeft: 4, padding: "1px 6px", color: "var(--amber)" }} onClick={() => void reopen(c.date)}>reopen</button>}
+            </span>
+          ))}
         </div>
       )}
     </DeckTile>
