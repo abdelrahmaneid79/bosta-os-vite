@@ -86,12 +86,12 @@ function LoginScreen() {
   return (
     <Centered>
       <form onSubmit={submit} className="panel space-y-3 p-5">
-        <Eyebrow>Sign in to your Supabase account</Eyebrow>
+        <Eyebrow>Owner sign in</Eyebrow>
         <Field label="Email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
         <Field label="Password"><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
         {err && <div className="rounded-lg bg-bad/10 px-3 py-2 text-[12px] text-bad">{err}</div>}
         <Button type="submit" disabled={busy} className="w-full">{busy ? "Signing in…" : "Sign in"}</Button>
-        <p className="text-center text-[11px] text-dim">All reads and writes run under your session. RLS is enforced.</p>
+        <p className="text-center text-[11px] text-dim">Your books are private — everything runs under your own account.</p>
       </form>
     </Centered>
   );

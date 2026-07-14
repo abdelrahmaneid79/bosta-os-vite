@@ -304,3 +304,42 @@
 .cdk .metaline{display:flex;flex-wrap:wrap;gap:6px 16px;padding:2px 2px 0;font-size:12px;color:var(--cd-dim)}
 .cdk .metaline b{color:var(--cd-muted);font-weight:600}
 .cdk .metaline .warn{color:var(--amber, #f5b14c)}
+
+/* ── Production polish pass (final UI pass) ─────────────────────────────
+   One small-button vocabulary, real touch targets, global focus-visible,
+   reduced-motion, safe text overflow, mobile KPI scaling. */
+
+/* the app's small utility button — replaces ad-hoc inline styles */
+.cdk .mbtn{display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:600;color:var(--cd-muted);background:none;border:1px solid var(--stroke);border-radius:8px;padding:5px 11px;min-height:30px;cursor:pointer;text-decoration:none;white-space:nowrap;transition:color .15s ease,border-color .15s ease,background .15s ease}
+.cdk .mbtn:hover{color:var(--cd-text);border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.04)}
+.cdk .mbtn:disabled{opacity:.45;cursor:default}
+.cdk .mbtn.on{color:var(--cd-text);border-color:var(--mag)}
+.cdk .mbtn.accent{color:var(--mag);border-color:rgba(255,77,187,.4)}
+
+/* touch devices get real 40px targets and finger-sized checkboxes */
+@media (pointer:coarse){
+  .cdk .mbtn{min-height:40px;padding:8px 14px}
+  .cdk input[type="checkbox"]{width:18px;height:18px;accent-color:var(--mag)}
+}
+
+/* keyboard focus is visible EVERYWHERE, one vocabulary */
+.cdk :is(button,a,[role="button"],input,select,textarea,summary):focus-visible{outline:2px solid var(--mag);outline-offset:2px;border-radius:8px}
+
+/* reduced motion: kill decorative animation app-wide, keep instant state */
+@media (prefers-reduced-motion:reduce){
+  .cdk *, .cdk *::before, .cdk *::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+
+/* horizontally scrollable chip/filter rows on phones — never poor wrapping */
+.cdk .chiprow{display:flex;gap:6px;flex-wrap:wrap}
+@media (max-width:640px){
+  .cdk .chiprow{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-right:-18px;padding-right:18px}
+  .cdk .chiprow::-webkit-scrollbar{display:none}
+}
+
+/* long product names (Arabic + English) truncate instead of blowing layout */
+.cdk .th .tname{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.cdk .tile{overflow-wrap:break-word}
+
+/* large monetary values stay inside 320–390px tiles */
+@media (max-width:390px){ .cdk .kv{font-size:25px} .cdk .kv small{font-size:13px} }

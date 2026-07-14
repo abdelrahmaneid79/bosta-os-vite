@@ -376,16 +376,16 @@ function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
       </div>
       <div className="space-y-2" style={{ marginTop: 10 }}>
         {exceptions.map((e) => (
-          <div key={e.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px", borderLeft: `3px solid ${EXC_COLOR[e.severity]}` }}>
+          <div key={e.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px" }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{e.title}</span>
               <Chip text={e.severity} color={EXC_COLOR[e.severity]} />
               {e.status !== "open" && <Chip text={e.status} color="rgb(var(--dim))" />}
               {e.recurrenceCount > 1 && <Chip text={`×${e.recurrenceCount}`} color="rgb(var(--dim))" />}
               <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-                <Link to={e.screenLink} style={{ ...MINI, textDecoration: "none" }}>Fix</Link>
-                {e.status === "open" && <button style={MINI} onClick={() => void onAck(e.id)}>Ack</button>}
-                <button style={MINI} onClick={() => { setDismissing(dismissing === e.id ? null : e.id); setReason(""); }}>Dismiss</button>
+                <Link to={e.screenLink} className="mbtn">Fix</Link>
+                {e.status === "open" && <button className="mbtn" onClick={() => void onAck(e.id)}>Ack</button>}
+                <button className="mbtn" onClick={() => { setDismissing(dismissing === e.id ? null : e.id); setReason(""); }}>Dismiss</button>
               </span>
             </div>
             <div style={{ fontSize: 12, color: "rgb(var(--muted))", marginTop: 4 }}>{e.detail}</div>
@@ -393,7 +393,7 @@ function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
             {dismissing === e.id && (
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                 <Input placeholder="Reason (required)" value={reason} onChange={(ev) => setReason(ev.target.value)} style={{ maxWidth: 260 }} />
-                <button style={MINI} disabled={!reason.trim()} onClick={async () => { await onDismiss(e.id, reason.trim()); setDismissing(null); }}>Confirm</button>
+                <button className="mbtn" disabled={!reason.trim()} onClick={async () => { await onDismiss(e.id, reason.trim()); setDismissing(null); }}>Confirm</button>
               </div>
             )}
           </div>
@@ -424,7 +424,7 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: 
         <div className="th"><span className="tname">Owner knowledge</span>
           <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
             <Chip text={`${data.progress.pct}% complete`} color="var(--green)" />
-            <button style={MINI} onClick={onOpenSetup}>Edit stand</button>
+            <button className="mbtn" onClick={onOpenSetup}>Edit stand</button>
           </span>
         </div>
         <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>BostaOS has the context it needs right now. Answers make merchandising and packaging advice specific to your stand.</div>
@@ -436,7 +436,7 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: 
       <div className="th"><span className="tname">A few things only you know</span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           <Chip text={`${data.progress.answered}/${data.progress.total}`} color="rgb(var(--dim))" />
-          <button style={MINI} onClick={onOpenSetup}>Set up my stand</button>
+          <button className="mbtn" onClick={onOpenSetup}>Set up my stand</button>
         </span>
       </div>
       <div style={{ fontSize: 12, color: "rgb(var(--faint))", margin: "6px 0 10px" }}>Answering these makes advice specific to your real stand — BostaOS never guesses this.</div>
@@ -453,12 +453,12 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: 
                 {field ? (
                   <>
                     <Input placeholder="comma-separated" value={draftText[q.id] ?? ""} onChange={(e) => setDraftText({ ...draftText, [q.id]: e.target.value })} style={{ maxWidth: 280 }} />
-                    <button style={MINI} disabled={!draftText[q.id]?.trim()} onClick={() => void onAnswerList(q.id, field, draftText[q.id].split(",").map((x) => x.trim()).filter(Boolean))}>Save</button>
+                    <button className="mbtn" disabled={!draftText[q.id]?.trim()} onClick={() => void onAnswerList(q.id, field, draftText[q.id].split(",").map((x) => x.trim()).filter(Boolean))}>Save</button>
                   </>
                 ) : (
-                  <Link to={q.screenLink} style={{ ...MINI, textDecoration: "none" }}>Answer in {q.screenLink.replace("/", "")}</Link>
+                  <Link to={q.screenLink} className="mbtn">Answer in {q.screenLink.replace("/", "")}</Link>
                 )}
-                {q.allowUnknown && <button style={MINI} onClick={() => void onMarkUnknown(q.id)}>Unknown / skip</button>}
+                {q.allowUnknown && <button className="mbtn" onClick={() => void onMarkUnknown(q.id)}>Unknown / skip</button>}
               </div>
             </div>
           );
@@ -514,7 +514,7 @@ function RetailSetupModal({ open, onClose, onSaved, onError }: { open: boolean; 
         <Input placeholder="pkg cost" value={pkg.packageCost} onChange={(e) => setPkg({ ...pkg, packageCost: e.target.value })} style={{ maxWidth: 80 }} />
         <Input placeholder="prep" value={pkg.prepCost} onChange={(e) => setPkg({ ...pkg, prepCost: e.target.value })} style={{ maxWidth: 60 }} />
         <Input placeholder="label/seal" value={pkg.labelSealCost} onChange={(e) => setPkg({ ...pkg, labelSealCost: e.target.value })} style={{ maxWidth: 80 }} />
-        <button style={MINI} disabled={!pkg.name.trim()} onClick={() => void addPkg()}>Add</button>
+        <button className="mbtn" disabled={!pkg.name.trim()} onClick={() => void addPkg()}>Add</button>
       </div>
       {(pkgQ.data ?? []).length > 0 && (
         <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginBottom: 14 }}>
@@ -523,8 +523,8 @@ function RetailSetupModal({ open, onClose, onSaved, onError }: { open: boolean; 
       )}
 
       <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "rgb(var(--faint))", margin: "6px 0" }}>Per-product stand facts</div>
-      <div style={{ maxHeight: "40vh", overflowY: "auto" }}>
-        <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+      <div style={{ maxHeight: "40vh", overflowY: "auto", overflowX: "auto" }}>
+        <table style={{ width: "100%", minWidth: 540, fontSize: 12, borderCollapse: "collapse" }}>
           <thead><tr style={{ color: "rgb(var(--faint))", textAlign: "left" }}>
             <th style={{ padding: "4px 6px" }}>Product</th><th>Facings</th><th>Zone</th><th>Tier</th><th>Traffic</th><th>Keep</th>
           </tr></thead>
@@ -600,9 +600,9 @@ function RetailAdvisor({ result, loading, onExperiment }: {
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "10px 0" }}>
+          <div className="chiprow" style={{ margin: "10px 0" }}>
             {buckets.map((b) => (
-              <button key={b} style={{ ...MINI, ...(filter === b ? { color: "rgb(var(--text))", borderColor: "var(--mag)" } : {}) }} onClick={() => setFilter(b)}>{b}</button>
+              <button key={b} className={filter === b ? "mbtn on" : "mbtn"} onClick={() => setFilter(b)}>{b}</button>
             ))}
           </div>
           <div className="space-y-2">
@@ -611,7 +611,7 @@ function RetailAdvisor({ result, loading, onExperiment }: {
               const open = openId === r.id;
               const prose = renderRecommendation(r);
               return (
-                <div key={r.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px", borderLeft: `3px solid ${t.color}` }}>
+                <div key={r.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px" }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", cursor: "pointer" }} onClick={() => setOpenId(open ? null : r.id)}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{r.title}</span>
                     <Chip text={t.label} color={t.color} />
@@ -631,8 +631,8 @@ function RetailAdvisor({ result, loading, onExperiment }: {
                         <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}> · Confidence: </span>{prose.confidence}
                       </div>
                       <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                        <Link to={r.screenLink} style={{ ...MINI, textDecoration: "none" }}>Open screen</Link>
-                        {r.truthLevel === "experiment_hypothesis" && <button style={MINI} onClick={() => void onExperiment(r)}>Add as experiment</button>}
+                        <Link to={r.screenLink} className="mbtn">Open screen</Link>
+                        {r.truthLevel === "experiment_hypothesis" && <button className="mbtn" onClick={() => void onExperiment(r)}>Add as experiment</button>}
                       </div>
                     </div>
                   )}
@@ -788,7 +788,6 @@ function BriefCell({ label, text, color }: { label: string; text: string; color:
 
 /* ═══ WHAT MATTERS NOW ════════════════════════════════════════════════ */
 
-const MINI: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: "rgb(var(--muted))", background: "none", border: "1px solid var(--stroke)", borderRadius: 8, padding: "4px 10px", cursor: "pointer" };
 
 function WhatMattersNow({ findings, insightByFinding, onEvidence, onStatus, onAccept }: {
   findings: Finding[];
@@ -809,7 +808,7 @@ function WhatMattersNow({ findings, insightByFinding, onEvidence, onStatus, onAc
           const meta = CLASS_META[f.class];
           const row = insightByFinding.get(f.id);
           return (
-            <div key={f.id} style={{ border: "1px solid var(--stroke2)", borderLeft: `3px solid ${meta.color}`, borderRadius: 12, padding: "12px 14px" }}>
+            <div key={f.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 12, padding: "12px 14px" }}>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: "rgb(var(--faint))" }}>#{f.rank}</span>
                 <Chip text={meta.label} color={meta.color} />
@@ -837,8 +836,8 @@ function WhatMattersNow({ findings, insightByFinding, onEvidence, onStatus, onAc
               )}
               {row && (row.status === "active" || row.status === "reopened") && (
                 <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
-                  <button style={MINI} onClick={() => void onStatus(row, "acknowledged")}>Acknowledge</button>
-                  <button style={MINI} onClick={() => void onStatus(row, "dismissed")}>Dismiss</button>
+                  <button className="mbtn" onClick={() => void onStatus(row, "acknowledged")}>Acknowledge</button>
+                  <button className="mbtn" onClick={() => void onStatus(row, "dismissed")}>Dismiss</button>
                   {row.status === "reopened" && <Chip text="Returned after being resolved" color="var(--amber)" />}
                 </div>
               )}
@@ -847,7 +846,7 @@ function WhatMattersNow({ findings, insightByFinding, onEvidence, onStatus, onAc
         })}
       </div>
       {findings.length > 3 && (
-        <button style={{ ...MINI, marginTop: 12 }} onClick={() => setShowAll((v) => !v)}>
+        <button className="mbtn" style={{ marginTop: 12 }} onClick={() => setShowAll((v) => !v)}>
           {showAll ? "Show top 3 only" : `Show all ${findings.length} findings`}
         </button>
       )}
@@ -927,9 +926,9 @@ function ActionQueue({ actions, onUpdate }: { actions: ActionRow[]; onUpdate: (i
               {a.outcomeState !== "not_started" && <div style={{ marginTop: 3 }}><Chip text={a.outcomeState.replace(/_/g, " ")} color={a.outcomeState === "improved" ? "var(--green)" : a.outcomeState === "worsened" ? "var(--red)" : "rgb(var(--dim))"} /></div>}
             </div>
             <Link to={a.screenLink} style={{ fontSize: 11.5, color: "var(--mag)", fontWeight: 700 }}>Open</Link>
-            {a.status !== "in_progress" && <button style={MINI} onClick={() => void onUpdate(a.id, "in_progress")}>Start</button>}
-            <button style={MINI} onClick={() => void onUpdate(a.id, "completed")}>Done</button>
-            <button style={{ ...MINI, color: "rgb(var(--faint))" }} onClick={() => void onUpdate(a.id, "dismissed")}>Dismiss</button>
+            {a.status !== "in_progress" && <button className="mbtn" onClick={() => void onUpdate(a.id, "in_progress")}>Start</button>}
+            <button className="mbtn" onClick={() => void onUpdate(a.id, "completed")}>Done</button>
+            <button className="mbtn" style={{ color: "rgb(var(--faint))" }} onClick={() => void onUpdate(a.id, "dismissed")}>Dismiss</button>
           </div>
         ))}
       </div>
@@ -1055,9 +1054,9 @@ function AskStrategist({ s, report, actions, insights, brief, exceptions }: {
       </div>
 
       {/* suggested questions — from live data, never canned */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+      <div className="chiprow" style={{ gap: 8, marginTop: 10 }}>
         {suggestions.map((q) => (
-          <button key={q.text} style={MINI} disabled={!!pending} onClick={() => void ask(q.text, q.mode)}>{q.text}</button>
+          <button key={q.text} className="mbtn" disabled={!!pending} onClick={() => void ask(q.text, q.mode)}>{q.text}</button>
         ))}
       </div>
 
@@ -1119,11 +1118,11 @@ function AnswerCard({ r, messageId, snapshotMeta }: { r: StrategistResponse; mes
           <span style={{ fontSize: 11.5, color: "rgb(var(--faint))" }}>Feedback: {fb.replace("_", " ")} ✓</span>
         ) : (
           <>
-            <button style={MINI} onClick={() => void give("useful")}>Useful</button>
-            <button style={MINI} onClick={() => void give("not_useful")}>Not useful</button>
-            <button style={MINI} onClick={() => setAskReason(true)}>Incorrect…</button>
-            <button style={MINI} onClick={() => void give("already_knew")}>Knew it</button>
-            <button style={MINI} onClick={() => void give("acted_on")}>Acted on it</button>
+            <button className="mbtn" onClick={() => void give("useful")}>Useful</button>
+            <button className="mbtn" onClick={() => void give("not_useful")}>Not useful</button>
+            <button className="mbtn" onClick={() => setAskReason(true)}>Incorrect…</button>
+            <button className="mbtn" onClick={() => void give("already_knew")}>Knew it</button>
+            <button className="mbtn" onClick={() => void give("acted_on")}>Acted on it</button>
           </>
         )}
         {r.usage?.cache_read_input_tokens ? <span style={{ fontSize: 10.5, color: "rgb(var(--faint))", marginLeft: "auto" }}>cached context reused</span> : null}
@@ -1215,9 +1214,9 @@ function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyRe
       <div className="th"><span className="tname">Decision mode</span>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>deterministic numbers first · AI judgment second</span>
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+      <div className="chiprow" style={{ gap: 8, marginTop: 10 }}>
         {([["withdrawal", "Owner withdrawal"], ["stock", "Buy stock"], ["employee", "Hire employee"], ["price", "Price change"], ["other", "Something else"]] as [DecisionKind, string][]).map(([k, label]) => (
-          <button key={k} style={{ ...MINI, ...(kind === k ? { borderColor: "var(--mag)", color: "var(--mag)" } : {}) }} onClick={() => { setKind(k); setAiAnswer(null); }}>{label}</button>
+          <button key={k} className={kind === k ? "mbtn accent" : "mbtn"} onClick={() => { setKind(k); setAiAnswer(null); }}>{label}</button>
         ))}
       </div>
 
@@ -1354,12 +1353,12 @@ function ActivationTile({ checklist, liveHealth, onConfirmStart }: {
       <div className="th"><span className="tname">Activate BostaOS</span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           <Chip text={meta1} color={meta2} />
-          <button style={MINI} onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Steps"}</button>
+          <button className="mbtn" onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Steps"}</button>
         </span>
       </div>
       <div style={{ fontSize: 13, color: "rgb(var(--muted))", marginTop: 8, lineHeight: 1.5 }}>{checklist.readinessReason}</div>
       {checklist.nextStep && (
-        <div style={{ marginTop: 10, borderLeft: "3px solid var(--mag)", paddingLeft: 10 }}>
+        <div style={{ marginTop: 10 }}>
           <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Do this next · {checklist.nextStep.effort} effort</div>
           <div className="disp" style={{ fontSize: 15, fontWeight: 700, marginTop: 3 }}>{checklist.nextStep.title}</div>
           <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 3 }}>{checklist.nextStep.why}</div>
@@ -1447,7 +1446,7 @@ function DailyCloseTile({ lastDataDate, signals, onSaved, onError }: { lastDataD
       <div className="th"><span className="tname">Daily close</span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           {recent[0] && <Chip text={`last ${fmtDate(recent[0].date)} · ${recent[0].status}${recent[0].isStale ? " · stale" : ""}`} color={recent[0].isStale ? "var(--amber)" : "rgb(var(--dim))"} />}
-          <button style={MINI} onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Run close"}</button>
+          <button className="mbtn" onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Run close"}</button>
         </span>
       </div>
       {open && (
@@ -1490,7 +1489,7 @@ function DailyCloseTile({ lastDataDate, signals, onSaved, onError }: { lastDataD
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                 <Button onClick={() => void saveComplete()}>{evalr.canComplete ? "Complete close" : "Save partial"}</Button>
-                <button style={MINI} onClick={() => void saveNoTrading()}>No trading today</button>
+                <button className="mbtn" onClick={() => void saveNoTrading()}>No trading today</button>
               </div>
             </>
           )}
@@ -1501,7 +1500,7 @@ function DailyCloseTile({ lastDataDate, signals, onSaved, onError }: { lastDataD
           {recent.slice(0, 5).map((c) => (
             <span key={c.date}>
               {fmtDate(c.date)} {c.status === "complete" ? "✓" : c.status === "no_trading" ? "—" : "·"}
-              {c.isStale && <button style={{ ...MINI, marginLeft: 4, padding: "1px 6px", color: "var(--amber)" }} onClick={() => void reopen(c.date)}>reopen</button>}
+              {c.isStale && <button className="mbtn" style={{ marginLeft: 4, color: "var(--amber)" }} onClick={() => void reopen(c.date)}>reopen</button>}
             </span>
           ))}
         </div>
@@ -1527,7 +1526,7 @@ function CashIntelligence({ report }: { report: StrategyReport }) {
       <div className="th"><span className="tname">Cash intelligence</span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           <Chip text={VERDICT[cash.safety.verdict][0]} color={VERDICT[cash.safety.verdict][1]} />
-          <button style={MINI} onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Detail"}</button>
+          <button className="mbtn" onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Detail"}</button>
         </span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginTop: 10 }}>
@@ -1586,7 +1585,7 @@ function WeeklyPriorityCard({ weekly, onQueue }: { weekly: ReturnType<typeof sel
         {!p.alreadyQueued && <button className="addbtn" style={{ fontSize: 11.5, padding: "3px 10px" }} onClick={() => void onQueue(p)}>+ Queue it</button>}
         {p.alreadyQueued && <Chip text="Already in your queue" color="rgb(var(--cyan))" />}
         {weekly.secondary.length > 0 && (
-          <button style={MINI} onClick={() => setShowSecondary((v) => !v)}>{showSecondary ? "Hide" : `+${weekly.secondary.length} secondary`}</button>
+          <button className="mbtn" onClick={() => setShowSecondary((v) => !v)}>{showSecondary ? "Hide" : `+${weekly.secondary.length} secondary`}</button>
         )}
       </div>
       {showSecondary && weekly.secondary.map((sx) => (
@@ -1624,11 +1623,11 @@ function ProductStrategy({ report }: { report: StrategyReport }) {
         <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>{pf.reason}</div>
       ) : (
         <>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+          <div className="chiprow" style={{ gap: 8, marginTop: 10 }}>
             {report.shelf.filter((x) => x.verdict === "expand_consideration").slice(0, 3).map((x) => <Chip key={x.name} text={`↑ ${x.name}`} color="var(--green)" />)}
             {report.pricingReviews.slice(0, 3).map((x) => <Chip key={x.name} text={`£ ${x.name}`} color="var(--amber)" />)}
             {report.purchaseReviews.slice(0, 3).map((x) => <Chip key={x.name} text={`⇄ ${x.name}`} color="rgb(var(--cyan))" />)}
-            <button style={{ ...MINI, marginLeft: "auto" }} onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Full analysis"}</button>
+            <button className="mbtn" style={{ marginLeft: "auto" }} onClick={() => setOpen((v) => !v)}>{open ? "Collapse" : "Full analysis"}</button>
           </div>
           {open && (
             <div style={{ marginTop: 12 }}>
@@ -1792,7 +1791,7 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
             <input type="checkbox" checked={lang.allowEnhanced} onChange={(e) => setLang({ ...lang, allowEnhanced: e.target.checked })} />
             Allow enhanced briefings and answers (each call costs money; nothing runs automatically)
           </label>
-          <button style={{ ...MINI, marginTop: 10 }} onClick={() => setShowDiag((v) => !v)}>{showDiag ? "Hide diagnostics" : "Diagnostics"}</button>
+          <button className="mbtn" style={{ marginTop: 10 }} onClick={() => setShowDiag((v) => !v)}>{showDiag ? "Hide diagnostics" : "Diagnostics"}</button>
           {showDiag && (
             <div style={{ marginTop: 8, fontSize: 11.5, color: "rgb(var(--dim))", lineHeight: 1.7 }}>
               {health.map((h) => <div key={h.id}>{h.id}: {h.available ? "available" : "unavailable"} — {h.detail}{h.lastLatencyMs ? ` · ${h.lastLatencyMs}ms` : ""}</div>)}
@@ -1803,7 +1802,7 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button style={MINI} onClick={onClose}>Cancel</button>
+          <button className="mbtn" onClick={onClose}>Cancel</button>
           <Button onClick={() => save.mutate()} disabled={save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
         </div>
       </div>
