@@ -37,7 +37,7 @@ async function rpc<T extends keyof Database["public"]["Functions"]>(
   return data as Database["public"]["Functions"][T]["Returns"];
 }
 
-// ── WRITE-PATH WRAPPERS (defined, not yet wired — approval required) ─────────
+// ── WRITE-PATH WRAPPERS — the verified Postgres RPCs, called from mutations.ts ──
 
 export interface PurchaseLine {
   product_id: string;
@@ -83,3 +83,14 @@ export const recalcMoneyAccount = (p_account_id: string) => rpc("recalc_money_ac
 export const voidPurchaseBatch = (p_batch_id: string, p_reason: string) => rpc("void_purchase_batch", { p_batch_id, p_reason });
 export const ensureMonthlySettlementPeriod = (p_location_id: string, p_month: string) =>
   rpc("ensure_monthly_settlement_period", { p_location_id, p_month });
+/** Atomic cash count (0039): reconciliation + conditional adjustment + balance
+ *  recalc in one transaction — replaces a 3-round-trip client sequence. */
+export const recordCashCountAtomic = (args: {
+  accountId: string; countDate: string; counted: number; expected: number; notes: string | null;
+  isOpeningBaseline: boolean; verification: string; countedSource: string; bankBalance: number | null;
+  idempotencyKey: string | null;
+}) => rpc("record_cash_count", {
+  p_account_id: args.accountId, p_count_date: args.countDate, p_counted: args.counted, p_expected: args.expected,
+  p_notes: args.notes, p_is_opening_baseline: args.isOpeningBaseline, p_verification: args.verification,
+  p_counted_source: args.countedSource, p_bank_balance: args.bankBalance, p_idempotency_key: args.idempotencyKey,
+}) as Promise<{ id: string; difference: number; replayed: boolean }>;

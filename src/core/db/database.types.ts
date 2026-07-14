@@ -2633,6 +2633,21 @@ export type Database = {
         Args: { p_period_id: string }
         Returns: undefined
       }
+      record_cash_count: {
+        Args: {
+          p_account_id: string
+          p_bank_balance: number | null
+          p_count_date: string
+          p_counted: number
+          p_counted_source: string
+          p_expected: number
+          p_idempotency_key: string | null
+          p_is_opening_baseline: boolean
+          p_notes: string | null
+          p_verification: string
+        }
+        Returns: Json
+      }
       recompute_all_product_costs: { Args: never; Returns: undefined }
       recompute_product_costs: {
         Args: { p_product_id: string }

@@ -3,6 +3,7 @@
  *  Stores references/outputs/state — never authoritative financial numbers. */
 import { requireEngine } from "@/core/db/engine";
 import { setAppSetting } from "@/core/db/mutations";
+import { logAudit } from "@/core/audit/log";
 import type { Finding } from "../analysis/types";
 import type { StrategistResponse } from "../response";
 import { planInsightSync, isDuplicateAction, type InsightLite, type InsightStatus, type ActionLite } from "./lifecycle";
@@ -173,6 +174,7 @@ export async function updateActionStatus(id: string, status: string, completionN
   if (status === "dismissed") patch.dismissed_at = now;
   const { error } = await requireEngine().from("strategist_actions").update(patch as never).eq("id", id);
   if (error) throw error;
+  void logAudit({ action: "action.status_change", entityType: "strategist_actions", entityId: id, detail: { status, completionNote } });
 }
 
 /** Link an accepted action to the operational exception it resolves, so

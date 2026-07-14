@@ -3,6 +3,7 @@
  *  daily_closes and the live_operations app_setting. */
 import { requireEngine } from "@/core/db/engine";
 import { setAppSetting } from "@/core/db/mutations";
+import { logAudit } from "@/core/audit/log";
 import type { AcceptedCommitment } from "../analysis/cash";
 
 /* ── live-operations start date ───────────────────────────────────────── */
@@ -71,6 +72,7 @@ export async function saveClose(i: SaveCloseInput): Promise<void> {
     updated_at: new Date().toISOString(),
   }, { onConflict: "location_id,close_date" });
   if (error) throw error;
+  void logAudit({ action: "close.complete", entityType: "daily_closes", entityId: i.date, detail: { status, completeness: i.completeness, version } });
 }
 
 export async function reopenDailyClose(locationId: string | null, date: string, reason: string): Promise<void> {
@@ -81,6 +83,7 @@ export async function reopenDailyClose(locationId: string | null, date: string, 
     .eq("close_date", date).is("voided_at", null);
   const { error } = await byLoc(q, locationId);
   if (error) throw error;
+  void logAudit({ action: "close.reopen", entityType: "daily_closes", entityId: date, detail: { reason, version } });
 }
 
 export async function voidDailyClose(locationId: string | null, date: string, reason: string): Promise<void> {
@@ -90,6 +93,7 @@ export async function voidDailyClose(locationId: string | null, date: string, re
     .eq("close_date", date).is("voided_at", null);
   const { error } = await byLoc(q, locationId);
   if (error) throw error;
+  void logAudit({ action: "close.void", entityType: "daily_closes", entityId: date, detail: { reason } });
 }
 
 /** Owner confirms the store did not trade — the one no-trading fact BostaOS

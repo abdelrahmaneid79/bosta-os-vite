@@ -3,6 +3,7 @@
  *  dismissal, acknowledgement or note survives across refreshes, and a resolved
  *  issue reopens deterministically if the underlying problem returns. */
 import { requireEngine } from "@/core/db/engine";
+import { logAudit } from "@/core/audit/log";
 import type { PersistedExceptionState, ReconciledException, OperationalException } from "../analysis/exceptions";
 
 export async function loadPersistedExceptions(): Promise<PersistedExceptionState[]> {
@@ -67,9 +68,11 @@ async function patch(id: string, fields: Record<string, unknown>): Promise<void>
   if (error) throw error;
 }
 
-export const acknowledgeException = (id: string) => patch(id, { status: "acknowledged", acknowledged_at: new Date().toISOString() });
+export const acknowledgeException = (id: string) => patch(id, { status: "acknowledged", acknowledged_at: new Date().toISOString() })
+  .then(() => void logAudit({ action: "exception.acknowledge", entityType: "operational_exceptions", entityId: id }));
 export const startException = (id: string) => patch(id, { status: "in_progress" });
-export const resolveException = (id: string) => patch(id, { status: "resolved", resolved_at: new Date().toISOString() });
+export const resolveException = (id: string) => patch(id, { status: "resolved", resolved_at: new Date().toISOString() })
+  .then(() => void logAudit({ action: "exception.resolve", entityType: "operational_exceptions", entityId: id }));
 
 /** Dismiss with a reason. Low-risk issues stay suppressed; critical issues can
  *  be dismissed but will reopen automatically if they persist (handled by the
@@ -78,6 +81,7 @@ export async function dismissException(id: string, reason: string, suppressDays 
   if (!reason.trim()) throw new Error("A dismissal reason is required.");
   const until = new Date(Date.now() + suppressDays * 86_400_000).toISOString().slice(0, 10);
   await patch(id, { status: "dismissed", dismissed_at: new Date().toISOString(), dismiss_reason: reason.trim(), suppressed_until: until });
+  void logAudit({ action: "exception.dismiss", entityType: "operational_exceptions", entityId: id, detail: { reason } });
 }
 
 export const noteException = (id: string, note: string) => patch(id, { owner_note: note });

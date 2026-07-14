@@ -9,16 +9,16 @@ import {
   requireEngine, createPurchase as rpcCreatePurchase,
   createSaleItem as rpcCreateSaleItem, updateSaleItem as rpcUpdateSaleItem,
   deleteSaleItem as rpcDeleteSaleItem, voidSaleAtomic,
-  recalcMoneyAccount, ensureMonthlySettlementPeriod, voidPurchaseBatch,
+  recalcMoneyAccount, ensureMonthlySettlementPeriod, voidPurchaseBatch, recordCashCountAtomic,
 } from "@/core/db/engine";
 import type { Enums } from "@/core/db/tables";
 import type { Database } from "@/core/db/database.types";
 import { signMoney, type MoneyType } from "@/core/money/sign";
 import { getCashPosition } from "@/core/read/money";
 import { isIdempotentDuplicate } from "@/core/db/idempotency";
+import { logAudit } from "@/core/audit/log";
 
 type ChequeStatus = Enums<"cheque_status">;
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
 
@@ -164,6 +164,7 @@ export async function deleteProduct(id: string): Promise<void> {
   // the product itself survives.
   const { error } = await requireEngine().from("products").delete().eq("id", id);
   if (error) throw error;
+  void logAudit({ action: "product.delete", entityType: "products", entityId: id });
 }
 
 /** Teach the import matcher an alternate name (or barcode) for a product. The
@@ -206,6 +207,7 @@ export async function addPurchase(input: PurchaseInput): Promise<void> {
  *  Soft: batch + linked movement get voided_at; the WAC ledger replays. */
 export async function voidPurchase(batchId: string, reason?: string): Promise<void> {
   await voidPurchaseBatch(batchId, reason ?? "Voided by owner");
+  void logAudit({ action: "purchase.void", entityType: "purchase_batches", entityId: batchId, detail: { reason } });
 }
 
 // ── Sales (header = safe insert; lines + reversal = verified RPCs) ───────────
@@ -250,17 +252,20 @@ export async function editSaleItem(itemId: string, i: Omit<SaleItemInput, "saleI
     p_id: itemId, p_product_id: i.productId, p_raw_product_name: "",
     p_quantity: i.qty, p_unit_price: i.unitPrice, p_line_total: i.lineTotal, p_notes: i.notes ?? "",
   });
+  void logAudit({ action: "sale_item.edit", entityType: "sale_items", entityId: itemId, detail: { qty: i.qty, unitPrice: i.unitPrice, lineTotal: i.lineTotal } });
 }
 
 /** Void a line → restores stock (RPC). Reversible, never a hard money delete. */
 export async function voidSaleItem(itemId: string): Promise<void> {
   await rpcDeleteSaleItem(itemId);
+  void logAudit({ action: "sale_item.void", entityType: "sale_items", entityId: itemId });
 }
 
 /** Void the whole day — ONE atomic RPC (0021): inventory movements + header
  *  in the same transaction, so the books can never end up half-voided. */
 export async function voidSale(saleId: string): Promise<void> {
   await voidSaleAtomic(saleId, "Voided by owner");
+  void logAudit({ action: "sale.void", entityType: "sales", entityId: saleId });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -284,6 +289,7 @@ export async function voidExpense(id: string, reason?: string): Promise<void> {
     .update({ voided_at: new Date().toISOString(), void_reason: reason?.trim() || "Voided by owner" })
     .eq("id", id).is("voided_at", null);
   if (error) throw error;
+  void logAudit({ action: "expense.void", entityType: "expenses", entityId: id, detail: { reason } });
 }
 /** Find-or-create an expense category by name. */
 export async function ensureExpenseCategory(name: string, isOperating: boolean): Promise<string> {
@@ -334,6 +340,7 @@ export async function voidMovement(id: string, accountId: string, reason?: strin
     .eq("id", id).is("voided_at", null);
   if (error) throw error;
   await recalcMoneyAccount(accountId);
+  void logAudit({ action: "movement.void", entityType: "money_movements", entityId: id, detail: { reason, accountId } });
 }
 /** Physical cash count: snapshot expected, store reconciliation, land balance via a voidable adjustment. */
 export interface CashCountOptions {
@@ -345,43 +352,25 @@ export interface CashCountOptions {
   source?: string;
   idempotencyKey?: string;
 }
+/** Atomic (migration 0039): reconciliation + conditional adjustment + balance
+ *  recalc happen in ONE database transaction via record_cash_count, instead of
+ *  3 separate network round-trips — a mid-flight failure can no longer leave
+ *  an orphaned reconciliation with no adjustment. Same financial logic as
+ *  before: same "expected" formula (read in TS, unchanged), same
+ *  opening-baseline rule (never posts an adjustment), same difference math. */
 export async function recordCashCount(accountId: string, counted: number, date: string, notes: string | null, opts: CashCountOptions = {}): Promise<number> {
-  const sb = requireEngine();
   // expected = the true cash position (movements − expenses − purchases), not the
   // raw movements balance — so a physical count anchors cash on hand to reality.
   const { onHand: expected } = await getCashPosition();
-  const difference = r2(counted - expected);
   const baseline = opts.openingBaseline === true;
-  const recon = await sb.from("cash_reconciliations")
-    .insert({
-      account_id: accountId, count_date: date, counted_amount: counted, expected_balance: expected, notes,
-      is_opening_baseline: baseline,
-      verification: opts.verification ?? "verified",
-      counted_source: opts.source ?? "manual",
-      bank_balance: opts.bankBalance ?? null,
-      // the opening difference is recorded for the record, never actioned
-      opening_difference: baseline ? difference : null,
-      idempotency_key: opts.idempotencyKey ?? null,
-    })
-    .select("id").single();
-  if (recon.error) {
-    // a retry of the SAME count already saved — return its difference, don't double-post
-    if (opts.idempotencyKey && isIdempotentDuplicate(recon.error)) return difference;
-    throw recon.error;
-  }
-  // A NON-baseline count reconciles from the prior baseline forward, so a
-  // real difference posts an adjustment. The opening baseline does NOT —
-  // its gap vs the historical ledger is informational only.
-  if (!baseline && difference !== 0) {
-    const mv = await sb.from("money_movements").insert({
-      account_id: accountId, movement_date: date, movement_type: "adjustment", amount: difference,
-      reference_type: "cash_reconciliation", reference_id: recon.data.id,
-      notes: notes ?? `Cash count: counted ${counted} vs expected ${expected}`, source_type: "manual",
-    });
-    if (mv.error) throw mv.error;
-    await recalcMoneyAccount(accountId);
-  }
-  return difference;
+  const result = await recordCashCountAtomic({
+    accountId, countDate: date, counted, expected, notes,
+    isOpeningBaseline: baseline, verification: opts.verification ?? "verified",
+    countedSource: opts.source ?? "manual", bankBalance: opts.bankBalance ?? null,
+    idempotencyKey: opts.idempotencyKey ?? null,
+  });
+  void logAudit({ action: "cash_count.record", entityType: "cash_reconciliations", entityId: result.id, detail: { counted, expected, difference: result.difference, baseline } });
+  return result.difference;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -425,6 +414,7 @@ export async function voidCheque(id: string, reason?: string): Promise<void> {
     .update({ voided_at: new Date().toISOString(), void_reason: reason?.trim() || "Voided by owner" })
     .eq("id", id).is("voided_at", null);
   if (error) throw error;
+  void logAudit({ action: "cheque.void", entityType: "cheques", entityId: id, detail: { reason } });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
