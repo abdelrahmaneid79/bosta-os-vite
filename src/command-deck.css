@@ -286,3 +286,21 @@
   /* #5 Segmented range/tab controls wrap instead of overflowing. */
   .cdk .seg, .cdk .subtabs{ flex-wrap:wrap; }
 }
+
+/* ── Page sections (progressive disclosure) — Cycle 12 design refactor ──
+   A quiet region divider, not a card: hairline top border, Clash title,
+   count pill, chevron. Keeps long operational pages scannable. */
+.cdk .csec{margin-top:10px}
+.cdk .csec-h{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;border-top:1px solid var(--stroke);padding:16px 2px 14px;cursor:pointer;color:var(--cd-dim);text-align:left;transition:color .15s ease}
+.cdk .csec-h:hover{color:var(--cd-text)}
+.cdk .csec-h:focus-visible{outline:2px solid var(--mag);outline-offset:2px;border-radius:8px}
+.cdk .csec-t{font-family:'Clash Display','Satoshi',sans-serif;font-weight:600;font-size:14.5px;letter-spacing:-.005em;color:var(--cd-text)}
+.cdk .csec-b{font-size:11px;font-weight:800;padding:2.5px 9px;border-radius:999px;background:rgba(255,255,255,.06);color:var(--cd-muted);font-variant-numeric:tabular-nums}
+.cdk .csec-s{font-size:12px;color:var(--cd-dim);font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdk .csec-ch{width:15px;height:15px;margin-left:auto;flex-shrink:0;transition:transform .18s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion:reduce){ .cdk .csec-ch{transition:none} }
+
+/* Quiet metadata line (replaces the boxed freshness strip) */
+.cdk .metaline{display:flex;flex-wrap:wrap;gap:6px 16px;padding:2px 2px 0;font-size:12px;color:var(--cd-dim)}
+.cdk .metaline b{color:var(--cd-muted);font-weight:600}
+.cdk .metaline .warn{color:var(--amber, #f5b14c)}

@@ -8,6 +8,7 @@
  *  language adapter may later re-voice this prose, but this is the baseline and
  *  it must stand on its own. */
 import type { DomainFinding, FindingConfidence, RetailDomain } from "./contract";
+import { lowerFirst, toPlainEnglish, uncertaintyLine } from "../plain-english";
 
 export type NlgStyle = "brief" | "detailed" | "action";
 
@@ -29,7 +30,9 @@ const CONF_PHRASE: Record<FindingConfidence, string> = {
 
 const FINDING_OPENERS = ["", "", "Notably, ", "What stands out: ", "In short, "] as const;
 const DRIVER_CONNECTORS = ["The driver is", "This traces to", "The cause sits in", "It is driven by"] as const;
-const REC_CONNECTORS = ["Recommended:", "The move here:", "What to do:", "Act on this by"] as const;
+// causally linked to the driver/context above — doubles as the "why this
+// action" step of the Executive Communication Standard, not just a label.
+const REC_CONNECTORS = ["That's why the move is:", "Given that, here's the action:", "So the right move is:", "Here's what to do about it:"] as const;
 
 const DOMAIN_LABEL: Record<RetailDomain, string> = {
   revenue: "Revenue", margin: "Margin", pricing: "Pricing", promotion: "Promotion",
@@ -42,48 +45,43 @@ const DOMAIN_LABEL: Record<RetailDomain, string> = {
 const trimDot = (s: string) => s.replace(/\s*$/, "").replace(/\.*$/, "");
 const sentence = (s: string) => { const t = s.trim(); return t ? (/[.!?]$/.test(t) ? t : `${t}.`) : ""; };
 
-/** Render ONE finding as prose. */
+/** Render ONE finding as prose. Always ends with the Executive Communication
+ *  Standard's step 8 ("what could make me wrong?") — never a bare confidence
+ *  label — and runs the whole result through the plain-English pass. */
 export function renderFinding(df: DomainFinding, style: NlgStyle = "detailed"): string {
   const opener = pick(FINDING_OPENERS, df.id);
   const findingSentence = sentence(`${opener}${df.finding}`);
 
   if (style === "brief") {
-    const rec = df.recommendation ? ` ${sentence(`${pick(REC_CONNECTORS, df.id + "r")} ${lower(trimDot(df.recommendation))}`)}` : "";
-    return `${findingSentence}${rec}`.trim();
+    const rec = df.recommendation ? ` ${sentence(`${pick(REC_CONNECTORS, df.id + "r")} ${lowerFirst(trimDot(df.recommendation))}`)}` : "";
+    return toPlainEnglish(`${findingSentence}${rec}`.trim());
   }
 
   if (style === "action") {
     const parts = [
-      sentence(`${pick(REC_CONNECTORS, df.id + "r")} ${lower(trimDot(df.recommendation))}`),
-      df.expectedBenefit ? sentence(`Expected benefit: ${lower(trimDot(df.expectedBenefit))}`) : "",
-      df.successCriteria ? sentence(`You'll know it worked when ${lower(trimDot(df.successCriteria))}`) : "",
+      sentence(`${pick(REC_CONNECTORS, df.id + "r")} ${lowerFirst(trimDot(df.recommendation))}`),
+      df.expectedBenefit ? sentence(`Expected benefit: ${lowerFirst(trimDot(df.expectedBenefit))}`) : "",
+      df.successCriteria ? sentence(`You'll know it worked when ${lowerFirst(trimDot(df.successCriteria))}`) : "",
       df.blockingInformation.length ? sentence(`Blocked until: ${df.blockingInformation.join("; ")}`) : "",
+      sentence(uncertaintyLine(df.confidence, df.blockingInformation)),
     ];
-    return parts.filter(Boolean).join(" ");
+    return toPlainEnglish(parts.filter(Boolean).join(" "));
   }
 
   // detailed — the full consultant paragraph, only from the 11 fields
   const parts: string[] = [
     findingSentence,
-    sentence(`${pick(DRIVER_CONNECTORS, df.id + "d")} ${lower(trimDot(df.driver))}`),
+    sentence(`${pick(DRIVER_CONNECTORS, df.id + "d")} ${lowerFirst(trimDot(df.driver))}`),
     sentence(df.businessContext),
     df.risk ? sentence(df.risk) : "",
     df.opportunity ? sentence(df.opportunity) : "",
-    sentence(`${pick(REC_CONNECTORS, df.id + "r")} ${lower(trimDot(df.recommendation))}`),
-    df.expectedBenefit ? sentence(`Expected benefit: ${lower(trimDot(df.expectedBenefit))}`) : "",
-    df.successCriteria ? sentence(`Success looks like: ${lower(trimDot(df.successCriteria))}`) : "",
-    sentence(`${CONF_PHRASE[df.confidence]}${df.blockingInformation.length ? `, pending ${df.blockingInformation.join("; ")}` : ""}`),
+    sentence(`${pick(REC_CONNECTORS, df.id + "r")} ${lowerFirst(trimDot(df.recommendation))}`),
+    df.expectedBenefit ? sentence(`Expected benefit: ${lowerFirst(trimDot(df.expectedBenefit))}`) : "",
+    df.successCriteria ? sentence(`Success looks like: ${lowerFirst(trimDot(df.successCriteria))}`) : "",
+    sentence(CONF_PHRASE[df.confidence]),
+    sentence(uncertaintyLine(df.confidence, df.blockingInformation)),
   ];
-  return parts.filter(Boolean).join(" ");
-}
-
-function lower(s: string): string {
-  // lowercase the first letter unless it's an acronym/number/proper noun-ish token
-  if (!s) return s;
-  const first = s[0];
-  const second = s[1] ?? "";
-  if (first === first.toUpperCase() && second && second === second.toUpperCase()) return s; // ACRONYM
-  return first.toLowerCase() + s.slice(1);
+  return toPlainEnglish(parts.filter(Boolean).join(" "));
 }
 
 export interface ReportOptions {
@@ -114,7 +112,7 @@ export function renderReport(findings: DomainFinding[], opts: ReportOptions = {}
   const risks = capped.filter((f) => f.risk).length;
   const opps = capped.filter((f) => f.opportunity).length;
   const summary = lead
-    ? sentence(`${lead.headline}${capped.length > 1 ? ` — plus ${capped.length - 1} more finding${capped.length - 1 === 1 ? "" : "s"} (${risks} risk${risks === 1 ? "" : "s"}, ${opps} opportunit${opps === 1 ? "y" : "ies"})` : ""}`)
+    ? toPlainEnglish(sentence(`${lead.headline}${capped.length > 1 ? ` — plus ${capped.length - 1} more finding${capped.length - 1 === 1 ? "" : "s"} (${risks} risk${risks === 1 ? "" : "s"}, ${opps} opportunit${opps === 1 ? "y" : "ies"})` : ""}`))
     : "No findings above the reporting threshold — the books look clean for this view.";
 
   const sections: RenderedReport["sections"] = [];

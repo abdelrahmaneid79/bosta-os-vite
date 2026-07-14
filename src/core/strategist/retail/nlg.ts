@@ -6,6 +6,7 @@
  *  filler ("consider monitoring", "leverage", "maintain momentum", …) never
  *  appears because no such string exists here. */
 import type { RetailRecommendation, TruthLevel } from "./contract";
+import { BANNED_PHRASES, toPlainEnglish, uncertaintyLine } from "../plain-english";
 
 const TRUTH_LABEL: Record<TruthLevel, string> = {
   measured_conclusion: "Measured conclusion",
@@ -38,16 +39,23 @@ export function renderRecommendation(r: RetailRecommendation): RenderedRecommend
     : r.implementationSteps.length
       ? `How: ${r.implementationSteps.map((x) => x.replace(/\.$/, "")).join("; ")}.`
       : "";
+  const why = r.reasoning.length ? `Why this action: ${s(r.reasoning.join(" "))}` : "";
   const success = r.successCriteria.length ? `Keep it only if ${lower(r.successCriteria.join("; "))}` : "";
-  const risk = r.risks.length ? `Watch: ${r.risks.join("; ")}` : (r.contraindications.length ? `Caution: ${r.contraindications.join("; ")}` : "");
+  const risk = r.risks.length ? `Watch: ${r.risks.join("; ")}` : "";
+  // step 8 of the Executive Communication Standard: contraindications are
+  // literally "what would make this wrong" — prefer them, else missing info,
+  // else the assumptions the recommendation rests on.
+  const cautions = r.contraindications.length ? r.contraindications : (r.missingInformation.length ? r.missingInformation : r.assumptions);
 
   const paragraphs = [
     // 1 conclusion + 2 evidence
     [s(r.proposedAction), ...r.observedFacts.map(s)].filter(Boolean).join(" "),
-    // 3 interpretation + 4/5 method + success
-    [s(r.mechanism), method, s(success)].filter(Boolean).join(" "),
+    // 3 interpretation + 5 why this action + method + success
+    [s(r.mechanism), why, method, s(success)].filter(Boolean).join(" "),
     // 6 risk
     s(risk),
+    // 8 what could make me wrong — always present, never a bare confidence label
+    s(uncertaintyLine(r.confidence, cautions)),
   ].filter(Boolean);
 
   const classification = TRUTH_LABEL[r.truthLevel];
@@ -58,13 +66,13 @@ export function renderRecommendation(r: RetailRecommendation): RenderedRecommend
     : (r.observedFacts.length ? `Evidence: ${r.observedFacts.length} observed fact(s)` : "Evidence: —");
   const missingLine = r.missingInformation.length ? `Missing: ${r.missingInformation.join(", ")}` : null;
 
-  const text = [
+  const text = toPlainEnglish([
     ...paragraphs,
     `Classification: ${classification}. Confidence: ${confidence}. Source: ${sourceLabel}.`,
     evidenceLine + (missingLine ? `\n${missingLine}` : ""),
-  ].join("\n\n");
+  ].join("\n\n"));
 
-  return { headline: r.title, paragraphs, classification, confidence, sourceLabel, evidenceLine, missingLine, text };
+  return { headline: toPlainEnglish(r.title), paragraphs: paragraphs.map(toPlainEnglish), classification, confidence, sourceLabel, evidenceLine, missingLine, text };
 }
 
 function lower(str: string): string {
@@ -74,8 +82,11 @@ function lower(str: string): string {
   return a.toLowerCase() + str.slice(1);
 }
 
-/** Phrases BostaOS must never emit — used by tests to prove there's no filler. */
+/** Phrases BostaOS must never emit — used by tests to prove there's no filler.
+ *  Union of this domain's own filler plus the app-wide Executive Communication
+ *  Standard's banned consultant-speak ([[bostaos-communication-standard]]). */
 export const BANNED_FILLER = [
   "consider monitoring", "leverage opportunities", "maintain momentum",
   "continue reviewing", "sales are doing well", "this may indicate", "keep an eye on",
+  ...BANNED_PHRASES,
 ];

@@ -84,7 +84,8 @@ describe("deterministic NLG", () => {
   it("composes a report, dedups, and can group by domain", () => {
     const findings = toDomainFindings([finding(), finding({ id: "cash-x", title: "Cash is tight", detail: "Runway is 2.1 months", drivers: ["salary"], class: "warning" })]);
     const r = renderReport(findings, { groupByDomain: true, maxFindings: 5 });
-    expect(r.summary).toMatch(/Gross margin slipped/);
+    // the plain-english layer translates "Gross margin" into owner words
+    expect(r.summary).toMatch(/slipped 3.1 points/);
     expect(r.sections.map((s) => s.label)).toEqual(expect.arrayContaining(["Margin", "Cash"]));
     // no repeated lines
     const all = r.sections.flatMap((s) => s.lines);

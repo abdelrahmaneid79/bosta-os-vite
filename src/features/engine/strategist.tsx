@@ -9,7 +9,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { DeckTile, PageHdr } from "./deck";
+import { DeckTile, PageHdr, Section } from "./deck";
 import { Button, Field, Input } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { SkeletonRows, ErrorState, EmptyState } from "@/components/feedback";
@@ -153,6 +153,9 @@ export function StrategistScreen() {
   const [drawer, setDrawer] = useState<Finding | null>(null);
   const [tuneOpen, setTuneOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
+  // Section disclosure: null = follow the data signal (open when something needs the owner)
+  const [opsOpen, setOpsOpen] = useState<boolean | null>(null);
+  const [intelOpen, setIntelOpen] = useState<boolean | null>(null);
 
   if (!en) return <EmptyState title="Sign in to load the strategist" />;
   if (snapQ.isError) {
@@ -170,22 +173,24 @@ export function StrategistScreen() {
     reviewPeriodDays: 14,
   });
 
-  return (
-    <div className="cdk space-y-5">
-      <PageHdr title="Strategist" sub="Deterministic findings from your audited books · AI interpretation on demand"
-        right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
+  // ── section signals: open what needs the owner, fold what doesn't ──────
+  const exceptions = opsQ.data?.exceptions ?? [];
+  const activating = report.activation.readiness === "historical_only" || report.activation.readiness === "activation_incomplete";
+  const interviewPending = (interviewQ.data?.questions.length ?? 0) > 0;
+  const openActions = actions.filter((a) => ["suggested", "accepted", "in_progress"].includes(a.status)).length;
+  const opsSignal = exceptions.length > 0 || activating || interviewPending;
+  const opsCritical = exceptions.some((e) => e.severity === "critical" || e.severity === "high");
+  const opsBadgeCount = exceptions.length + (interviewPending ? 1 : 0) + openActions;
 
+  return (
+    <div className="cdk space-y-4">
+      {/* ═══ COMMAND HEADER — one glance: what period, how fresh, one setting ═══ */}
+      <PageHdr title="Strategist" sub="Your books, read like an operator — deterministic, evidence-first"
+        right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
       <FreshnessStrip s={s} />
+
+      {/* ═══ DECIDE — the focal point: today's verdict + what I would do ═══ */}
       <DailyBriefCard brief={opsQ.data?.brief ?? null} loading={opsQ.isLoading} />
-      <ActivationTile checklist={report.activation} liveHealth={report.liveHealth}
-        onConfirmStart={async (d) => { await confirmLiveStart(d); qc.invalidateQueries({ queryKey: ["snapshot-v2"] }); reportSuccess("Activation", "Live start date confirmed"); }} />
-      <OperationalExceptionsPanel exceptions={opsQ.data?.exceptions ?? []} loading={opsQ.isLoading}
-        onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
-        onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
-      <ExecutiveBriefing s={s} report={report} weekly={weekly} />
-      <OwnerInterviewCard data={interviewQ.data ?? null} onOpenSetup={() => setSetupOpen(true)}
-        onMarkUnknown={async (id) => { await markQuestionAnswered(id); qc.invalidateQueries({ queryKey: ["strategist-interview"] }); }}
-        onAnswerList={async (id, field, values) => { await saveRetailContext({ [field]: values } as never); await markQuestionAnswered(id); qc.invalidateQueries({ queryKey: ["strategist-interview"] }); qc.invalidateQueries({ queryKey: ["strategist-retail"] }); reportSuccess("Owner knowledge", "Saved — advice will use it"); }} />
       <RetailAdvisor result={retailQ.data ?? null} loading={retailQ.isLoading}
         onExperiment={async (r) => {
           await createExperiment({
@@ -211,36 +216,60 @@ export function StrategistScreen() {
         reportSuccess("Action queue", res.created ? "Queued this week's priority" : "Already queued");
         qc.invalidateQueries({ queryKey: ["strategist-actions"] });
       }} />
-      <CashIntelligence report={report} />
-      <DailyCloseTile lastDataDate={s.meta.lastDataDate}
-        signals={{
-          cashCountRequired: report.activation.liveStartConfirmed && s.cash.hasLiveData,
-          cashDifferenceUnresolved: s.cash.hasLiveData && (s.cash.unexplainedDifference.value ?? 0) !== 0,
-          chequeNeedsUpdate: (s.cheques.overduePeriods.value ?? []).length > 0,
-          inventoryAlertsToAck: (s.products.stockRisk.value ?? []).length,
-          criticalActionsOpen: report.findings.filter((f) => (f.class === "warning" || f.class === "contradiction") && f.urgency === "today").length,
-        }}
-        onError={(e) => reportError("Daily close", e)} onSaved={() => reportSuccess("Daily close", "Recorded")} />
-      <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
-        onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
-        onAccept={async (f) => {
-          const a = f.action;
-          const res = await createAction({
-            title: a?.title ?? f.title, description: a?.action ?? f.detail, source: "finding",
-            findingId: f.id, category: f.class, priority: f.urgency === "today" ? "high" : f.urgency === "this_week" ? "medium" : "low",
-            screenLink: a?.screenLink ?? "/health", expectedOutcome: a?.expectedImpact ?? null, status: "accepted",
-            baselineFinding: f,
-          });
-          reportSuccess("Action queue", res.created ? "Added to your action queue" : "Already in your queue");
-          qc.invalidateQueries({ queryKey: ["strategist-actions"] });
+
+      {/* ═══ RUN THE DAY — operational surface; opens itself when something needs you ═══ */}
+      <Section title="Run the day" sub={activating ? "activation in progress" : "exceptions · close · setup · queue"}
+        badge={opsBadgeCount || undefined} badgeColor={opsCritical ? "var(--red)" : undefined}
+        open={opsOpen ?? opsSignal} onToggle={setOpsOpen} keepMounted>
+        <OperationalExceptionsPanel exceptions={exceptions} loading={opsQ.isLoading}
+          onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
+          onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
+        <DailyCloseTile lastDataDate={s.meta.lastDataDate}
+          signals={{
+            cashCountRequired: report.activation.liveStartConfirmed && s.cash.hasLiveData,
+            cashDifferenceUnresolved: s.cash.hasLiveData && (s.cash.unexplainedDifference.value ?? 0) !== 0,
+            chequeNeedsUpdate: (s.cheques.overduePeriods.value ?? []).length > 0,
+            inventoryAlertsToAck: (s.products.stockRisk.value ?? []).length,
+            criticalActionsOpen: report.findings.filter((f) => (f.class === "warning" || f.class === "contradiction") && f.urgency === "today").length,
+          }}
+          onError={(e) => reportError("Daily close", e)} onSaved={() => reportSuccess("Daily close", "Recorded")} />
+        <ActivationTile checklist={report.activation} liveHealth={report.liveHealth}
+          onConfirmStart={async (d) => { await confirmLiveStart(d); qc.invalidateQueries({ queryKey: ["snapshot-v2"] }); reportSuccess("Activation", "Live start date confirmed"); }} />
+        <OwnerInterviewCard data={interviewQ.data ?? null} onOpenSetup={() => setSetupOpen(true)}
+          onMarkUnknown={async (id) => { await markQuestionAnswered(id); qc.invalidateQueries({ queryKey: ["strategist-interview"] }); }}
+          onAnswerList={async (id, field, values) => { await saveRetailContext({ [field]: values } as never); await markQuestionAnswered(id); qc.invalidateQueries({ queryKey: ["strategist-interview"] }); qc.invalidateQueries({ queryKey: ["strategist-retail"] }); reportSuccess("Owner knowledge", "Saved — advice will use it"); }} />
+        <ActionQueue actions={actionsQ.data ?? []} onUpdate={async (id, status, note) => {
+          await updateActionStatus(id, status, note); qc.invalidateQueries({ queryKey: ["strategist-actions"] });
         }} />
-      <ProductStrategy report={report} />
-      <ActionQueue actions={actionsQ.data ?? []} onUpdate={async (id, status, note) => {
-        await updateActionStatus(id, status, note); qc.invalidateQueries({ queryKey: ["strategist-actions"] });
-      }} />
-      <AskStrategist s={s} report={report} actions={actionsQ.data ?? []} insights={insights}
-        brief={opsQ.data?.brief ?? null} exceptions={opsQ.data?.exceptions ?? []} />
-      <DecisionMode s={s} report={report} />
+      </Section>
+
+      {/* ═══ INTELLIGENCE — the full analysis, folded until wanted ═══ */}
+      <Section title="Intelligence" sub="findings · products · cash" badge={findings.length || undefined}
+        open={intelOpen ?? false} onToggle={setIntelOpen} keepMounted>
+        <ExecutiveBriefing s={s} report={report} weekly={weekly} />
+        <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
+          onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
+          onAccept={async (f) => {
+            const a = f.action;
+            const res = await createAction({
+              title: a?.title ?? f.title, description: a?.action ?? f.detail, source: "finding",
+              findingId: f.id, category: f.class, priority: f.urgency === "today" ? "high" : f.urgency === "this_week" ? "medium" : "low",
+              screenLink: a?.screenLink ?? "/health", expectedOutcome: a?.expectedImpact ?? null, status: "accepted",
+              baselineFinding: f,
+            });
+            reportSuccess("Action queue", res.created ? "Added to your action queue" : "Already in your queue");
+            qc.invalidateQueries({ queryKey: ["strategist-actions"] });
+          }} />
+        <ProductStrategy report={report} />
+        <CashIntelligence report={report} />
+      </Section>
+
+      {/* ═══ ASK & DECIDE — conversation and structured decisions ═══ */}
+      <Section title="Ask & decide" sub="questions · withdrawal & affordability" defaultOpen keepMounted>
+        <AskStrategist s={s} report={report} actions={actionsQ.data ?? []} insights={insights}
+          brief={opsQ.data?.brief ?? null} exceptions={exceptions} />
+        <DecisionMode s={s} report={report} />
+      </Section>
 
       <RetailSetupModal open={setupOpen} onClose={() => setSetupOpen(false)}
         onSaved={() => { qc.invalidateQueries({ queryKey: ["strategist-interview"] }); qc.invalidateQueries({ queryKey: ["strategist-retail"] }); }}
@@ -264,18 +293,19 @@ function FreshnessStrip({ s }: { s: StrategistSnapshot }) {
     { label: "Inventory", value: s.inventory.hasLiveData ? "tracked" : "not tracked", warn: !s.inventory.hasLiveData },
     { label: "Completeness", value: `${s.meta.completenessScore}/100`, warn: s.meta.completenessScore < 60 },
   ];
+  // A quiet metadata line, not a boxed bar — freshness is context, never the
+  // focal point. Warnings keep their amber; everything else recedes.
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 14, padding: "10px 14px", border: "1px solid var(--stroke2)", borderRadius: 12, background: "var(--surface2)" }}>
+    <div className="metaline">
       {items.map((it) => (
-        <div key={it.label} style={{ fontSize: 12 }}>
-          <span style={{ color: "rgb(var(--faint))", fontWeight: 600 }}>{it.label} </span>
-          <span style={{ color: it.warn ? "var(--amber)" : "rgb(var(--muted))", fontWeight: 700 }}>{it.value}</span>
-        </div>
+        <span key={it.label}>
+          {it.label} <b className={it.warn ? "warn" : undefined} style={it.warn ? { color: "var(--amber)" } : undefined}>{it.value}</b>
+        </span>
       ))}
       {s.meta.isStale && s.meta.staleDays != null && (
-        <div style={{ fontSize: 12, color: "var(--amber)", fontWeight: 700 }}>
+        <span style={{ color: "var(--amber)", fontWeight: 700 }}>
           ⚠ {s.meta.staleDays} days behind — numbers are as of {s.meta.lastDataDate ? fmtDate(s.meta.lastDataDate) : "—"}, not today
-        </div>
+        </span>
       )}
     </div>
   );
