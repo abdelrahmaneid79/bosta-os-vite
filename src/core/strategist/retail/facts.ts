@@ -81,6 +81,7 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
     const avgCost = pos?.avgCost ?? 0;
     const invValue = onHand != null && avgCost > 0 ? onHand * avgCost : null;
     const growthPct = prior && prior.revenue > 0 ? r1(((d.revenue - prior.revenue) / prior.revenue) * 100) : null;
+    const marginDeltaPts = d.marginPct != null && prior?.marginPct != null ? r1(d.marginPct - prior.marginPct) : null;
     return {
       id: null,
       name: d.name,
@@ -95,6 +96,7 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
       revenueSharePct: i.totalRevenue > 0 ? r1((d.revenue / i.totalRevenue) * 100) : 0,
       profitSharePct: d.grossProfit != null && i.totalGrossProfit && i.totalGrossProfit > 0 ? r1((d.grossProfit / i.totalGrossProfit) * 100) : null,
       growthPct,
+      marginDeltaPts,
       onHand,
       inventoryValue: invValue != null ? Math.round(invValue) : null,
       inventorySharePct: invValue != null && totalInvValue > 0 ? r1((invValue / totalInvValue) * 100) : null,

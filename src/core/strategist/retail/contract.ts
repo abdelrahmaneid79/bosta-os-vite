@@ -61,6 +61,8 @@ export interface ProductFact {
   revenueSharePct: number;          // % of period revenue
   profitSharePct: number | null;    // % of period gross profit
   growthPct: number | null;         // vs comparison period (revenue)
+  /** margin percentage-POINT change vs the comparison period (cost-rise signal) */
+  marginDeltaPts: number | null;
   // live position
   onHand: number | null;
   inventoryValue: number | null;

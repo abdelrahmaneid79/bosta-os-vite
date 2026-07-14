@@ -37,7 +37,7 @@ describe("owner knowledge interview", () => {
 
 const P = (o: Partial<ProductFact>): ProductFact => ({
   id: null, name: "X", category: null, revenue: 1000, grossProfit: 400, marginPct: 40, units: 100, cogs: 600,
-  daysSold: 20, velocityPerDay: 5, revenueSharePct: 10, profitSharePct: 10, growthPct: 0, onHand: 50,
+  daysSold: 20, velocityPerDay: 5, marginDeltaPts: null, revenueSharePct: 10, profitSharePct: 10, growthPct: 0, onHand: 50,
   inventoryValue: 1000, inventorySharePct: 10, daysCover: 20, sellingPrice: 10, avgCost: 6, hasCost: true,
   isLow: false, vendor: null, packagingFormat: null, packSizeG: null, packagingCost: null, displayZone: null,
   shelfLevel: null, facings: null, tier: null, impulseType: null, minOrderQty: null, supplierLeadDays: null,
