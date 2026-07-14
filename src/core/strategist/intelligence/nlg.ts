@@ -8,7 +8,7 @@
  *  language adapter may later re-voice this prose, but this is the baseline and
  *  it must stand on its own. */
 import type { DomainFinding, FindingConfidence, RetailDomain } from "./contract";
-import { lowerFirst, toPlainEnglish, uncertaintyLine } from "../plain-english";
+import { lowerFirst, missingDataCaveat, toPlainEnglish } from "../plain-english";
 
 export type NlgStyle = "brief" | "detailed" | "action";
 
@@ -62,8 +62,7 @@ export function renderFinding(df: DomainFinding, style: NlgStyle = "detailed"): 
       sentence(`${pick(REC_CONNECTORS, df.id + "r")} ${lowerFirst(trimDot(df.recommendation))}`),
       df.expectedBenefit ? sentence(`Expected benefit: ${lowerFirst(trimDot(df.expectedBenefit))}`) : "",
       df.successCriteria ? sentence(`You'll know it worked when ${lowerFirst(trimDot(df.successCriteria))}`) : "",
-      df.blockingInformation.length ? sentence(`Blocked until: ${df.blockingInformation.join("; ")}`) : "",
-      sentence(uncertaintyLine(df.confidence, df.blockingInformation)),
+      sentence(missingDataCaveat(df.confidence, df.blockingInformation)),
     ];
     return toPlainEnglish(parts.filter(Boolean).join(" "));
   }
@@ -79,7 +78,7 @@ export function renderFinding(df: DomainFinding, style: NlgStyle = "detailed"): 
     df.expectedBenefit ? sentence(`Expected benefit: ${lowerFirst(trimDot(df.expectedBenefit))}`) : "",
     df.successCriteria ? sentence(`Success looks like: ${lowerFirst(trimDot(df.successCriteria))}`) : "",
     sentence(CONF_PHRASE[df.confidence]),
-    sentence(uncertaintyLine(df.confidence, df.blockingInformation)),
+    sentence(missingDataCaveat(df.confidence, df.blockingInformation)),
   ];
   return toPlainEnglish(parts.filter(Boolean).join(" "));
 }

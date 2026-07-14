@@ -17,6 +17,10 @@ export type PlainConfidence = "high" | "medium" | "low";
 // full sentence like "you're making less money..." would read as broken
 // grammar once dropped into that slot.
 const GLOSSARY: [RegExp, string][] = [
+  // composite phrases must precede their shorter sub-phrases, else "gross
+  // margin compression" replaces only "margin compression" and leaves a
+  // dangling "gross" behind.
+  [/\bgross margin compression\b/gi, "shrinking profit on every sale"],
   [/\bmargin compression\b/gi, "shrinking profit on every sale"],
   [/\bmargin deterioration\b/gi, "shrinking profit per sale"],
   [/\bworking capital pressure\b/gi, "cash getting tied up in stock"],
@@ -78,18 +82,37 @@ export function toPlainEnglish(text: string): string {
   return out;
 }
 
-/** Step 8 of the standard — "what could make me wrong?" Always returns
- *  something in plain words; never a bare confidence label. `cautions` are the
- *  specific conditions that would break the recommendation (contraindications,
- *  missing information, or assumptions — pass whichever is most relevant, in
- *  that priority); when none are recorded, falls back to an honest
- *  confidence-scaled caveat. */
-export function uncertaintyLine(confidence: PlainConfidence, cautions: string[]): string {
-  if (cautions.length) {
-    const clauses = cautions.map((c) => lowerFirst(c.replace(/\.$/, "")));
-    return `This could be wrong if ${clauses.join(", or if ")}.`;
-  }
+function confidenceFallback(confidence: PlainConfidence): string {
   if (confidence === "low") return "Treat this as directional, not certain — verify on the ground before acting.";
   if (confidence === "medium") return "This holds as long as nothing outside these numbers has changed.";
   return "This is well-supported by the data, but double-check it still matches what you're seeing day to day.";
+}
+
+/** Step 8 of the standard — "what could make me wrong?" — for CONDITION-shaped
+ *  cautions (contraindications, assumptions): things phrased as a state that,
+ *  if true, breaks the recommendation ("the display already gets heavy
+ *  traffic"). Always returns something in plain words, never a bare
+ *  confidence label; falls back to an honest confidence-scaled caveat when
+ *  there are no recorded cautions. */
+export function uncertaintyLine(confidence: PlainConfidence, cautions: string[]): string {
+  if (cautions.length) {
+    // strip a leading "if"/"whether" — "This could be wrong if" already supplies
+    // the conditional, so a caution phrased as "whether X" must not double up.
+    const clauses = cautions.map((c) => lowerFirst(c.replace(/\.$/, "").replace(/^(if|whether)\s+/i, "")));
+    return `This could be wrong if ${clauses.join(", or if ")}.`;
+  }
+  return confidenceFallback(confidence);
+}
+
+/** Step 8 for MISSING-DATA-shaped cautions: noun phrases naming what hasn't
+ *  been recorded yet ("a confirmed unit cost for X"), not a condition. "This
+ *  could be wrong if {noun phrase}" is ungrammatical, so this reads instead as
+ *  "this isn't fully certain — it's missing {noun phrase}". Same
+ *  confidence-scaled fallback as `uncertaintyLine` when nothing is missing. */
+export function missingDataCaveat(confidence: PlainConfidence, missing: string[]): string {
+  if (missing.length) {
+    const clauses = missing.map((m) => lowerFirst(m.replace(/\.$/, "")));
+    return `This isn't fully certain yet — it's missing ${clauses.join(" and ")}.`;
+  }
+  return confidenceFallback(confidence);
 }

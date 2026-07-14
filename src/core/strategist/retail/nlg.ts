@@ -6,7 +6,7 @@
  *  filler ("consider monitoring", "leverage", "maintain momentum", …) never
  *  appears because no such string exists here. */
 import type { RetailRecommendation, TruthLevel } from "./contract";
-import { BANNED_PHRASES, toPlainEnglish, uncertaintyLine } from "../plain-english";
+import { BANNED_PHRASES, missingDataCaveat, toPlainEnglish, uncertaintyLine } from "../plain-english";
 
 const TRUTH_LABEL: Record<TruthLevel, string> = {
   measured_conclusion: "Measured conclusion",
@@ -42,10 +42,18 @@ export function renderRecommendation(r: RetailRecommendation): RenderedRecommend
   const why = r.reasoning.length ? `Why this action: ${s(r.reasoning.join(" "))}` : "";
   const success = r.successCriteria.length ? `Keep it only if ${lower(r.successCriteria.join("; "))}` : "";
   const risk = r.risks.length ? `Watch: ${r.risks.join("; ")}` : "";
-  // step 8 of the Executive Communication Standard: contraindications are
-  // literally "what would make this wrong" — prefer them, else missing info,
-  // else the assumptions the recommendation rests on.
-  const cautions = r.contraindications.length ? r.contraindications : (r.missingInformation.length ? r.missingInformation : r.assumptions);
+  // step 8 of the Executive Communication Standard: contraindications and
+  // assumptions are CONDITION-shaped ("if the display already gets heavy
+  // traffic...") and read naturally after "this could be wrong if"; missing
+  // information is a NOUN-phrase list of what hasn't been recorded ("a
+  // confirmed unit cost for X") and needs different phrasing, or "if X" comes
+  // out ungrammatical. Prefer contraindications, then assumptions (both
+  // condition-shaped), and only fall back to missingInformation's own phrasing
+  // when nothing condition-shaped is recorded.
+  const conditionCautions = r.contraindications.length ? r.contraindications : r.assumptions;
+  const caveat = conditionCautions.length
+    ? uncertaintyLine(r.confidence, conditionCautions)
+    : missingDataCaveat(r.confidence, r.missingInformation);
 
   const paragraphs = [
     // 1 conclusion + 2 evidence
@@ -55,7 +63,7 @@ export function renderRecommendation(r: RetailRecommendation): RenderedRecommend
     // 6 risk
     s(risk),
     // 8 what could make me wrong — always present, never a bare confidence label
-    s(uncertaintyLine(r.confidence, cautions)),
+    s(caveat),
   ].filter(Boolean);
 
   const classification = TRUTH_LABEL[r.truthLevel];
@@ -63,7 +71,7 @@ export function renderRecommendation(r: RetailRecommendation): RenderedRecommend
   const sourceLabel = SOURCE_LABEL[r.source];
   const evidenceLine = r.evidence.length
     ? `Evidence: ${r.evidence.map((e) => `${e.label} ${e.value}`).join(", ")}`
-    : (r.observedFacts.length ? `Evidence: ${r.observedFacts.length} observed fact(s)` : "Evidence: —");
+    : (r.observedFacts.length ? `Evidence: ${r.observedFacts.length} observed fact${r.observedFacts.length === 1 ? "" : "s"}` : "Evidence: —");
   const missingLine = r.missingInformation.length ? `Missing: ${r.missingInformation.join(", ")}` : null;
 
   const text = toPlainEnglish([
