@@ -1,11 +1,11 @@
 # BostaOS — Testing
 
-_Updated 2026-07-13 (replaces the 2026-06 checklist — superseded sections live in git history)._
+_Updated 2026-07-14 (replaces the 2026-06 checklist — superseded sections live in git history)._
 
 ## Gates (all must pass before push)
 ```bash
 npm run typecheck   # tsc -b (strict, noUnusedLocals)
-npm run test        # vitest — 366 tests / 26 files
+npm run test        # vitest — 498 tests / 34 files
 npm run build       # tsc -b && vite build
 ```
 (`lint` was removed — eslint was never installed/configured; typecheck is the gate.)
@@ -32,6 +32,9 @@ Settings → **QA checklist** (`/qa`, now reachable from nav) — interactive ch
 - **Cycle 6 product intelligence** (`strategist-cycle6.test.ts`, 31 tests): contribution (growth/decline/low-coverage-refusal/missing-cost exclusion/determinism), decomposition (volume/price/cost-led + refusals), classification (all tags, thresholds labeled, stock-risk gated on tracked inventory), shelf caveats, pricing (target price, no fabricated targets, price-drift flags, owner off-switch), purchasing (data-first when untracked, days-of-cover, excess stock), weekly priority (cash outranks pricing, suppression, queued-action awareness), outcomes (improved/worsened/awaiting-data/cancelled/no-re-eval).
 - **Language layer** (`strategist-language.test.ts`, 15 tests): deterministic templates without credentials, fake-provider plug-in (proves provider independence), router fallback on throw/unavailable/invented-number/over-confidence/budget, grounding validator.
 - **Strategy report** (`strategy-report.test.ts`, 10 tests): executive status transitions, confidence-ceiling degradation, persistence eligibility, price/employee/memory-override/settlement/cash-unavailable scenarios.
+
+## Cycle 13 — hardening + Retail Intelligence expansion
+`audit-log.test.ts` (4): best-effort write, never throws on failure. `sales-gaps.test.ts` (4): lines-missing derivation, import-period date expansion, feeds `detectSalesGaps` correctly. `retail-authorship.test.ts` (+7): Promotion/Supplier/Basket/Seasonality Intelligence each domain-scoped, plus a guard test asserting no two registered `DomainEngine`s ever claim the same domain. Suite 409→498.
 
 ## Cycle 10 — Retail Reasoning (`retail-reasoning.test.ts`, 23 tests)
 Grounded, specific recommendations: almonds high-value-slow-mover (measured), cashews not-a-slow-mover, growing-margin→mini-bag hypothesis (packaging cost missing), high-volume-low-margin traffic→protect price, profit-driver with no facings→space review (never a fabricated move), reduce-excess-facings, premium-presentation (needs zone), dead-stock→add-on, stockout-risk with cash unavailable→buy-after-cheque (gate blocks buy_now), don't-discount-strong, missing-cost→collect-evidence, portfolio concentration, Eid gift format. Plus: stale/thin-coverage confidence discipline, quality-gate accept/reject, dedupe against open experiments, deterministic NLG with no banned filler, facts composition (shares/velocity/growth/inventory value, nothing invented). Also `intelligence.test.ts` (11): DomainFinding contract compliance + adapter + NLG determinism. Suite total 443.

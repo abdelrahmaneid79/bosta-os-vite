@@ -1,10 +1,14 @@
-/** Reference domain engines (Cycle 10 boundary work). Per the directive, the
- *  SHARED Retail Reasoning framework comes first; these are the first two
- *  reference implementations on top of it — Margin Intelligence and
- *  Merchandising/Packaging Intelligence. Each is a thin selector over the shared
- *  knowledge library + candidate intake (no duplicated reasoning), proving the
- *  contract that every future domain engine (Pricing, Inventory, Supplier, …)
- *  will follow. */
+/** Reference domain engines (Cycle 10 boundary work, expanded Cycle 13). The
+ *  SHARED Retail Reasoning framework comes first; each engine below is a thin
+ *  selector over the shared knowledge library + candidate intake (no
+ *  duplicated reasoning) — the contract every future domain engine follows.
+ *
+ *  Domain ownership is a clean partition: each RetailDomain belongs to exactly
+ *  one engine so two engines never surface the same finding. Pricing content
+ *  lives inside Margin Intelligence (a below-floor margin and a price review
+ *  are the same decision in this system) — Promotion Intelligence, not a
+ *  second "Pricing" engine, completes the original candidate list without
+ *  creating overlapping ownership. */
 import type { RetailBusinessFacts, RetailRecommendation, RetailDomain } from "./contract";
 import { buildDeterministicCandidates } from "./reasoning";
 import { ingestCandidates, type Candidate, type IngestOptions } from "./candidates";
@@ -39,8 +43,49 @@ export const merchandisingPackagingIntelligence: RetailDomainEngine = {
   analyze: (f, opts) => ingestCandidates(candidatesForDomains(f, ["merchandising", "shelf", "packaging"]), f, opts).accepted,
 };
 
+/** PROMOTION INTELLIGENCE — bundles, thresholds, and when NOT to discount. */
+export const promotionIntelligence: RetailDomainEngine = {
+  id: "promotion-intelligence",
+  title: "Promotion Intelligence",
+  domains: ["promotion"],
+  analyze: (f, opts) => ingestCandidates(candidatesForDomains(f, ["promotion"]), f, opts).accepted,
+};
+
+/** SUPPLIER INTELLIGENCE — concentration risk, negotiation leverage, sourcing.
+ *  Quantity-break and lead-time timing currently live under "purchase" (they're
+ *  purchase-timing decisions as much as supplier ones); this engine owns the
+ *  supplier-relationship-specific reasoning. */
+export const supplierIntelligence: RetailDomainEngine = {
+  id: "supplier-intelligence",
+  title: "Supplier Intelligence",
+  domains: ["supplier"],
+  analyze: (f, opts) => ingestCandidates(candidatesForDomains(f, ["supplier"]), f, opts).accepted,
+};
+
+/** BASKET INTELLIGENCE — cross-sell and adjacency grounded in confirmed
+ *  co-purchase behaviour (never a fabricated basket claim). */
+export const basketIntelligence: RetailDomainEngine = {
+  id: "basket-intelligence",
+  title: "Basket Intelligence",
+  domains: ["basket"],
+  analyze: (f, opts) => ingestCandidates(candidatesForDomains(f, ["basket"]), f, opts).accepted,
+};
+
+/** SEASONALITY INTELLIGENCE — Ramadan, Eid, weekend and other confirmed
+ *  occasion-driven reasoning. */
+export const seasonalityIntelligence: RetailDomainEngine = {
+  id: "seasonality-intelligence",
+  title: "Seasonality Intelligence",
+  domains: ["seasonality"],
+  analyze: (f, opts) => ingestCandidates(candidatesForDomains(f, ["seasonality"]), f, opts).accepted,
+};
+
 /** The reference domain engines wired so far. New domains append here. */
 export const DOMAIN_ENGINES: RetailDomainEngine[] = [
   marginIntelligence,
   merchandisingPackagingIntelligence,
+  promotionIntelligence,
+  supplierIntelligence,
+  basketIntelligence,
+  seasonalityIntelligence,
 ];

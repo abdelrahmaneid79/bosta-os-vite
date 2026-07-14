@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { validateModelCandidate, ingestCandidates } from "@/core/strategist/retail/candidates";
 import { runRetailReasoning, runReasoningWithCandidates } from "@/core/strategist/retail/reasoning";
-import { marginIntelligence, merchandisingPackagingIntelligence } from "@/core/strategist/retail/domains";
+import {
+  marginIntelligence, merchandisingPackagingIntelligence,
+  promotionIntelligence, supplierIntelligence, basketIntelligence, seasonalityIntelligence,
+  DOMAIN_ENGINES,
+} from "@/core/strategist/retail/domains";
 import { renderRecommendation } from "@/core/strategist/retail/nlg";
 import type { ProductFact, RetailBusinessFacts } from "@/core/strategist/retail/contract";
 
@@ -108,5 +112,44 @@ describe("reference domain engines", () => {
     const recs = merchandisingPackagingIntelligence.analyze(facts, OPTS);
     expect(recs.length).toBeGreaterThan(0);
     expect(recs.every((r) => ["merchandising", "shelf", "packaging"].includes(r.domain))).toBe(true);
+  });
+
+  it("Promotion Intelligence returns only promotion recommendations", () => {
+    const promoFacts = F([P({ name: "Jelly", growthPct: 20, revenueSharePct: 16, marginPct: 42 })]);
+    const recs = promotionIntelligence.analyze(promoFacts, OPTS);
+    expect(recs.length).toBeGreaterThan(0);
+    expect(recs.every((r) => r.domain === "promotion")).toBe(true);
+  });
+
+  it("Supplier Intelligence returns only supplier recommendations", () => {
+    const products = [1, 2, 3, 4, 5].map((i) => P({ name: `N${i}`, vendor: "BigSupplier", inventoryValue: 5000 }))
+      .concat([P({ name: "Other", vendor: "Small", inventoryValue: 1000 })]);
+    const recs = supplierIntelligence.analyze(F(products), OPTS);
+    expect(recs.length).toBeGreaterThan(0);
+    expect(recs.every((r) => r.domain === "supplier")).toBe(true);
+  });
+
+  it("Basket Intelligence returns only basket recommendations", () => {
+    const basketFacts = F([P({ name: "Cashews" }), P({ name: "Jelly" })], { commonlyBoughtTogether: [["Cashews", "Jelly"]] });
+    const recs = basketIntelligence.analyze(basketFacts, OPTS);
+    expect(recs.length).toBeGreaterThan(0);
+    expect(recs.every((r) => r.domain === "basket")).toBe(true);
+  });
+
+  it("Seasonality Intelligence returns only seasonality recommendations", () => {
+    const seasonFacts = F([P({ name: "Dates" })], { season: "ramadan" });
+    const recs = seasonalityIntelligence.analyze(seasonFacts, OPTS);
+    expect(recs.length).toBeGreaterThan(0);
+    expect(recs.every((r) => r.domain === "seasonality")).toBe(true);
+  });
+
+  it("every registered engine owns a disjoint set of domains (no overlap)", () => {
+    const seen = new Set<string>();
+    for (const engine of DOMAIN_ENGINES) {
+      for (const d of engine.domains) {
+        expect(seen.has(d)).toBe(false); // fails loudly if two engines ever claim the same domain
+        seen.add(d);
+      }
+    }
   });
 });

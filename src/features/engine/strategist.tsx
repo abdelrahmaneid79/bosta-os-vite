@@ -17,7 +17,9 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { egp } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { useUI } from "@/store/ui";
-import { todayCairo } from "@/core/time";
+import { todayCairo, isoDaysAgo } from "@/core/time";
+import { assembleSalesGaps } from "@/core/read/sales-gaps";
+import type { SalesGap } from "@/core/strategist/analysis/operations";
 import { assembleSnapshotV2 } from "@/core/strategist/snapshot-v2";
 import type { Finding } from "@/core/strategist/analysis/types";
 import type { StrategistSnapshot } from "@/core/strategist/contract";
@@ -140,6 +142,13 @@ export function StrategistScreen() {
     queryFn: () => assembleRetailRecommendations(s!, report!),
   });
 
+  // Cycle 13 — sales catch-up workspace over the (previously unsurfaced) detectSalesGaps engine.
+  const gapsQ = useQuery({
+    queryKey: ["sales-gaps", s?.meta.today],
+    enabled: en && !!s,
+    queryFn: () => assembleSalesGaps(isoDaysAgo(s!.meta.today, 29), s!.meta.today),
+  });
+
   // Cycle 11 — Owner Knowledge Interview: ask only what can't be derived.
   const interviewQ = useQuery({
     queryKey: ["strategist-interview"],
@@ -178,9 +187,10 @@ export function StrategistScreen() {
   const activating = report.activation.readiness === "historical_only" || report.activation.readiness === "activation_incomplete";
   const interviewPending = (interviewQ.data?.questions.length ?? 0) > 0;
   const openActions = actions.filter((a) => ["suggested", "accepted", "in_progress"].includes(a.status)).length;
-  const opsSignal = exceptions.length > 0 || activating || interviewPending;
+  const gaps = gapsQ.data ?? [];
+  const opsSignal = exceptions.length > 0 || activating || interviewPending || gaps.length > 0;
   const opsCritical = exceptions.some((e) => e.severity === "critical" || e.severity === "high");
-  const opsBadgeCount = exceptions.length + (interviewPending ? 1 : 0) + openActions;
+  const opsBadgeCount = exceptions.length + (interviewPending ? 1 : 0) + openActions + gaps.length;
 
   return (
     <div className="cdk space-y-4">
@@ -224,6 +234,7 @@ export function StrategistScreen() {
         <OperationalExceptionsPanel exceptions={exceptions} loading={opsQ.isLoading}
           onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
           onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
+        <SalesCatchUpWorkspace gaps={gaps} loading={gapsQ.isLoading} />
         <DailyCloseTile lastDataDate={s.meta.lastDataDate}
           signals={{
             cashCountRequired: report.activation.liveStartConfirmed && s.cash.hasLiveData,
@@ -398,6 +409,59 @@ function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
             )}
           </div>
         ))}
+      </div>
+    </DeckTile>
+  );
+}
+
+/* ═══ SALES CATCH-UP WORKSPACE (Cycle 9 candidate, built Cycle 13) ═════ */
+
+const GAP_META: Record<SalesGap["kind"], { label: string; color: string; action: string; screenLink: string }> = {
+  missing: { label: "missing", color: "var(--red)", action: "Enter or import", screenLink: "/sales" },
+  total_only: { label: "no product detail", color: "var(--amber)", action: "Add product lines", screenLink: "/sales/product-lines" },
+  awaiting_import: { label: "awaiting import", color: "rgb(var(--cyan))", action: "Review import", screenLink: "/sales/import" },
+};
+const GAP_ORDER: SalesGap["kind"][] = ["missing", "total_only", "awaiting_import"];
+
+/** A scannable, recent-first catch-up list over the (previously built but
+ *  never surfaced) detectSalesGaps engine — one place to see and jump to
+ *  every day that needs entering, product-line detail, or import review. */
+function SalesCatchUpWorkspace({ gaps, loading }: { gaps: SalesGap[]; loading: boolean }) {
+  const [filter, setFilter] = useState<SalesGap["kind"] | "all">("all");
+  if (loading && !gaps.length) return null;
+  if (!gaps.length) {
+    return (
+      <DeckTile>
+        <div className="th"><span className="tname">Sales catch-up</span><span style={{ marginLeft: "auto" }}><Chip text="current" color="var(--green)" /></span></div>
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>No gaps in the last 30 days — every day has a total, product detail, and nothing awaiting import.</div>
+      </DeckTile>
+    );
+  }
+  const counts = GAP_ORDER.map((k) => ({ kind: k, n: gaps.filter((g) => g.kind === k).length })).filter((c) => c.n > 0);
+  const shown = filter === "all" ? gaps : gaps.filter((g) => g.kind === filter);
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">Sales catch-up</span>
+        <span style={{ marginLeft: "auto" }}><Chip text={`${gaps.length} day${gaps.length === 1 ? "" : "s"}`} color={GAP_META.missing.color} /></span>
+      </div>
+      <div className="chiprow" style={{ margin: "10px 0" }}>
+        <button className={filter === "all" ? "mbtn on" : "mbtn"} onClick={() => setFilter("all")}>All</button>
+        {counts.map((c) => (
+          <button key={c.kind} className={filter === c.kind ? "mbtn on" : "mbtn"} onClick={() => setFilter(c.kind)}>{GAP_META[c.kind].label} · {c.n}</button>
+        ))}
+      </div>
+      <div className="space-y-1" style={{ maxHeight: 260, overflowY: "auto" }}>
+        {shown.slice(0, 60).map((g) => {
+          const meta = GAP_META[g.kind];
+          return (
+            <div key={g.date} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 2px", borderTop: "1px solid var(--stroke2)" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "rgb(var(--text))", minWidth: 88 }}>{fmtDate(g.date)}</span>
+              <Chip text={meta.label} color={meta.color} />
+              <Link to={meta.screenLink} className="mbtn" style={{ marginLeft: "auto" }}>{meta.action}</Link>
+            </div>
+          );
+        })}
+        {shown.length > 60 && <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", padding: "6px 2px" }}>+{shown.length - 60} more — narrow with a filter above.</div>}
       </div>
     </DeckTile>
   );
