@@ -5,7 +5,7 @@
  * purchases, Money = cash + spend + cheques, Reports = summary + profit,
  * Insights = health + gaps + activity, Settings = general + system + QA).
  */
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/core/utils/cn";
@@ -13,9 +13,11 @@ import { AuthProvider, AuthGate } from "@/features/auth/auth";
 import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
 import { CommandPalette } from "@/features/engine/CommandPalette";
+import { useFocusTrap } from "@/components/ui/useFocusTrap";
 import { NAV_SECTIONS, SETTINGS_SECTION } from "@/core/nav";
 import { usePrefs, useApplyTheme } from "@/store/prefs";
 import { useFilters } from "@/store/filters";
+import { useUI } from "@/store/ui";
 import { isEngineConfigured } from "@/core/db/engine";
 import { getAlerts, getDismissedAlertKeys } from "@/core/read/alerts";
 import { dismissAlert, restoreAllAlerts, pruneAlertDismissals } from "@/core/db/mutations";
@@ -148,24 +150,33 @@ function Page({ group, children }: { group: Group; children: React.ReactNode }) 
   );
 }
 
+/** The "+" button opens the picker (open=true, view=null); ⌘K "Create"
+ *  commands set `quickAddView` on the UI store directly, jumping straight into
+ *  the form instead of just navigating to its screen. Either source opens the
+ *  same sheet, so there's exactly one quick-add surface. */
 function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { quickAddView, closeQuickAdd } = useUI();
   const [view, setView] = useState<null | "product" | "purchase" | "sale" | "expense" | "cashcount">(null);
   const navigate = useNavigate();
-  if (!open) return null;
-  const close = () => { setView(null); onClose(); };
+  const effectiveOpen = open || quickAddView !== null;
+  const effectiveView = quickAddView ?? view;
+  const close = useCallback(() => { setView(null); closeQuickAdd(); onClose(); }, [closeQuickAdd, onClose]);
+  const panelRef = useFocusTrap<HTMLDivElement>(effectiveOpen, close);
+  if (!effectiveOpen) return null;
   const titles = { product: "Add product", purchase: "Add purchase", sale: "New sale day", expense: "Add expense", cashcount: "Count cash" } as const;
   return (
     <div onClick={close} className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
-      <div onClick={(e) => e.stopPropagation()} className={`max-h-[92vh] w-full ${view === "sale" ? "max-w-2xl" : "max-w-md"} animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 shadow-sheet sm:rounded-3xl`}>
+      <div ref={panelRef} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={effectiveView ? titles[effectiveView] : "Quick add"} tabIndex={-1}
+        className={`max-h-[92vh] w-full ${effectiveView === "sale" ? "max-w-2xl" : "max-w-md"} animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 shadow-sheet focus:outline-none sm:rounded-3xl`}>
         <div className="mb-3 flex items-center justify-between">
-          <div className="font-display text-lg font-semibold">{view ? titles[view] : "Quick add"}</div>
+          <div className="font-display text-lg font-semibold">{effectiveView ? titles[effectiveView] : "Quick add"}</div>
           <button onClick={close} className="flex h-8 w-8 items-center justify-center rounded-lg bg-panel2 text-muted hover:text-text">✕</button>
         </div>
-        {view === "product" ? <ProductForm onDone={close} />
-          : view === "purchase" ? <PurchaseForm onDone={close} />
-          : view === "sale" ? <SaleForm onDone={close} />
-          : view === "expense" ? <ExpenseForm onDone={close} />
-          : view === "cashcount" ? <CashForm mode="count" onDone={close} />
+        {effectiveView === "product" ? <ProductForm onDone={close} />
+          : effectiveView === "purchase" ? <PurchaseForm onDone={close} />
+          : effectiveView === "sale" ? <SaleForm onDone={close} />
+          : effectiveView === "expense" ? <ExpenseForm onDone={close} />
+          : effectiveView === "cashcount" ? <CashForm mode="count" onDone={close} />
           : (
           <div className="space-y-2">
             {([["sale", "New sale"], ["purchase", "Add purchase"], ["product", "Add product"], ["expense", "Add expense"], ["cashcount", "Count cash"]] as const).map(([v, label]) => (
@@ -300,6 +311,8 @@ function MobileNav() {
   const { pathname } = useLocation();
   const active = groupForPath(pathname);
   const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const panelRef = useFocusTrap<HTMLDivElement>(open, close);
   const MOBILE_IDS = ["today", "sales", "inventory", "money", "insights"];
   const vis = useVisibleGroups();
   const primary = MOBILE_IDS.map((id) => vis.find((g) => g.id === id)).filter((g): g is Group => !!g);
@@ -317,10 +330,11 @@ function MobileNav() {
         </button>
       </nav>
       {open && (
-        <div onClick={() => setOpen(false)} className="fixed inset-0 z-[60] flex items-end bg-black/70 md:hidden">
-          <div onClick={(e) => e.stopPropagation()} className="max-h-[80vh] w-full animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 pb-8 shadow-sheet">
+        <div onClick={close} className="fixed inset-0 z-[60] flex items-end bg-black/70 md:hidden">
+          <div ref={panelRef} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="All sections" tabIndex={-1}
+            className="max-h-[80vh] w-full animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 pb-8 shadow-sheet focus:outline-none">
             <div className="mb-3 flex items-center justify-between"><div className="font-display text-lg font-semibold">All sections</div>
-              <button onClick={() => setOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-lg bg-panel2 text-muted">✕</button></div>
+              <button onClick={close} className="flex h-8 w-8 items-center justify-center rounded-lg bg-panel2 text-muted">✕</button></div>
             <div className="space-y-3">
               {[...GROUPS, SETTINGS].map((g) => (
                 <div key={g.id}>

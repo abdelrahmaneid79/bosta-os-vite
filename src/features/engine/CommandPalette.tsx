@@ -12,7 +12,7 @@ import { ALL_SECTIONS } from "@/core/nav";
 interface Cmd { id: string; label: string; hint: string; group: string; run: () => void }
 
 export function CommandPalette() {
-  const { commandOpen, setCommandOpen } = useUI();
+  const { commandOpen, setCommandOpen, openQuickAdd } = useUI();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
@@ -36,12 +36,15 @@ export function CommandPalette() {
     const nav: Cmd[] = ALL_SECTIONS.flatMap((s) => s.tabs.map((t) => ({
       id: `nav:${t.to}`, label: `${s.label} · ${t.label}`, hint: "Go to", group: "Navigate", run: () => go(t.to),
     })));
+    // "Create" commands open the actual quick-add FORM (via the UI store),
+    // not just the screen it lives on — that's the whole point of ⌘K.
+    const openAdd = (view: "product" | "purchase" | "sale" | "expense" | "cashcount") => { setCommandOpen(false); openQuickAdd(view); };
     const actions: Cmd[] = [
-      { id: "a:sale", label: "New sale day", hint: "Action", group: "Create", run: () => go("/sales") },
-      { id: "a:product", label: "Add product", hint: "Action", group: "Create", run: () => go("/stock") },
-      { id: "a:purchase", label: "Add purchase", hint: "Action", group: "Create", run: () => go("/purchases") },
-      { id: "a:expense", label: "Add expense", hint: "Action", group: "Create", run: () => go("/expenses") },
-      { id: "a:cash", label: "Count cash", hint: "Action", group: "Create", run: () => go("/money") },
+      { id: "a:sale", label: "New sale day", hint: "Action", group: "Create", run: () => openAdd("sale") },
+      { id: "a:product", label: "Add product", hint: "Action", group: "Create", run: () => openAdd("product") },
+      { id: "a:purchase", label: "Add purchase", hint: "Action", group: "Create", run: () => openAdd("purchase") },
+      { id: "a:expense", label: "Add expense", hint: "Action", group: "Create", run: () => openAdd("expense") },
+      { id: "a:cash", label: "Count cash", hint: "Action", group: "Create", run: () => openAdd("cashcount") },
       { id: "a:import", label: "Import receipt / sheet", hint: "Action", group: "Create", run: () => go("/sales/import") },
       { id: "a:history", label: "Load my Bosta Bites history", hint: "Action", group: "Create", run: () => go("/settings/history") },
     ];

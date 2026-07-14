@@ -34,6 +34,13 @@ interface UIState {
   clearDiagnostics: () => void;
   commandOpen: boolean;
   setCommandOpen: (open: boolean) => void;
+  /** Which quick-add form is open (null = closed). Set directly by ⌘K "Create"
+   *  commands so they open the actual form, not just navigate to its screen —
+   *  the quick-add sheet in EngineApp reads this instead of owning its own
+   *  local state, so any part of the app can open it. */
+  quickAddView: null | "product" | "purchase" | "sale" | "expense" | "cashcount";
+  openQuickAdd: (view: NonNullable<UIState["quickAddView"]>) => void;
+  closeQuickAdd: () => void;
 }
 
 const MAX_DIAG = 50;
@@ -73,4 +80,7 @@ export const useUI = create<UIState>((set) => ({
   clearDiagnostics: () => set({ diagnostics: [] }),
   commandOpen: false,
   setCommandOpen: (commandOpen) => set({ commandOpen }),
+  quickAddView: null,
+  openQuickAdd: (view) => set({ quickAddView: view }),
+  closeQuickAdd: () => set({ quickAddView: null }),
 }));

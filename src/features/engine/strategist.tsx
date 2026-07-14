@@ -48,7 +48,7 @@ import { generateLanguage, loadLanguageSettings, saveLanguageSettings, providerH
 import { type LanguageMode, type LanguageResult, type LanguageSettings, type ProviderHealth, DEFAULT_LANGUAGE_SETTINGS } from "@/core/strategist/language/types";
 import { timings, timed, timedSync } from "@/core/strategist/diagnostics";
 import type { StrategistResponse, ResponsePriority } from "@/core/strategist/response";
-import { loadOwnerContext, saveOwnerContext, type OwnerContextAnswers } from "@/core/strategist/context";
+import { loadOwnerContext, saveOwnerContext, CONTEXT_DEFAULTS, type OwnerContextAnswers } from "@/core/strategist/context";
 import {
   syncInsights, listInsights, setInsightStatus, type InsightRow,
   createAction, listActions, updateActionStatus, type ActionRow,
@@ -1695,16 +1695,29 @@ function ProductStrategy({ report }: { report: StrategyReport }) {
 
 /* ═══ TUNE (owner context) ════════════════════════════════════════════ */
 
+/** "name | date | note" per line ⇄ upcomingEvents. Round-trips cleanly since
+ *  '|' never appears in owner-typed event names/notes in practice; if it did,
+ *  the extra segments just fold into the note. */
+function parseEventLines(text: string): NonNullable<OwnerContextAnswers["upcomingEvents"]> {
+  return text.split("\n").map((l) => l.trim()).filter(Boolean).map((line) => {
+    const [name, date, ...rest] = line.split("|").map((s) => s.trim());
+    return { name: name ?? "", date: date ?? "", note: rest.join(" | ") };
+  });
+}
+const eventLines = (events: OwnerContextAnswers["upcomingEvents"]) =>
+  (events ?? []).map((e) => `${e.name} | ${e.date} | ${e.note}`).join("\n");
+
 function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose: () => void; onSaved: () => void; onError: (e: unknown) => void }) {
   const [form, setForm] = useState<OwnerContextAnswers>({});
   const [lang, setLang] = useState<LanguageSettings>(DEFAULT_LANGUAGE_SETTINGS);
   const [health, setHealth] = useState<ProviderHealth[]>([]);
   const [showDiag, setShowDiag] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [rawEvents, setRawEvents] = useState("");
   useEffect(() => {
     if (!open || loaded) return;
     Promise.all([loadOwnerContext(), loadLanguageSettings(), providerHealth()])
-      .then(([a, l, h]) => { setForm(a ?? {}); setLang(l); setHealth(h); setLoaded(true); })
+      .then(([a, l, h]) => { setForm(a ?? {}); setRawEvents(eventLines(a?.upcomingEvents)); setLang(l); setHealth(h); setLoaded(true); })
       .catch(() => setLoaded(true));
   }, [open, loaded]);
 
@@ -1774,6 +1787,43 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
           <input type="checkbox" checked={form.allowExpectedCashForOptional ?? false} onChange={(e) => setForm({ ...form, allowExpectedCashForOptional: e.target.checked })} />
           Let OPTIONAL spending decisions use expected (uncounted) cash — off means verified cash only
         </label>
+
+        <div style={{ borderTop: "1px solid var(--stroke2)", paddingTop: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "rgb(var(--faint))", marginBottom: 8 }}>Products &amp; priorities</div>
+          <p style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 0, marginBottom: 8 }}>The Retail Intelligence engine already reads these — a protected product is never recommended for discontinuation, and a product to grow gets weighted differently in shelf/purchase advice.</p>
+          <div className="space-y-2">
+            <Field label="Strategic products — never recommend discontinuing (comma-separated)">
+              <Input value={(form.strategicProducts ?? []).join(", ")}
+                onChange={(e) => setForm({ ...form, strategicProducts: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })}
+                placeholder="e.g. Cashews, Premium Pistachios" />
+            </Field>
+            <Field label="Products to grow — prioritise in advice (comma-separated)">
+              <Input value={(form.productsToGrow ?? []).join(", ")}
+                onChange={(e) => setForm({ ...form, productsToGrow: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })}
+                placeholder="e.g. Roasted Almonds" />
+            </Field>
+            <Field label="Withdrawal rule — when a personal withdrawal should be flagged">
+              <Input value={form.withdrawalRule ?? ""} onChange={(e) => setForm({ ...form, withdrawalRule: e.target.value || undefined })}
+                placeholder={CONTEXT_DEFAULTS.withdrawalRule} />
+            </Field>
+            <Field label="Briefing cadence — how often you want a summary">
+              <Input value={form.briefingCadence ?? ""} onChange={(e) => setForm({ ...form, briefingCadence: e.target.value || undefined })}
+                placeholder={CONTEXT_DEFAULTS.briefingCadence} />
+            </Field>
+            <Field label="Known constraints — anything the strategist should respect (comma-separated)">
+              <Input value={(form.knownConstraints ?? []).join(", ")}
+                onChange={(e) => setForm({ ...form, knownConstraints: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })}
+                placeholder="e.g. limited prep capacity, no refrigeration" />
+            </Field>
+            <Field label="Upcoming events — one per line: name | date | note">
+              <textarea value={rawEvents}
+                onChange={(e) => { setRawEvents(e.target.value); setForm({ ...form, upcomingEvents: parseEventLines(e.target.value) }); }}
+                placeholder={"Eid al-Fitr | 2026-08-15 | gifting season\nRamadan start | 2026-07-20 | evening demand shifts"}
+                rows={3}
+                style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13, fontFamily: "inherit", resize: "vertical" }} />
+            </Field>
+          </div>
+        </div>
 
         <div style={{ borderTop: "1px solid var(--stroke2)", paddingTop: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "rgb(var(--faint))", marginBottom: 8 }}>Language service</div>

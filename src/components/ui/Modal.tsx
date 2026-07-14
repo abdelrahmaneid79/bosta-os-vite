@@ -1,28 +1,31 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { cn } from "@/core/utils/cn";
+import { useFocusTrap } from "./useFocusTrap";
 
 /** The design's .modal — a clean centered card over a dimmed, lightly-blurred
  *  backdrop. No slide/bounce; the background is scroll-locked while open so the
- *  page can't jump. `wide` widens it; omit `title` for a bare card (floating ✕). */
+ *  page can't jump. `wide` widens it; omit `title` for a bare card (floating ✕).
+ *
+ *  Traps keyboard focus inside the dialog while open (see useFocusTrap) —
+ *  standard dialog behaviour, previously missing. */
 export function Modal({ open, onClose, title, children, wide }: {
   open: boolean; onClose: () => void; title?: string; children: ReactNode; wide?: boolean;
 }) {
+  const panelRef = useFocusTrap<HTMLDivElement>(open, onClose);
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
     // Lock background scroll so opening a popup never shifts/bounces the page.
-    const prev = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
-  }, [open, onClose]);
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, [open]);
   if (!open) return null;
   return (
     <div className="modal-root fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6">
       <div onClick={onClose} className="absolute inset-0 bg-[rgba(3,4,6,0.84)] backdrop-blur-[10px]" />
-      <div onClick={(e) => e.stopPropagation()}
-        className={cn("relative max-h-[86vh] w-full overflow-y-auto rounded-[26px] border border-white/[0.09] bg-[linear-gradient(180deg,#16191f,#101319)] p-6 shadow-[0_50px_110px_-30px_#000]",
+      <div ref={panelRef} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
+        className={cn("relative max-h-[86vh] w-full overflow-y-auto rounded-[26px] border border-white/[0.09] bg-[linear-gradient(180deg,#16191f,#101319)] p-6 shadow-[0_50px_110px_-30px_#000] focus:outline-none",
           wide ? "max-w-3xl" : "max-w-md")}>
         {title ? (
           <div className="mb-4 flex items-center justify-between">
