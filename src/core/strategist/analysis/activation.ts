@@ -70,7 +70,7 @@ export function buildActivationChecklist(s: StrategistSnapshot): ActivationCheck
       ["verified cash", "withdrawal decisions", "cash reconciliation", "absolute cash forecasts", "verified runway"]),
     step("bank_balance", "Record bank/other liquid balance (if any)",
       "If money also sits in a bank, tracking it completes the available-cash picture.",
-      false, "Enter the bank balance alongside the drawer count, or skip if all cash is in the drawer.",
+      s.cash.bankBalanceRecorded, "Enter the bank balance alongside the drawer count, or skip if all cash is in the drawer.",
       "low", "/money",
       ["fuller available-cash total"], false),
     step("cheque_status", "Confirm the current open cheque position",

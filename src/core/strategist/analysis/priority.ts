@@ -62,9 +62,6 @@ export function selectWeeklyPriority(report: StrategyReport, inputs: PriorityInp
   const openSet = new Set(inputs.openActionFindingIds);
   const suppressed: { findingId: string; why: string }[] = [];
 
-  const focus = report.decisionContext.reserveFloor != null ? null : null; // placeholder to keep signature honest
-  void focus;
-
   const CLASS_BOOST: Record<Finding["class"], number> = {
     decision_risk: 30, contradiction: 25, warning: 15, data_quality: 10,
     opportunity: 5, recommendation: 5, forecast: 0, fact: 0,
