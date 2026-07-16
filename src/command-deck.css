@@ -285,6 +285,32 @@
 
   /* #5 Segmented range/tab controls wrap instead of overflowing. */
   .cdk .seg, .cdk .subtabs{ flex-wrap:wrap; }
+
+  /* #6 Hero card: the mascot + orb are decoration positioned absolutely, and on
+     a narrow card the 56px value ran straight under the logo (numbers overlapped,
+     the subtitle was clipped). Drop the decoration on phones and scale the value
+     so it always sits clear on its own. */
+  .cdk .hero .heronut, .cdk .hero .orb{ display:none; }
+  .cdk .hv{ font-size:42px; }
+  .cdk .hcur{ font-size:20px; margin-right:5px; }
+
+  /* #7 Cash-conversion tile: a fixed 200px gauge sat beside the text and (once
+     min-width:0 let the column shrink) squeezed it to a sliver that broke the
+     big number mid-digit. Stack the gauge above a full-width body instead. */
+  .cdk .perf{ flex-direction:column; align-items:center; text-align:center; gap:16px; }
+  .cdk .hgauge{ width:auto; }
+  .cdk .hbody{ min-width:0; width:100%; }
+  .cdk .hhead{ max-width:none; }
+  .cdk .hstats{ justify-content:center; }
+
+  /* #8 Remaining oversized display numbers scale to stay inside their tile. */
+  .cdk .hscore{ font-size:40px; }
+  .cdk .bhbig{ font-size:38px; }
+
+  /* #9 The revenue-trend header packs a 7-item range picker beside the title; on
+     phones let it wrap so the title keeps its own line instead of clipping to
+     "Revenu…". */
+  .cdk .trend .th{ flex-wrap:wrap; row-gap:10px; }
 }
 
 /* ── Page sections (progressive disclosure) — Cycle 12 design refactor ──
@@ -343,3 +369,30 @@
 
 /* large monetary values stay inside 320–390px tiles */
 @media (max-width:390px){ .cdk .kv{font-size:25px} .cdk .kv small{font-size:13px} }
+
+/* ── Cheque settlement timeline (Money → Cheques) ─────────────────────────────
+   Each cheque is a block; block width ∝ the run of days it settled. Hover/tap a
+   block to see that cheque; the trace box resolves any single day to its cheque. */
+.cdk .chq-legend{display:flex;gap:14px 18px;flex-wrap:wrap;font-size:11.5px;color:var(--cd-dim);margin:0 0 14px}
+.cdk .chq-legend span{display:inline-flex;align-items:center;gap:7px}
+.cdk .chq-legend i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.cdk .chq-bar{display:flex;height:48px;width:100%;border-radius:13px;overflow:hidden;border:1px solid var(--stroke);background:var(--surface2)}
+.cdk .chq-seg{height:100%;border:none;padding:0;cursor:pointer;min-width:2px;border-right:1px solid rgba(6,7,10,.4);transition:filter .12s ease}
+.cdk .chq-seg:last-child{border-right:none}
+.cdk .chq-seg:hover{filter:brightness(1.3)}
+.cdk .chq-seg.on{filter:brightness(1.5);box-shadow:inset 0 0 0 2px rgba(255,255,255,.92)}
+.cdk .chq-seg:focus-visible{outline:2px solid rgb(var(--text));outline-offset:-2px;z-index:2}
+.cdk .chq-axis{display:flex;justify-content:space-between;margin-top:10px;font-size:11px;color:var(--cd-faint);font-weight:500}
+.cdk .chq-detail{margin-top:16px;border:1px solid var(--stroke);border-radius:16px;padding:16px 18px;background:var(--surface2);display:flex;align-items:center;gap:14px 20px;flex-wrap:wrap}
+.cdk .chq-detail .amt{font-family:'Clash Display','Satoshi',sans-serif;font-weight:700;font-size:27px;letter-spacing:-.02em;color:var(--green);line-height:1}
+.cdk .chq-detail .amt small{font-size:14px;color:var(--cd-dim);font-weight:600;margin-right:3px}
+.cdk .chq-detail .win{font-size:13.5px;color:var(--cd-muted)}
+.cdk .chq-detail .win b{color:var(--cd-text);font-weight:600}
+.cdk .chq-detail .sub{font-size:12px;color:var(--cd-dim);margin-top:4px}
+.cdk .chq-detail .dot{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:7px;vertical-align:1px}
+.cdk .chq-trace-in{background:rgba(255,255,255,.05);border:1px solid var(--stroke);border-radius:12px;padding:11px 14px;color:var(--cd-text);font-family:inherit;font-size:14px;color-scheme:dark;outline:none}
+.cdk .chq-trace-in:focus{border-color:rgba(255,77,187,.5)}
+.cdk .chq-answer{margin-top:15px;font-size:14px;line-height:1.65;color:var(--cd-muted)}
+.cdk .chq-answer b{color:var(--cd-text);font-weight:600}
+.cdk .chq-answer .hl{color:var(--mag);font-weight:700}
+:root[data-theme="light"] .cdk .chq-seg{border-right-color:rgba(255,255,255,.5)}

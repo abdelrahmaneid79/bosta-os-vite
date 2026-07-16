@@ -212,6 +212,9 @@ export type Database = {
         Row: {
           amount_received: number | null
           created_at: string
+          cycle_end: string | null
+          cycle_gross: number | null
+          cycle_start: string | null
           difference: number | null
           due_date: string | null
           edited_at: string | null
@@ -229,6 +232,9 @@ export type Database = {
         Insert: {
           amount_received?: number | null
           created_at?: string
+          cycle_end?: string | null
+          cycle_gross?: number | null
+          cycle_start?: string | null
           difference?: number | null
           due_date?: string | null
           edited_at?: string | null
@@ -246,6 +252,9 @@ export type Database = {
         Update: {
           amount_received?: number | null
           created_at?: string
+          cycle_end?: string | null
+          cycle_gross?: number | null
+          cycle_start?: string | null
           difference?: number | null
           due_date?: string | null
           edited_at?: string | null

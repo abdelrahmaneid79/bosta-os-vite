@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Stat, DeckTile, TileHead } from "./deck";
@@ -9,12 +9,13 @@ import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { egp, egpShort } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
+import { cn } from "@/core/utils/cn";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getCashLedger, getCashSummary, getMoneyAccounts } from "@/core/read/money";
-import { getChequeCycle, getSettlementStatements } from "@/core/read/settlements";
+import { getChequeLedger } from "@/core/read/settlements";
 import { getExpenses } from "@/core/read/expenses";
-import { voidMovement, voidCheque, voidExpense, setSettlementStatus } from "@/core/db/mutations";
+import { voidMovement, voidCheque, voidExpense } from "@/core/db/mutations";
 import { CashForm, ChequeForm, ExpenseForm } from "./forms";
 import { useUI } from "@/store/ui";
 
@@ -232,63 +233,103 @@ export function ExpensesScreen() {
 
 
 // ── Cheques — close the running sales tab, cross-referenced to sales ─────────
+// A settlement cycle's colour by commission era — the mall's deal changed twice.
+const chqEra = (start: string): string =>
+  start <= "2025-05-31" ? "#F7A23B" : start <= "2025-08-31" ? "#2BD4C4" : "#ff4dbb";
+const bareEgp = (n: number) => egp(n).replace("EGP ", "");
+
 export function ChequesScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [voidId, setVoidId] = useState<string | null>(null);
+  const [active, setActive] = useState<string | null>(null);
+  const [trace, setTrace] = useState("");
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
-  const cy = useQuery({ queryKey: ["cheque-cycle"], queryFn: getChequeCycle, enabled: en });
-  const del = useMutation({ mutationFn: (id: string) => voidCheque(id), onSuccess: () => { reportSuccess("Void cheque", "Cheque removed · kept for audit"); setVoidId(null); qc.invalidateQueries(); }, onError: (e) => reportError("Void cheque", e) });
+  const led = useQuery({ queryKey: ["cheque-ledger"], queryFn: getChequeLedger, enabled: en });
+  const del = useMutation({ mutationFn: (id: string) => voidCheque(id), onSuccess: () => { reportSuccess("Void cheque", "Cheque removed · kept for audit"); setVoidId(null); setActive(null); qc.invalidateQueries(); }, onError: (e) => reportError("Void cheque", e) });
   if (!en) return <EmptyState title="Sign in to load cheques" />;
-  const c = cy.data;
 
-  const chq = c?.cheques ?? [];
-  const total = c?.totalReceived ?? 0;
-  const avg = chq.length ? total / chq.length : 0;
-  const largest = chq.length ? Math.max(...chq.map((x) => x.amount)) : 0;
+  // Real settlement cheques, oldest → newest. The 3 × 32,000 nuts-deal payments
+  // carry no cycle and are a separate stream, so they're excluded here.
+  const rows = (led.data ?? [])
+    .filter((c) => c.cycleStart && c.cycleEnd && Math.round(c.net) !== 32000)
+    .sort((a, b) => (a.cycleStart as string).localeCompare(b.cycleStart as string));
+  const totalReceived = rows.reduce((s, r) => s + r.net, 0);
+  const totalDays = rows.reduce((s, r) => s + (r.cycleDays ?? 0), 0);
+  const avgCycle = rows.length ? totalDays / rows.length : 0;
+  const first = rows[0]?.cycleStart ?? undefined;
+  const last = rows.length ? rows[rows.length - 1].cycleEnd ?? undefined : undefined;
+  const detail = rows.find((c) => c.id === active) ?? (rows.length ? rows[rows.length - 1] : null);
+  const traced = trace ? rows.find((c) => (c.cycleStart as string) <= trace && trace <= (c.cycleEnd as string)) ?? null : null;
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 600 }}>Cheques close the running sales tab — cross-referenced to your sales</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 600 }}>Every cheque, linked to the exact run of sales days it settled</div>
         <button className="qadd" style={{ height: 38, marginLeft: "auto" }} onClick={() => setAddOpen(true)}><span>+ Add cheque</span></button>
       </div>
 
-      {c && c.openTab.revenue > 0 && (
-        <div className="note" style={{ marginBottom: 16, background: "rgba(255,177,62,.08)", borderColor: "rgba(255,177,62,.25)" }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 16v-4M12 8h.01M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" /></svg>
-          <div>Open tab: sales since the last cheque ({c.openTab.from ? fmtDate(c.openTab.from) : "—"} → {fmtDate(c.openTab.to)}) total <b style={{ color: "rgb(var(--text))" }}>{egp(c.openTab.revenue)}</b> over {c.openTab.days} days — the next cheque will close it.</div>
-        </div>
-      )}
-
-      {cy.isLoading ? <SkeletonRows /> : cy.isError ? <ErrorState message={String((cy.error as Error)?.message ?? "Read failed")} /> : (
+      {led.isLoading ? <SkeletonRows /> : led.isError ? <ErrorState message={String((led.error as Error)?.message ?? "Read failed")} /> : rows.length === 0 ? (
+        <EmptyState title="No cheques yet" hint="Add your first settlement cheque to start the timeline." />
+      ) : (
         <>
           <div className="statgrid">
-            <Stat label="Cheques logged" color="rgb(var(--cyan))" value={chq.length} />
-            <Stat label="Total value" color="var(--mag)" value={egp(total)} />
-            <Stat label="Average" color="rgb(var(--violet))" value={chq.length ? egp(avg) : "—"} />
-            <Stat label="Largest" color="var(--green)" value={chq.length ? egp(largest) : "—"} />
+            <Stat label="Total received" color="var(--green)" value={egp(totalReceived)} />
+            <Stat label="Cheques" color="rgb(var(--cyan))" value={rows.length} />
+            <Stat label="Days covered" color="var(--mag)" value={totalDays} />
+            <Stat label="Avg cycle" color="var(--amber)" value={`${avgCycle.toFixed(1)} days`} />
           </div>
-          <DeckTile style={{ padding: 0 }}>
-            <div style={{ padding: "22px 24px 8px", display: "flex", alignItems: "center", gap: 10 }}>
-              <span className="tname">All cheques</span>
-              <button className="addbtn" style={{ marginLeft: "auto" }} onClick={() => setAddOpen(true)}>+ Add cheque</button>
+
+          <DeckTile>
+            <div>
+              <div className="tname">Settlement timeline</div>
+              <div style={{ fontSize: 12, color: "rgb(var(--faint))", marginTop: 4 }}>each block is one cheque — its width is the run of days it settled · hover or tap a block</div>
             </div>
-            <div className="scroll">
-              <table className="tbl">
-                <thead><tr><th>Date</th><th>Coverage</th><th className="r">Amount</th><th style={{ width: 34 }} /></tr></thead>
-                <tbody>
-                  {chq.map((ch) => (
-                    <tr key={ch.id}>
-                      <td>{fmtDate(ch.date, "EEE d MMM yyyy")}</td>
-                      <td style={{ color: "rgb(var(--dim))", fontSize: 12.5 }}>{ch.coverFrom ? `${fmtDate(ch.coverFrom, "d MMM")} → ${fmtDate(ch.coverTo, "d MMM")}${ch.deductionPct != null && ch.deductionPct >= 0 ? ` · ${ch.deductionPct}% cut` : ""}` : "opening cheque"}</td>
-                      <td className="r" style={{ color: "var(--green)" }}>{egp(ch.amount)}</td>
-                      <td><button onClick={() => setVoidId(ch.id)} title="Void" style={{ color: "rgb(var(--faint))", cursor: "pointer", background: "none", border: "none", fontSize: 12 }} onMouseEnter={(ev) => (ev.currentTarget.style.color = "var(--red)")} onMouseLeave={(ev) => (ev.currentTarget.style.color = "rgb(var(--faint))")}>✕</button></td>
-                    </tr>
-                  ))}
-                  {chq.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "rgb(var(--faint))", padding: 28 }}>No cheques recorded yet.</td></tr>}
-                </tbody>
-              </table>
+            <div className="chq-legend" style={{ marginTop: 15 }}>
+              <span><i style={{ background: "#F7A23B" }} /> Opening deal · monthly</span>
+              <span><i style={{ background: "#2BD4C4" }} /> Rent begins · weekly</span>
+              <span><i style={{ background: "#ff4dbb" }} /> Today&rsquo;s deal · weekly</span>
+            </div>
+            <div className="chq-bar" role="img" aria-label="Settlement cheques over time; block width shows the days each one covered">
+              {rows.map((c) => (
+                <button key={c.id} type="button"
+                  className={cn("chq-seg", active === c.id && "on")}
+                  style={{ flexGrow: c.cycleDays ?? 1, background: chqEra(c.cycleStart as string) }}
+                  onMouseEnter={() => setActive(c.id)} onFocus={() => setActive(c.id)} onClick={() => setActive(c.id)}
+                  aria-label={`${egp(c.net)} received ${c.receivedDate ? fmtDate(c.receivedDate, "d MMM yyyy") : "—"}`} />
+              ))}
+            </div>
+            <div className="chq-axis"><span>{first ? fmtDate(first, "MMM yyyy") : ""}</span><span>{last ? fmtDate(last, "MMM yyyy") : ""}</span></div>
+
+            {detail && (
+              <div className="chq-detail">
+                <div className="amt"><small>EGP</small>{bareEgp(detail.net)}</div>
+                <div style={{ flex: 1, minWidth: 210 }}>
+                  <div className="win"><span className="dot" style={{ background: chqEra(detail.cycleStart as string) }} />Received <b>{detail.receivedDate ? fmtDate(detail.receivedDate, "d MMM yyyy") : "—"}</b> · settles <b>{fmtDate(detail.cycleStart as string, "d MMM")} → {fmtDate(detail.cycleEnd as string, "d MMM yyyy")}</b> ({detail.cycleDays} days)</div>
+                  {detail.gross != null && (
+                    <div className="sub">EGP {bareEgp(detail.gross)} of sales in this run{detail.deductions ? ` · mall kept EGP ${bareEgp(detail.deductions)}` : " · matches your sales to the pound"}</div>
+                  )}
+                </div>
+                <button className="mbtn" onClick={() => setVoidId(detail.id)}>Void</button>
+              </div>
+            )}
+          </DeckTile>
+
+          <DeckTile>
+            <div>
+              <div className="tname">Trace any day</div>
+              <div style={{ fontSize: 12, color: "rgb(var(--faint))", marginTop: 4 }}>pick a sales day — see the exact cheque that settled it</div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 15 }}>
+              <span style={{ fontSize: 13.5, color: "rgb(var(--muted))" }}>A sale on</span>
+              <input type="date" className="chq-trace-in" value={trace} min={first} max={last} onChange={(e) => setTrace(e.target.value)} />
+              <span style={{ fontSize: 13.5, color: "rgb(var(--muted))" }}>was paid by…</span>
+            </div>
+            <div className="chq-answer">
+              {!trace ? "Pick a date above to trace it to its cheque."
+                : traced ? (
+                  <>Settled by your cheque of <span className="hl">{egp(traced.net)}</span>, received <b>{traced.receivedDate ? fmtDate(traced.receivedDate, "d MMM yyyy") : "—"}</b> — covering <b>{fmtDate(traced.cycleStart as string, "d MMM")} → {fmtDate(traced.cycleEnd as string, "d MMM yyyy")}</b> ({traced.cycleDays} days).</>
+                ) : "That day is outside your settled range — it may still be on the open tab, waiting for the next cheque."}
             </div>
           </DeckTile>
         </>
@@ -298,100 +339,6 @@ export function ChequesScreen() {
       <Confirm open={!!voidId} title="Void this cheque?" danger busy={del.isPending}
         message="Removed from cheque totals and cash in; kept for audit." confirmLabel="Void"
         onConfirm={() => voidId && del.mutate(voidId)} onClose={() => setVoidId(null)} />
-    </div>
-  );
-}
-
-const MINI_BTN: CSSProperties = {
-  padding: "3px 9px", borderRadius: 8, border: "1px solid var(--stroke)",
-  background: "rgba(255,255,255,.04)", color: "rgb(var(--muted))", fontSize: 11.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
-};
-
-// ── Settlements — monthly statement (READ-ONLY over the engine caches) ───────
-/** Per month: revenue − flat rent − 3% charge = net expected, vs cheque
- *  received. Every figure is read from the trigger-maintained caches; the only
- *  write is an admin-triggered period status transition (never auto-reconcile). */
-export function SettlementsScreen() {
-  const { reportSuccess, reportError } = useUI();
-  const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["settlement-statements"], queryFn: getSettlementStatements, enabled: en });
-  const setStatus = useMutation({
-    mutationFn: (v: { id: string; status: "received" | "reconciled" | "open" }) => setSettlementStatus(v.id, v.status),
-    onSuccess: (_d, v) => { reportSuccess("Settlement status", `Period marked ${v.status}`); qc.invalidateQueries(); },
-    onError: (e) => reportError("Settlement status", e),
-  });
-  const [statusAsk, setStatusAsk] = useState<{ id: string; status: "received" | "reconciled" | "open"; label: string } | null>(null);
-  if (!en) return <EmptyState title="Sign in to load settlements" />;
-  const rows = q.data ?? [];
-  const tol = (r: { revenue: number }) => Math.max(5, 0.005 * r.revenue); // reconciliation tolerance
-  const totNet = rows.reduce((s, r) => s + r.netExpected, 0);
-  const totRecv = rows.reduce((s, r) => s + (r.chequeReceived ?? 0), 0);
-  const outstanding = rows.filter((r) => r.chequeReceived == null && r.netExpected > 0).reduce((s, r) => s + r.netExpected, 0);
-
-  const STATUS_COLOR: Record<string, string> = { open: "rgb(var(--dim))", expected: "var(--amber)", received: "rgb(var(--cyan))", reconciled: "var(--green)" };
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 600 }}>Revenue − flat rent − 3% charge = net expected, vs the cheque received</div>
-      </div>
-      {q.isLoading ? <SkeletonRows /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : (
-        <>
-          <div className="statgrid">
-            <Stat label="Months" color="rgb(var(--cyan))" value={rows.length} />
-            <Stat label="Net expected · all" color="var(--mag)" value={egp(totNet)} />
-            <Stat label="Cheques received · all" color="var(--green)" value={egp(totRecv)} />
-            <Stat label="Outstanding (no cheque)" color="var(--amber)" value={egp(outstanding)} />
-          </div>
-          <DeckTile style={{ padding: 0 }}>
-            <div style={{ padding: "22px 24px 8px" }}><span className="tname">Monthly settlement statement</span></div>
-            <div className="scroll">
-              <table className="tbl">
-                <thead><tr>
-                  <th>Month</th><th className="r">Revenue</th><th className="r">Rent</th><th className="r">3% charge</th>
-                  <th className="r">Net expected</th><th className="r">Cheque received</th><th className="r">Difference</th><th>Status</th>
-                </tr></thead>
-                <tbody>
-                  {rows.map((r) => {
-                    const ok = r.difference != null && Math.abs(r.difference) <= tol(r);
-                    return (
-                      <tr key={r.id}>
-                        <td style={{ whiteSpace: "nowrap" }}>{fmtDate(r.month, "MMM yyyy")}</td>
-                        <td className="r">{egp(r.revenue)}</td>
-                        <td className="r" style={{ color: "rgb(var(--dim))" }}>−{egp(r.rent)}</td>
-                        <td className="r" style={{ color: "rgb(var(--dim))" }}>−{egp(r.charge)}{r.other ? ` −${egp(r.other)}` : ""}</td>
-                        <td className="r" style={{ fontWeight: 700 }}>{egp(r.netExpected)}</td>
-                        <td className="r">{r.chequeReceived != null ? egp(r.chequeReceived) : <span style={{ color: "rgb(var(--faint))" }}>— none —</span>}</td>
-                        <td className="r" style={{ color: r.difference == null ? "rgb(var(--faint))" : ok ? "var(--green)" : "var(--red)", fontWeight: 600 }}>
-                          {r.difference == null ? "—" : `${r.difference >= 0 ? "+" : "−"}${egp(Math.abs(r.difference))}`}
-                        </td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ textTransform: "capitalize", color: STATUS_COLOR[r.status] ?? "rgb(var(--dim))", fontWeight: 600, fontSize: 12.5 }}>{r.status}</span>
-                            {r.status !== "reconciled" && r.chequeReceived != null && (
-                              <>
-                                {r.status === "open" && <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatusAsk({ id: r.id, status: "received", label: `Mark ${r.month} as received?` })}>Mark received</button>}
-                                <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatusAsk({ id: r.id, status: "reconciled", label: `Reconcile ${r.month}? You can reopen it later if something changes.` })}>Reconcile</button>
-                              </>
-                            )}
-                            {r.status !== "open" && (
-                              <button style={MINI_BTN} disabled={setStatus.isPending} onClick={() => setStatusAsk({ id: r.id, status: "open", label: `Reopen ${r.month}? Its status goes back to open so it can be corrected.` })}>Reopen</button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {rows.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center", color: "rgb(var(--faint))", padding: 28 }}>No settlement periods yet.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </DeckTile>
-          <Confirm open={!!statusAsk} title="Settlement status" message={statusAsk?.label ?? ""} busy={setStatus.isPending}
-            onConfirm={() => { if (statusAsk) setStatus.mutate({ id: statusAsk.id, status: statusAsk.status }); setStatusAsk(null); }}
-            onClose={() => setStatusAsk(null)} />
-        </>
-      )}
     </div>
   );
 }
