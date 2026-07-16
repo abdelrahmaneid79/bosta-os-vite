@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Stat, DeckTile, TileHead } from "./deck";
@@ -238,11 +238,24 @@ const chqEra = (start: string): string =>
   start <= "2025-05-31" ? "#F7A23B" : start <= "2025-08-31" ? "#2BD4C4" : "#ff4dbb";
 const bareEgp = (n: number) => egp(n).replace("EGP ", "");
 
+// Phone widths — the timeline becomes a swipeable strip instead of a squeeze.
+function useNarrow() {
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width:767px)").matches);
+  useEffect(() => {
+    const m = window.matchMedia("(max-width:767px)");
+    const on = () => setNarrow(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
 export function ChequesScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [voidId, setVoidId] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [trace, setTrace] = useState("");
+  const narrow = useNarrow();
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const led = useQuery({ queryKey: ["cheque-ledger"], queryFn: getChequeLedger, enabled: en });
@@ -264,8 +277,7 @@ export function ChequesScreen() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
-        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 600 }}>Every cheque, linked to the exact run of sales days it settled</div>
+      <div style={{ display: "flex", marginBottom: 16 }}>
         <button className="qadd" style={{ height: 38, marginLeft: "auto" }} onClick={() => setAddOpen(true)}><span>+ Add cheque</span></button>
       </div>
 
@@ -283,31 +295,35 @@ export function ChequesScreen() {
           <DeckTile>
             <div>
               <div className="tname">Settlement timeline</div>
-              <div style={{ fontSize: 12, color: "rgb(var(--faint))", marginTop: 4 }}>each block is one cheque — its width is the run of days it settled · hover or tap a block</div>
+              <div style={{ fontSize: 12, color: "rgb(var(--faint))", marginTop: 4 }}>{narrow ? "swipe across · tap a block" : "wider = more days · tap a block"}</div>
             </div>
-            <div className="chq-legend" style={{ marginTop: 15 }}>
-              <span><i style={{ background: "#F7A23B" }} /> Opening deal · monthly</span>
-              <span><i style={{ background: "#2BD4C4" }} /> Rent begins · weekly</span>
-              <span><i style={{ background: "#ff4dbb" }} /> Today&rsquo;s deal · weekly</span>
+            <div className="chq-legend" style={{ marginTop: 14 }}>
+              <span><i style={{ background: "#F7A23B" }} /> Opening deal</span>
+              <span><i style={{ background: "#2BD4C4" }} /> Rent begins</span>
+              <span><i style={{ background: "#ff4dbb" }} /> Today&rsquo;s deal</span>
             </div>
-            <div className="chq-bar" role="img" aria-label="Settlement cheques over time; block width shows the days each one covered">
-              {rows.map((c) => (
-                <button key={c.id} type="button"
-                  className={cn("chq-seg", active === c.id && "on")}
-                  style={{ flexGrow: c.cycleDays ?? 1, background: chqEra(c.cycleStart as string) }}
-                  onMouseEnter={() => setActive(c.id)} onFocus={() => setActive(c.id)} onClick={() => setActive(c.id)}
-                  aria-label={`${egp(c.net)} received ${c.receivedDate ? fmtDate(c.receivedDate, "d MMM yyyy") : "—"}`} />
-              ))}
+            <div className="chq-scroll">
+              <div className="chq-bar" style={narrow ? { width: "max-content" } : undefined} role="img" aria-label="Settlement cheques over time; block width shows days covered">
+                {rows.map((c) => (
+                  <button key={c.id} type="button"
+                    className={cn("chq-seg", active === c.id && "on")}
+                    style={narrow
+                      ? { width: Math.max(22, (c.cycleDays ?? 1) * 3), flexShrink: 0, background: chqEra(c.cycleStart as string) }
+                      : { flexGrow: c.cycleDays ?? 1, background: chqEra(c.cycleStart as string) }}
+                    onMouseEnter={() => setActive(c.id)} onFocus={() => setActive(c.id)} onClick={() => setActive(c.id)}
+                    aria-label={`${egp(c.net)} received ${c.receivedDate ? fmtDate(c.receivedDate, "d MMM yyyy") : "—"}`} />
+                ))}
+              </div>
             </div>
             <div className="chq-axis"><span>{first ? fmtDate(first, "MMM yyyy") : ""}</span><span>{last ? fmtDate(last, "MMM yyyy") : ""}</span></div>
 
             {detail && (
               <div className="chq-detail">
                 <div className="amt"><small>EGP</small>{bareEgp(detail.net)}</div>
-                <div style={{ flex: 1, minWidth: 210 }}>
-                  <div className="win"><span className="dot" style={{ background: chqEra(detail.cycleStart as string) }} />Received <b>{detail.receivedDate ? fmtDate(detail.receivedDate, "d MMM yyyy") : "—"}</b> · settles <b>{fmtDate(detail.cycleStart as string, "d MMM")} → {fmtDate(detail.cycleEnd as string, "d MMM yyyy")}</b> ({detail.cycleDays} days)</div>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div className="win"><span className="dot" style={{ background: chqEra(detail.cycleStart as string) }} />Received <b>{detail.receivedDate ? fmtDate(detail.receivedDate, "d MMM yyyy") : "—"}</b> · covers <b>{fmtDate(detail.cycleStart as string, "d MMM")} – {fmtDate(detail.cycleEnd as string, "d MMM")}</b> · {detail.cycleDays} days</div>
                   {detail.gross != null && (
-                    <div className="sub">EGP {bareEgp(detail.gross)} of sales in this run{detail.deductions ? ` · mall kept EGP ${bareEgp(detail.deductions)}` : " · matches your sales to the pound"}</div>
+                    <div className="sub">{detail.deductions ? `Sales EGP ${bareEgp(detail.gross)} · mall kept EGP ${bareEgp(detail.deductions)}` : "Matches your sales"}</div>
                   )}
                 </div>
                 <button className="mbtn" onClick={() => setVoidId(detail.id)}>Void</button>
@@ -317,19 +333,15 @@ export function ChequesScreen() {
 
           <DeckTile>
             <div>
-              <div className="tname">Trace any day</div>
-              <div style={{ fontSize: 12, color: "rgb(var(--faint))", marginTop: 4 }}>pick a sales day — see the exact cheque that settled it</div>
+              <div className="tname">Trace a day</div>
+              <div style={{ fontSize: 12, color: "rgb(var(--faint))", marginTop: 4 }}>which cheque paid for a day</div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 15 }}>
-              <span style={{ fontSize: 13.5, color: "rgb(var(--muted))" }}>A sale on</span>
-              <input type="date" className="chq-trace-in" value={trace} min={first} max={last} onChange={(e) => setTrace(e.target.value)} />
-              <span style={{ fontSize: 13.5, color: "rgb(var(--muted))" }}>was paid by…</span>
-            </div>
+            <input type="date" className="chq-trace-in" style={{ marginTop: 14 }} value={trace} min={first} max={last} onChange={(e) => setTrace(e.target.value)} />
             <div className="chq-answer">
-              {!trace ? "Pick a date above to trace it to its cheque."
+              {!trace ? "Pick a day above."
                 : traced ? (
-                  <>Settled by your cheque of <span className="hl">{egp(traced.net)}</span>, received <b>{traced.receivedDate ? fmtDate(traced.receivedDate, "d MMM yyyy") : "—"}</b> — covering <b>{fmtDate(traced.cycleStart as string, "d MMM")} → {fmtDate(traced.cycleEnd as string, "d MMM yyyy")}</b> ({traced.cycleDays} days).</>
-                ) : "That day is outside your settled range — it may still be on the open tab, waiting for the next cheque."}
+                  <>Paid by your <span className="hl">{egp(traced.net)}</span> cheque, received <b>{traced.receivedDate ? fmtDate(traced.receivedDate, "d MMM yyyy") : "—"}</b> · covers <b>{fmtDate(traced.cycleStart as string, "d MMM")} – {fmtDate(traced.cycleEnd as string, "d MMM")}</b>.</>
+                ) : "Not settled yet — still on the open tab."}
             </div>
           </DeckTile>
         </>

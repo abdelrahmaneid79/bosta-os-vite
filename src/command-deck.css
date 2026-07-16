@@ -396,3 +396,10 @@
 .cdk .chq-answer b{color:var(--cd-text);font-weight:600}
 .cdk .chq-answer .hl{color:var(--mag);font-weight:700}
 :root[data-theme="light"] .cdk .chq-seg{border-right-color:rgba(255,255,255,.5)}
+/* On phones the bar becomes a swipeable strip — blocks stay finger-sized and the
+   whole 2-year run scrolls horizontally; vertical swipes still scroll the page. */
+@media (max-width:767px){
+  .cdk .chq-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -2px;padding-bottom:5px}
+  .cdk .chq-scroll::-webkit-scrollbar{height:0}
+  .cdk .chq-bar{border-radius:11px}
+}
