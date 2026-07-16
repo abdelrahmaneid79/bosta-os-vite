@@ -34,9 +34,10 @@ supabase/.temp/
 # kept local only. The manifest (dates + metadata, no image data) is committed.
 fixtures/day-reports/*.png
 fixtures/day-reports/*.PNG
-# self-hosted OCR assets (large binaries reproduced by scripts/setup-ocr-assets.mjs)
-public/ocr/lang/*.traineddata
-public/ocr/lang/*.traineddata.gz
+# self-hosted OCR wasm/worker — reproduced from node_modules by
+# scripts/setup-ocr-assets.mjs at build time (npm install always runs), so kept
+# out of git. The LANGUAGE DATA (*.traineddata.gz) IS committed (below) so the
+# build never needs network — the only asset that would otherwise be downloaded.
 public/ocr/*.wasm
 public/ocr/worker.min.js
 public/ocr/tesseract-core*.js

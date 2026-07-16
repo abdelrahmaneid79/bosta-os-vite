@@ -7,7 +7,7 @@
  *  is a best-effort draft you verify — every uncertain line is flagged and the
  *  totals must reconcile before Approve unlocks. Nothing saves until you approve;
  *  writes go through the existing create_sale_item RPC (money math untouched). */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHead, Eyebrow, Button, Badge } from "@/components/ui";
@@ -15,7 +15,7 @@ import { EmptyState, SkeletonRows } from "@/components/feedback";
 import { ProductPicker } from "@/components/ProductPicker";
 import { egp } from "@/core/utils/format";
 import { isEngineConfigured, requireEngine } from "@/core/db/engine";
-import { getCodedProducts } from "@/core/read/products";
+import { getCodedProducts, getProductReferencePrices } from "@/core/read/products";
 import { getLocations, getChannels } from "@/core/read/common";
 import { createSale, addSaleItem, setProductCodes } from "@/core/db/mutations";
 import {
@@ -27,6 +27,7 @@ import { runLocalDayReportOCR } from "@/features/local-ocr/engine/run-local-ocr"
 import { signalRows, lineProvenance } from "@/features/local-ocr/adapter/to-raw-day-report";
 import { checkAgainstCatalog } from "@/features/local-ocr/validation/catalog-check";
 import { checkOcrReadiness, warmOcr, type OcrReadiness } from "@/features/local-ocr/engine/offline-readiness";
+import { saveDraft, loadDraft, clearDraft, hashImage, findImportedImage, markImageImported, type DayImportDraft, type ImportedMark } from "@/features/local-ocr/draft-store";
 import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
@@ -81,16 +82,39 @@ export function DaySalesPhotoImport() {
   const [dayDate, setDayDate] = useState("");
   const [assign, setAssign] = useState<Record<number, string>>({}); // line index → product override
   const [result, setResult] = useState<{ created: number; failed: number; coded: number; action: string } | null>(null);
+  // persistence: current photo (for the draft), a saved draft awaiting restore,
+  // and a warning if this exact photo was already imported before
+  const imageBlobRef = useRef<Blob | null>(null);
+  const imageHashRef = useRef<string | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<DayImportDraft | null>(null);
+  const [dupMark, setDupMark] = useState<ImportedMark | null>(null);
 
   // probe readiness + warm the worker up front so first read is fast/offline
   useEffect(() => { let live = true; checkOcrReadiness().then((r) => { if (live) setReady(r); if (r !== "unavailable") warmOcr(); }); return () => { live = false; }; }, []);
+
+  // offer to restore an interrupted review left in device storage
+  useEffect(() => { let live = true; loadDraft().then((d) => { if (live && d?.lines?.length) setPendingDraft(d); }); return () => { live = false; }; }, []);
+
+  // auto-save the in-progress review so closing the tab never loses it (debounced)
+  useEffect(() => {
+    if (!lines || busy) return;
+    const t = setTimeout(() => { void saveDraft({ lines, meta, branchTotal, dayDate, assign, imageBlob: imageBlobRef.current ?? undefined, savedAt: Date.now() }); }, 600);
+    return () => clearTimeout(t);
+  }, [lines, meta, branchTotal, dayDate, assign, busy]);
 
   const prods = useQuery({ queryKey: ["coded-products"], queryFn: getCodedProducts, enabled: en });
   const index = useMemo(() => buildCodeIndex(prods.data ?? []), [prods.data]);
   const nameById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.nameEn])), [prods.data]);
   const marketById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.marketCode])), [prods.data]);
   const posCodeById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.posCode])), [prods.data]);
-  const priceById = useMemo(() => new Map((prods.data ?? []).map((p) => [p.id, p.sellingPrice])), [prods.data]);
+  // reference price per product = catalog selling_price, else the most recent
+  // sold price — so the weight-check works without manually setting selling_price.
+  const refPrices = useQuery({ queryKey: ["product-ref-prices"], queryFn: getProductReferencePrices, enabled: en });
+  const priceById = useMemo(() => {
+    const m = new Map<string, number | null>();
+    for (const p of prods.data ?? []) m.set(p.id, p.sellingPrice ?? refPrices.data?.get(p.id) ?? null);
+    return m;
+  }, [prods.data, refPrices.data]);
 
   const locs = useQuery({ queryKey: ["locations"], queryFn: getLocations, enabled: en });
   const locationId = locs.data?.[0]?.id ?? "";
@@ -142,13 +166,25 @@ export function DaySalesPhotoImport() {
   const readyCount = viewLines.filter((l) => l.saveable).length;
   const canSave = !!decision && actionCanSave(decision.action) && readyCount > 0;
 
-  function resetAll() { setLines(null); setMeta([]); setImgUrl(null); setResult(null); setAssign({}); setDayDate(""); setBranchTotal(null); setStage(""); }
+  function resetAll() { setLines(null); setMeta([]); setImgUrl(null); setResult(null); setAssign({}); setDayDate(""); setBranchTotal(null); setStage(""); setDupMark(null); imageBlobRef.current = null; imageHashRef.current = null; }
+  function cancelAll() { resetAll(); setPendingDraft(null); void clearDraft(); }
+
+  /** Restore an interrupted review from device storage. */
+  function restoreDraft(d: DayImportDraft) {
+    setLines(d.lines); setMeta(d.meta); setBranchTotal(d.branchTotal); setDayDate(d.dayDate); setAssign(d.assign);
+    if (d.imageBlob) { imageBlobRef.current = d.imageBlob; setImgUrl(URL.createObjectURL(d.imageBlob)); }
+    setPendingDraft(null);
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     e.target.value = "";
     resetAll();
+    setPendingDraft(null);
     setBusy(true);
+    imageBlobRef.current = f;
+    // fingerprint the photo → warn if this exact image was imported before
+    hashImage(f).then((h) => { imageHashRef.current = h; return findImportedImage(h); }).then((m) => { if (m) setDupMark(m); }).catch(() => {});
     try {
       const { extraction, report, image } = await runLocalDayReportOCR(f, setStage);
       setImgUrl(image.previewUrl);
@@ -185,6 +221,8 @@ export function DaySalesPhotoImport() {
 
   const approve = useMutation({
     mutationFn: async () => {
+      // saving writes to Supabase; if offline, keep the (auto-saved) draft and say so
+      if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("You're offline — your review is saved. Reconnect, then Approve again.");
       if (!analysis || !decision) throw new Error("Nothing to import.");
       if (!actionCanSave(decision.action)) throw new Error("This day can't be saved yet — reconcile the totals first.");
       if (!dayDate) throw new Error("Set the sale day first.");
@@ -222,6 +260,9 @@ export function DaySalesPhotoImport() {
     },
     onSuccess: (res) => {
       setResult(res);
+      // review saved — drop the draft and remember this photo so re-importing it warns
+      void clearDraft();
+      if (imageHashRef.current) void markImageImported(imageHashRef.current, { date: dayDate, at: Date.now() });
       reportSuccess("Import day sales", `${res.created} product line(s) ${res.action === "create" ? "on a new day" : "attached"}${res.coded ? ` · ${res.coded} product(s) coded` : ""}${res.failed ? ` · ${res.failed} failed` : ""}`);
       qc.invalidateQueries();
     },
@@ -240,6 +281,20 @@ export function DaySalesPhotoImport() {
   return (
     <div className="space-y-4">
       <Eyebrow>Daily sales — read on your device, nothing leaves your phone</Eyebrow>
+
+      {pendingDraft && !lines && (
+        <Card className="!border-pink/40 !bg-pink/5">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1 text-sm text-text">
+              <b>You have an unfinished review</b> — {pendingDraft.lines.length} product line(s){pendingDraft.dayDate ? ` for ${new Date(pendingDraft.dayDate + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}, saved on this device. Pick up where you left off?
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => { setPendingDraft(null); void clearDraft(); }}>Discard</Button>
+              <Button onClick={() => restoreDraft(pendingDraft)}>Restore</Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {!lines ? (
         /* ───────── Upload ───────── */
@@ -274,6 +329,11 @@ export function DaySalesPhotoImport() {
                 <button className="mt-1.5 text-[12px] text-pink underline" onClick={resetAll}>Read a different photo</button>
               </div>
             </div>
+            {dupMark && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-[12px] text-warn">
+                <span>⚠</span><span>You already imported this exact photo{dupMark.date ? ` (for ${new Date(dupMark.date + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })})` : ""}. Saving again may double-count — check before approving.</span>
+              </div>
+            )}
           </Card>
 
           {/* ───────── Reconciliation — the thing to get right ───────── */}
@@ -323,7 +383,7 @@ export function DaySalesPhotoImport() {
               <span className="font-display text-sm font-semibold text-text">Products</span>
               <span className="text-[12px] text-dim">{needsAttention ? `${needsAttention} to check` : "all checked"}</span>
             </div>
-            <div className="max-h-[60vh] divide-y divide-line overflow-y-auto">
+            <div className="max-h-[60vh] divide-y divide-line overflow-y-auto overscroll-contain">
               {viewLines.map((l) => {
                 const attention = !l.productId || l.conf !== "verified";
                 return (
@@ -370,7 +430,7 @@ export function DaySalesPhotoImport() {
           <div className="sticky bottom-3 z-10 flex items-center gap-2 rounded-2xl border border-line bg-panel/95 px-3 py-2.5 shadow-lg backdrop-blur">
             <span className="text-[13px] text-dim"><b className="text-text">{readyCount}</b> ready{toAssign ? ` · ${toAssign} to assign` : ""}</span>
             <div className="flex-1" />
-            <Button variant="ghost" onClick={resetAll}>Cancel</Button>
+            <Button variant="ghost" onClick={cancelAll}>Cancel</Button>
             <Button disabled={approve.isPending || !canSave} onClick={() => approve.mutate()}>
               {approve.isPending ? "Saving…" : !reconciled ? "Match the total first" : `Approve ${readyCount}`}
             </Button>

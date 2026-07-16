@@ -14,6 +14,7 @@ import { Toaster, SkeletonRows } from "@/components/feedback";
 import { ProductForm, PurchaseForm, SaleForm, ExpenseForm, CashForm } from "@/features/engine/forms";
 import { CommandPalette } from "@/features/engine/CommandPalette";
 import { useFocusTrap } from "@/components/ui/useFocusTrap";
+import { useScrollLock } from "@/components/ui/useScrollLock";
 import { NAV_SECTIONS, SETTINGS_SECTION } from "@/core/nav";
 import { usePrefs, useApplyTheme } from "@/store/prefs";
 import { useFilters } from "@/store/filters";
@@ -49,7 +50,6 @@ const MissingScreen = L(dash, "MissingScreen");
 const ActivityScreen = L(dash, "ActivityScreen");
 const MoneyScreen = L(money, "MoneyScreen");
 const ChequesScreen = L(money, "ChequesScreen");
-const SettlementsScreen = L(money, "SettlementsScreen");
 const ExpensesScreen = L(money, "ExpensesScreen");
 const ReportsScreen = L(more, "ReportsScreen");
 const SystemCheckScreen = L(more, "SystemCheckScreen");
@@ -92,7 +92,7 @@ const EL: Record<string, React.ReactNode> = {
   "/dashboard": <DashboardScreen />,
   "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <DaySalesPhotoImport />, "/sales/product-lines/file": <ProductLineImportScreen />,
   "/stock": <StockScreen />, "/purchases": <PurchasesScreen />, "/costs": <ProductCostImportScreen />,
-  "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/settlements": <SettlementsScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
+  "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/settlements": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
   "/health": <StrategistScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
   "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/settings/opening": <OpeningBalancesScreen />, "/settings/history": <HistoryImportScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
@@ -162,12 +162,13 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const effectiveView = quickAddView ?? view;
   const close = useCallback(() => { setView(null); closeQuickAdd(); onClose(); }, [closeQuickAdd, onClose]);
   const panelRef = useFocusTrap<HTMLDivElement>(effectiveOpen, close);
+  useScrollLock(effectiveOpen);
   if (!effectiveOpen) return null;
   const titles = { product: "Add product", purchase: "Add purchase", sale: "New sale day", expense: "Add expense", cashcount: "Count cash" } as const;
   return (
     <div onClick={close} className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4">
       <div ref={panelRef} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={effectiveView ? titles[effectiveView] : "Quick add"} tabIndex={-1}
-        className={`max-h-[92vh] w-full ${effectiveView === "sale" ? "max-w-2xl" : "max-w-md"} animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 shadow-sheet focus:outline-none sm:rounded-3xl`}>
+        className={`max-h-[92vh] w-full ${effectiveView === "sale" ? "max-w-2xl" : "max-w-md"} animate-sheetUp overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel2 p-5 shadow-sheet focus:outline-none sm:rounded-3xl`}>
         <div className="mb-3 flex items-center justify-between">
           <div className="font-display text-lg font-semibold">{effectiveView ? titles[effectiveView] : "Quick add"}</div>
           <button onClick={close} className="flex h-8 w-8 items-center justify-center rounded-lg bg-panel2 text-muted hover:text-text">✕</button>
@@ -263,7 +264,7 @@ function AlertBell() {
               <div className="font-display text-sm font-bold">Alerts {openAlerts.length > 0 && <span className="text-dim">· {openAlerts.length}</span>}</div>
               <NavLink to="/missing" onClick={() => setOpen(false)} className="text-[12px] font-semibold text-pink">Open center →</NavLink>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto">
+            <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
               {q.isLoading ? <div className="px-4 py-6 text-center text-sm text-dim">Checking…</div>
                 : openAlerts.length === 0 ? (
                   <div className="px-4 py-8 text-center">
@@ -313,6 +314,7 @@ function MobileNav() {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const panelRef = useFocusTrap<HTMLDivElement>(open, close);
+  useScrollLock(open);
   const MOBILE_IDS = ["today", "sales", "inventory", "money", "insights"];
   const vis = useVisibleGroups();
   const primary = MOBILE_IDS.map((id) => vis.find((g) => g.id === id)).filter((g): g is Group => !!g);
@@ -332,7 +334,7 @@ function MobileNav() {
       {open && (
         <div onClick={close} className="fixed inset-0 z-[60] flex items-end bg-black/70 md:hidden">
           <div ref={panelRef} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="All sections" tabIndex={-1}
-            className="max-h-[80vh] w-full animate-sheetUp overflow-y-auto rounded-t-3xl border border-line bg-panel2 p-5 pb-8 shadow-sheet focus:outline-none">
+            className="max-h-[80vh] w-full animate-sheetUp overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel2 p-5 pb-8 shadow-sheet focus:outline-none">
             <div className="mb-3 flex items-center justify-between"><div className="font-display text-lg font-semibold">All sections</div>
               <button onClick={close} className="flex h-8 w-8 items-center justify-center rounded-lg bg-panel2 text-muted">✕</button></div>
             <div className="space-y-3">
