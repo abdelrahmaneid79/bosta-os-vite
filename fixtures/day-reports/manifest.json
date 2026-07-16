@@ -1,0 +1,536 @@
+[
+  {
+    "file": "2024-01-15.png",
+    "date": "2024-01-15",
+    "variantGuess": "v2024_no_barcode",
+    "source": "15-1-24 sales.PNG"
+  },
+  {
+    "file": "2024-10-30.png",
+    "date": "2024-10-30",
+    "variantGuess": "v2024_no_barcode",
+    "source": "30-10-24 sales.PNG"
+  },
+  {
+    "file": "2024-11-04.png",
+    "date": "2024-11-04",
+    "variantGuess": "v2024_no_barcode",
+    "source": "04-11-24 sales.PNG"
+  },
+  {
+    "file": "2024-11-11.png",
+    "date": "2024-11-11",
+    "variantGuess": "v2024_no_barcode",
+    "source": "11-11-24 sales.PNG"
+  },
+  {
+    "file": "2024-11-18.png",
+    "date": "2024-11-18",
+    "variantGuess": "v2024_no_barcode",
+    "source": "18-11-24 sales.PNG"
+  },
+  {
+    "file": "2024-11-25.png",
+    "date": "2024-11-25",
+    "variantGuess": "v2024_no_barcode",
+    "source": "25-11-24 sales.PNG"
+  },
+  {
+    "file": "2024-12-02.png",
+    "date": "2024-12-02",
+    "variantGuess": "v2024_no_barcode",
+    "source": "2-12-24 sales.PNG"
+  },
+  {
+    "file": "2024-12-09.png",
+    "date": "2024-12-09",
+    "variantGuess": "v2024_no_barcode",
+    "source": "9-12-24 sales.PNG"
+  },
+  {
+    "file": "2024-12-16.png",
+    "date": "2024-12-16",
+    "variantGuess": "v2024_no_barcode",
+    "source": "16-12-24 sales.PNG"
+  },
+  {
+    "file": "2024-12-23.png",
+    "date": "2024-12-23",
+    "variantGuess": "v2024_no_barcode",
+    "source": "23-12-24 sales.PNG"
+  },
+  {
+    "file": "2024-12-30.png",
+    "date": "2024-12-30",
+    "variantGuess": "v2024_no_barcode",
+    "source": "30-12-24 sales.PNG"
+  },
+  {
+    "file": "2025-01-06.png",
+    "date": "2025-01-06",
+    "variantGuess": "v2025_barcode",
+    "source": "6-1-25 sales.PNG"
+  },
+  {
+    "file": "2025-01-13.png",
+    "date": "2025-01-13",
+    "variantGuess": "v2025_barcode",
+    "source": "13-1-25 sales.PNG"
+  },
+  {
+    "file": "2025-01-20.png",
+    "date": "2025-01-20",
+    "variantGuess": "v2025_barcode",
+    "source": "20-1-25 sales.PNG"
+  },
+  {
+    "file": "2025-01-27.png",
+    "date": "2025-01-27",
+    "variantGuess": "v2025_barcode",
+    "source": "27-1-25 sales.PNG"
+  },
+  {
+    "file": "2025-02-03.png",
+    "date": "2025-02-03",
+    "variantGuess": "v2025_barcode",
+    "source": "3-2-25.PNG"
+  },
+  {
+    "file": "2025-02-10.png",
+    "date": "2025-02-10",
+    "variantGuess": "v2025_barcode",
+    "source": "10-2-25.PNG"
+  },
+  {
+    "file": "2025-02-17.png",
+    "date": "2025-02-17",
+    "variantGuess": "v2025_barcode",
+    "source": "17-2-25.PNG"
+  },
+  {
+    "file": "2025-02-24.png",
+    "date": "2025-02-24",
+    "variantGuess": "v2025_barcode",
+    "source": "24-2-25.PNG"
+  },
+  {
+    "file": "2025-03-03.png",
+    "date": "2025-03-03",
+    "variantGuess": "v2025_barcode",
+    "source": "3-3-25.PNG"
+  },
+  {
+    "file": "2025-03-10.png",
+    "date": "2025-03-10",
+    "variantGuess": "v2025_barcode",
+    "source": "10-3-25.PNG"
+  },
+  {
+    "file": "2025-03-17.png",
+    "date": "2025-03-17",
+    "variantGuess": "v2025_barcode",
+    "source": "17-3-25.PNG"
+  },
+  {
+    "file": "2025-03-24.png",
+    "date": "2025-03-24",
+    "variantGuess": "v2025_barcode",
+    "source": "24-3-25.PNG"
+  },
+  {
+    "file": "2025-03-31.png",
+    "date": "2025-03-31",
+    "variantGuess": "v2025_barcode",
+    "source": "31-3-25.PNG"
+  },
+  {
+    "file": "2025-04-07.png",
+    "date": "2025-04-07",
+    "variantGuess": "v2025_barcode",
+    "source": "7-4-25.PNG"
+  },
+  {
+    "file": "2025-04-14.png",
+    "date": "2025-04-14",
+    "variantGuess": "v2025_barcode",
+    "source": "14-4-25.PNG"
+  },
+  {
+    "file": "2025-04-21.png",
+    "date": "2025-04-21",
+    "variantGuess": "v2025_barcode",
+    "source": "21-4-25.PNG"
+  },
+  {
+    "file": "2025-04-28.png",
+    "date": "2025-04-28",
+    "variantGuess": "v2025_barcode",
+    "source": "28-4-25.PNG"
+  },
+  {
+    "file": "2025-05-05.png",
+    "date": "2025-05-05",
+    "variantGuess": "v2025_barcode",
+    "source": "5-5-25.PNG"
+  },
+  {
+    "file": "2025-05-12.png",
+    "date": "2025-05-12",
+    "variantGuess": "v2025_barcode",
+    "source": "12-5-25.PNG"
+  },
+  {
+    "file": "2025-05-19.png",
+    "date": "2025-05-19",
+    "variantGuess": "v2025_barcode",
+    "source": "19-5-25.PNG"
+  },
+  {
+    "file": "2025-05-26.png",
+    "date": "2025-05-26",
+    "variantGuess": "v2025_barcode",
+    "source": "26-5-25.PNG"
+  },
+  {
+    "file": "2025-06-02.png",
+    "date": "2025-06-02",
+    "variantGuess": "v2025_barcode",
+    "source": "2-6-25.PNG"
+  },
+  {
+    "file": "2025-06-09.png",
+    "date": "2025-06-09",
+    "variantGuess": "v2025_barcode",
+    "source": "9-6-25.PNG"
+  },
+  {
+    "file": "2025-06-16.png",
+    "date": "2025-06-16",
+    "variantGuess": "v2025_barcode",
+    "source": "16-6-25.PNG"
+  },
+  {
+    "file": "2025-06-23.png",
+    "date": "2025-06-23",
+    "variantGuess": "v2025_barcode",
+    "source": "23-6-25.PNG"
+  },
+  {
+    "file": "2025-06-30.png",
+    "date": "2025-06-30",
+    "variantGuess": "v2025_barcode",
+    "source": "30-6-25.PNG"
+  },
+  {
+    "file": "2025-07-07.png",
+    "date": "2025-07-07",
+    "variantGuess": "v2025_barcode",
+    "source": "7-7-25.PNG"
+  },
+  {
+    "file": "2025-07-14.png",
+    "date": "2025-07-14",
+    "variantGuess": "v2025_barcode",
+    "source": "14-7-25.PNG"
+  },
+  {
+    "file": "2025-07-21.png",
+    "date": "2025-07-21",
+    "variantGuess": "v2025_barcode",
+    "source": "21-7-25.PNG"
+  },
+  {
+    "file": "2025-07-28.png",
+    "date": "2025-07-28",
+    "variantGuess": "v2025_barcode",
+    "source": "28-7-25.PNG"
+  },
+  {
+    "file": "2025-08-04.png",
+    "date": "2025-08-04",
+    "variantGuess": "v2025_barcode",
+    "source": "4-8-25.PNG"
+  },
+  {
+    "file": "2025-08-11.png",
+    "date": "2025-08-11",
+    "variantGuess": "v2025_barcode",
+    "source": "11-8-25.PNG"
+  },
+  {
+    "file": "2025-08-18.png",
+    "date": "2025-08-18",
+    "variantGuess": "v2025_barcode",
+    "source": "18-8-25.PNG"
+  },
+  {
+    "file": "2025-08-25.png",
+    "date": "2025-08-25",
+    "variantGuess": "v2025_barcode",
+    "source": "25-8-25.PNG"
+  },
+  {
+    "file": "2025-09-01.png",
+    "date": "2025-09-01",
+    "variantGuess": "v2025_barcode",
+    "source": "1-9-25.PNG"
+  },
+  {
+    "file": "2025-09-08.png",
+    "date": "2025-09-08",
+    "variantGuess": "v2025_barcode",
+    "source": "8-9-25.PNG"
+  },
+  {
+    "file": "2025-09-15.png",
+    "date": "2025-09-15",
+    "variantGuess": "v2025_barcode",
+    "source": "15-9-25.PNG"
+  },
+  {
+    "file": "2025-09-22.png",
+    "date": "2025-09-22",
+    "variantGuess": "v2025_barcode",
+    "source": "22-9-25.PNG"
+  },
+  {
+    "file": "2025-09-29.png",
+    "date": "2025-09-29",
+    "variantGuess": "v2025_barcode",
+    "source": "29-9-25.PNG"
+  },
+  {
+    "file": "2025-10-06.png",
+    "date": "2025-10-06",
+    "variantGuess": "v2025_barcode",
+    "source": "6-10-25.PNG"
+  },
+  {
+    "file": "2025-10-13.png",
+    "date": "2025-10-13",
+    "variantGuess": "v2025_barcode",
+    "source": "13-10-25.PNG"
+  },
+  {
+    "file": "2025-10-20.png",
+    "date": "2025-10-20",
+    "variantGuess": "v2025_barcode",
+    "source": "20-10-25.PNG"
+  },
+  {
+    "file": "2025-10-27.png",
+    "date": "2025-10-27",
+    "variantGuess": "v2025_barcode",
+    "source": "27-10-25.PNG"
+  },
+  {
+    "file": "2025-11-03.png",
+    "date": "2025-11-03",
+    "variantGuess": "v2025_barcode",
+    "source": "3-11-25.PNG"
+  },
+  {
+    "file": "2025-11-10.png",
+    "date": "2025-11-10",
+    "variantGuess": "v2025_barcode",
+    "source": "10-11-25.PNG"
+  },
+  {
+    "file": "2025-11-17.png",
+    "date": "2025-11-17",
+    "variantGuess": "v2025_barcode",
+    "source": "17-11-25.PNG"
+  },
+  {
+    "file": "2025-11-24.png",
+    "date": "2025-11-24",
+    "variantGuess": "v2025_barcode",
+    "source": "24-11-25.PNG"
+  },
+  {
+    "file": "2025-12-01.png",
+    "date": "2025-12-01",
+    "variantGuess": "v2025_barcode",
+    "source": "1-12-25.PNG"
+  },
+  {
+    "file": "2025-12-08.png",
+    "date": "2025-12-08",
+    "variantGuess": "v2025_barcode",
+    "source": "8-12-25.PNG"
+  },
+  {
+    "file": "2025-12-15.png",
+    "date": "2025-12-15",
+    "variantGuess": "v2025_barcode",
+    "source": "15-12-25.PNG"
+  },
+  {
+    "file": "2025-12-22.png",
+    "date": "2025-12-22",
+    "variantGuess": "v2025_barcode",
+    "source": "22-12-25.PNG"
+  },
+  {
+    "file": "2025-12-29.png",
+    "date": "2025-12-29",
+    "variantGuess": "v2025_barcode",
+    "source": "29-12-25.PNG"
+  },
+  {
+    "file": "2026-01-05.png",
+    "date": "2026-01-05",
+    "variantGuess": "v2025_barcode",
+    "source": "5-1-26.PNG"
+  },
+  {
+    "file": "2026-01-12.png",
+    "date": "2026-01-12",
+    "variantGuess": "v2025_barcode",
+    "source": "12-1-26.PNG"
+  },
+  {
+    "file": "2026-01-19.png",
+    "date": "2026-01-19",
+    "variantGuess": "v2025_barcode",
+    "source": "19-1-26.PNG"
+  },
+  {
+    "file": "2026-01-26.png",
+    "date": "2026-01-26",
+    "variantGuess": "v2025_barcode",
+    "source": "26-1-26.PNG"
+  },
+  {
+    "file": "2026-02-02.png",
+    "date": "2026-02-02",
+    "variantGuess": "v2025_barcode",
+    "source": "2-2-26.PNG"
+  },
+  {
+    "file": "2026-02-09.png",
+    "date": "2026-02-09",
+    "variantGuess": "v2025_barcode",
+    "source": "9-2-26.PNG"
+  },
+  {
+    "file": "2026-02-16.png",
+    "date": "2026-02-16",
+    "variantGuess": "v2025_barcode",
+    "source": "16-2-26.PNG"
+  },
+  {
+    "file": "2026-02-23.png",
+    "date": "2026-02-23",
+    "variantGuess": "v2025_barcode",
+    "source": "23-2-26.PNG"
+  },
+  {
+    "file": "2026-03-02.png",
+    "date": "2026-03-02",
+    "variantGuess": "v2025_barcode",
+    "source": "2-3-26.PNG"
+  },
+  {
+    "file": "2026-03-09.png",
+    "date": "2026-03-09",
+    "variantGuess": "v2025_barcode",
+    "source": "9-3-26.PNG"
+  },
+  {
+    "file": "2026-03-16.png",
+    "date": "2026-03-16",
+    "variantGuess": "v2025_barcode",
+    "source": "16-3-26.PNG"
+  },
+  {
+    "file": "2026-03-23.png",
+    "date": "2026-03-23",
+    "variantGuess": "v2025_barcode",
+    "source": "23-3-26.PNG"
+  },
+  {
+    "file": "2026-03-30.png",
+    "date": "2026-03-30",
+    "variantGuess": "v2025_barcode",
+    "source": "30-3-26.PNG"
+  },
+  {
+    "file": "2026-04-06.png",
+    "date": "2026-04-06",
+    "variantGuess": "v2025_barcode",
+    "source": "6-4-26.PNG"
+  },
+  {
+    "file": "2026-04-13.png",
+    "date": "2026-04-13",
+    "variantGuess": "v2025_barcode",
+    "source": "13-4-26.PNG"
+  },
+  {
+    "file": "2026-04-20.png",
+    "date": "2026-04-20",
+    "variantGuess": "v2025_barcode",
+    "source": "20-4-26.PNG"
+  },
+  {
+    "file": "2026-04-27.png",
+    "date": "2026-04-27",
+    "variantGuess": "v2025_barcode",
+    "source": "27-4-26.PNG"
+  },
+  {
+    "file": "2026-05-04.png",
+    "date": "2026-05-04",
+    "variantGuess": "v2025_barcode",
+    "source": "4-5-26.PNG"
+  },
+  {
+    "file": "2026-05-11.png",
+    "date": "2026-05-11",
+    "variantGuess": "v2025_barcode",
+    "source": "11-5-26.PNG"
+  },
+  {
+    "file": "2026-05-18.png",
+    "date": "2026-05-18",
+    "variantGuess": "v2025_barcode",
+    "source": "18-5-26.PNG"
+  },
+  {
+    "file": "2026-05-25.png",
+    "date": "2026-05-25",
+    "variantGuess": "v2025_barcode",
+    "source": "25-5-26.PNG"
+  },
+  {
+    "file": "2026-06-01.png",
+    "date": "2026-06-01",
+    "variantGuess": "v2025_barcode",
+    "source": "1-6-26.PNG"
+  },
+  {
+    "file": "2026-06-08.png",
+    "date": "2026-06-08",
+    "variantGuess": "v2025_barcode",
+    "source": "8-6-26.PNG"
+  },
+  {
+    "file": "2026-06-15.png",
+    "date": "2026-06-15",
+    "variantGuess": "v2025_barcode",
+    "source": "15-6-26.PNG"
+  },
+  {
+    "file": "2026-06-22.png",
+    "date": "2026-06-22",
+    "variantGuess": "v2025_barcode",
+    "source": "22-6-26.PNG"
+  },
+  {
+    "file": "2026-06-29.png",
+    "date": "2026-06-29",
+    "variantGuess": "v2025_barcode",
+    "source": "29-6-26.PNG"
+  }
+]

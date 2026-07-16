@@ -29,3 +29,14 @@ Daily product sales nov2024-jan2025/
 
 # supabase CLI scratch state
 supabase/.temp/
+
+# local-ocr regression fixtures — real receipt PNGs are the owner's raw books,
+# kept local only. The manifest (dates + metadata, no image data) is committed.
+fixtures/day-reports/*.png
+fixtures/day-reports/*.PNG
+# self-hosted OCR assets (large binaries reproduced by scripts/setup-ocr-assets.mjs)
+public/ocr/lang/*.traineddata
+public/ocr/lang/*.traineddata.gz
+public/ocr/*.wasm
+public/ocr/worker.min.js
+public/ocr/tesseract-core*.js

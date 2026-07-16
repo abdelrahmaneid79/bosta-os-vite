@@ -37,11 +37,13 @@ export async function getSearchableProducts(): Promise<(SearchableProduct & { ac
 
 /** Products with their POS item code, for the vision-direct day-sales importer's
  *  exact code matching. name_ar/name_en come along for the review display. */
-export async function getCodedProducts(): Promise<{ id: string; nameEn: string; nameAr: string | null; posCode: string | null; marketCode: string | null; altCodes: string[] }[]> {
+export async function getCodedProducts(): Promise<{ id: string; nameEn: string; nameAr: string | null; posCode: string | null; marketCode: string | null; altCodes: string[]; sellingPrice: number | null }[]> {
   const { data, error } = await requireEngine()
-    .from("products").select("id,name_en,name_ar,pos_code,market_code,alt_pos_codes").order("name_en");
+    .from("products").select("id,name_en,name_ar,pos_code,market_code,alt_pos_codes,selling_price").order("name_en");
   if (error) throw error;
-  return (data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, posCode: p.pos_code, marketCode: p.market_code, altCodes: p.alt_pos_codes ?? [] }));
+  // selling_price is the catalog per-unit price — the day-sales importer uses it
+  // to sanity-check OCR'd prices/quantities and protect inventory + COGS.
+  return (data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, posCode: p.pos_code, marketCode: p.market_code, altCodes: p.alt_pos_codes ?? [], sellingPrice: p.selling_price == null ? null : Number(p.selling_price) }));
 }
 
 export interface ProductProfit {
