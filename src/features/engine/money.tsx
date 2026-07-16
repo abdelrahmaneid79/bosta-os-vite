@@ -274,6 +274,12 @@ export function ChequesScreen() {
   const last = rows.length ? rows[rows.length - 1].cycleEnd ?? undefined : undefined;
   const detail = rows.find((c) => c.id === active) ?? (rows.length ? rows[rows.length - 1] : null);
   const traced = trace ? rows.find((c) => (c.cycleStart as string) <= trace && trace <= (c.cycleEnd as string)) ?? null : null;
+  // The flat EGP 32,000 cheques (Banque Misr, historical) — a separate stream, not
+  // tied to a sales cycle, so they sit apart from the settlement timeline.
+  const flat = (led.data ?? [])
+    .filter((c) => Math.round(c.net) === 32000)
+    .sort((a, b) => (a.receivedDate ?? "").localeCompare(b.receivedDate ?? ""));
+  const flatTotal = flat.reduce((s, r) => s + r.net, 0);
 
   return (
     <div>
@@ -281,12 +287,12 @@ export function ChequesScreen() {
         <button className="qadd" style={{ height: 38, marginLeft: "auto" }} onClick={() => setAddOpen(true)}><span>+ Add cheque</span></button>
       </div>
 
-      {led.isLoading ? <SkeletonRows /> : led.isError ? <ErrorState message={String((led.error as Error)?.message ?? "Read failed")} /> : rows.length === 0 ? (
-        <EmptyState title="No cheques yet" hint="Add your first settlement cheque to start the timeline." />
+      {led.isLoading ? <SkeletonRows /> : led.isError ? <ErrorState message={String((led.error as Error)?.message ?? "Read failed")} /> : rows.length === 0 && flat.length === 0 ? (
+        <EmptyState title="No cheques yet" hint="Add your first cheque" />
       ) : (
         <>
           <div className="statgrid">
-            <Stat label="Total received" color="var(--green)" value={egp(totalReceived)} />
+            <Stat label="Settlement received" color="var(--green)" value={egp(totalReceived)} />
             <Stat label="Cheques" color="rgb(var(--cyan))" value={rows.length} />
             <Stat label="Days covered" color="var(--mag)" value={totalDays} />
             <Stat label="Avg cycle" color="var(--amber)" value={`${avgCycle.toFixed(1)} days`} />
@@ -344,6 +350,25 @@ export function ChequesScreen() {
                 ) : "Not settled yet — still on the open tab."}
             </div>
           </DeckTile>
+
+          {flat.length > 0 && (
+            <DeckTile>
+              <div>
+                <div className="tname">Flat 32,000 cheques</div>
+                <div style={{ fontSize: 12, color: "rgb(var(--faint))", marginTop: 4 }}>Separate stream · {egp(flatTotal)}</div>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+                {flat.map((c) => (
+                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 12px", borderRadius: 12, border: "1px solid var(--stroke)", background: "var(--surface2)" }}>
+                    <span style={{ width: 9, height: 9, borderRadius: 999, background: "#7c6cff", flexShrink: 0 }} />
+                    <span style={{ fontWeight: 700 }}>{egp(c.net)}</span>
+                    <span style={{ fontSize: 12.5, color: "rgb(var(--dim))" }}>received {c.receivedDate ? fmtDate(c.receivedDate, "d MMM yyyy") : "—"}</span>
+                    <button className="mbtn" style={{ marginLeft: 2 }} onClick={() => setVoidId(c.id)}>Void</button>
+                  </div>
+                ))}
+              </div>
+            </DeckTile>
+          )}
         </>
       )}
 

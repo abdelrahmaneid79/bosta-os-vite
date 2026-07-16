@@ -85,7 +85,7 @@ export function ReportsScreen() {
         <Stat label="Purchases" value={purch.data != null ? egpShort(purch.data) : "—"} />
       </div>
       <Card>
-        <Eyebrow>Export (from loaded real data)</Eyebrow>
+        <Eyebrow>Export</Eyebrow>
         <div className="mt-1 flex flex-wrap gap-2">
           <Button variant="outline" disabled={!stock.data}
             onClick={() => downloadCSV("stock-report.csv", (stock.data?.positions ?? []).map((x) => ({
@@ -108,7 +108,7 @@ export function ReportsScreen() {
             <Eyebrow>Top products · revenue (lifetime)</Eyebrow>
             <Badge tone="neutral">since launch</Badge>
           </div>
-          <p className="px-4 pt-1 text-[11px] text-dim">Lifetime sales × supplier-bill cost. <span className="text-faint">* margin is an estimate (raw nut/seed cost, excludes roasting + packaging). Products with no confident cost show “cost n/a”.</span></p>
+          <p className="px-4 pt-1 text-[11px] text-dim">Lifetime sales × supplier-bill cost. <span className="text-faint">* margin estimated on raw nut/seed cost — excludes roasting + packaging. No confident cost shows “cost n/a”.</span></p>
           <div className="mt-2 divide-y divide-line">
             {lifeProds.slice(0, 12).map((x, i) => {
               const top = lifeProds[0]?.revenue ?? 0;
@@ -137,7 +137,7 @@ export function ReportsScreen() {
           {prods.length > 0 && <span className="text-[11px] text-dim">{prods.length} sold</span>}
         </div>
         {products.isLoading ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Loading…</div>
-          : prods.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Per-range product profit needs daily product lines (sale items). Lifetime ranking shown above.</div>
+          : prods.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Needs daily product lines. Lifetime ranking shown above.</div>
           : (
           <div className="mt-2 divide-y divide-line">
             {prods.slice(0, 12).map((x, i) => {
@@ -274,7 +274,7 @@ function TargetsCard() {
   return (
     <Card>
       <Eyebrow>Monthly targets & budgets</Eyebrow>
-      <p className="mt-1 text-[12px] text-dim">Set monthly goals — progress and off-track alerts appear on Reports and in your alerts. Leave blank to disable a target.</p>
+      <p className="mt-1 text-[12px] text-dim">Set monthly goals. Leave blank to disable one.</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Field label="Revenue target (EGP)"><Input type="number" step="any" value={rev} onChange={(e) => setRev(e.target.value)} placeholder="150000" /></Field>
         <Field label="Profit target (EGP)"><Input type="number" step="any" value={prof} onChange={(e) => setProf(e.target.value)} placeholder="40000" /></Field>
@@ -300,7 +300,7 @@ function CostingCard() {
   return (
     <Card>
       <Eyebrow>Costing — roasting + packaging uplift</Eyebrow>
-      <p className="mt-1 text-[12px] text-dim">Raw nut/seed costs (from supplier bills) are uplifted to finished-good COGS to cover roasting weight-loss + packaging. Resale goods (jelly, pretzels…) are unaffected.</p>
+      <p className="mt-1 text-[12px] text-dim">Uplifts raw nut/seed cost to finished-good COGS for roasting loss + packaging. Resale goods (jelly, pretzels…) unaffected.</p>
       <div className="mt-2 flex items-end gap-2">
         <Field label="Uplift % on raw costs"><Input type="number" step="any" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="15" /></Field>
         <Button variant="outline" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
@@ -349,7 +349,7 @@ export function SettingsScreen() {
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <div className="font-display text-sm font-semibold text-text">Load my Bosta Bites history</div>
-            <div className="text-[12px] text-dim">Bring your real sales, expenses, stock buys, cheques and products in as editable entries.</div>
+            <div className="text-[12px] text-dim">Import real sales, expenses, buys, cheques and products as editable entries.</div>
           </div>
           <span className="font-display text-sm font-semibold text-pink">Open →</span>
         </div>
@@ -381,7 +381,7 @@ export function SettingsScreen() {
 
       <Card>
         <Eyebrow>Settlement terms (new effective from today)</Eyebrow>
-        <p className="mb-2 text-[12px] text-dim">Adds a new effective-dated lease term; the settlement engine uses the latest. Existing periods are unchanged.</p>
+        <p className="mb-2 text-[12px] text-dim">New term applies from today. Past periods unchanged.</p>
         <div className="space-y-3">
           <div className="flex items-end gap-2">
             <Field label="Monthly rent (EGP, flat)"><Input type="number" step="any" value={rent} onChange={(e) => setRent(e.target.value)} placeholder="15000" /></Field>
@@ -395,10 +395,10 @@ export function SettingsScreen() {
       </Card>
 
       <Confirm open={confirm === "rent"} title="Change monthly rent?" busy={save.isPending}
-        message={`This adds a new lease term of ${num(rent) ?? 0} EGP/month effective today. Future settlement periods will use it; past periods are unchanged. This affects what you're owed.`}
+        message={`New rent of ${num(rent) ?? 0} EGP/month, effective today. Future settlements use it; past periods unchanged. Affects what you're owed.`}
         confirmLabel="Set rent" onConfirm={() => save.mutate("rent")} onClose={() => setConfirm(null)} />
       <Confirm open={confirm === "share"} title="Change revenue share?" busy={save.isPending}
-        message={`This adds a new revenue-share term of ${num(share) ?? 0}% effective today. Future settlements deduct this rate from revenue; past periods are unchanged.`}
+        message={`New revenue share of ${num(share) ?? 0}%, effective today. Future settlements deduct it from revenue; past periods unchanged.`}
         confirmLabel="Set share" onConfirm={() => save.mutate("share")} onClose={() => setConfirm(null)} />
     </div>
   );
@@ -426,12 +426,12 @@ export function PreferencesScreen() {
             </Select>
           </Field>
         </div>
-        <p className="mt-2 text-[11px] text-dim">Applied each time you open the app. Saved in this browser.</p>
+        <p className="mt-2 text-[11px] text-dim">Applied on open. Saved in this browser.</p>
       </Card>
 
       <Card>
         <Eyebrow>Bookkeeping start</Eyebrow>
-        <p className="mt-1 text-[12px] text-dim">Costs (purchases/expenses) before this date are incomplete. Revenue is still shown for earlier periods, but <b>profit is only calculated from this date onward</b>, with a “partial before” note. Set it to when your accurate accounting begins.</p>
+        <p className="mt-1 text-[12px] text-dim">Costs before this date are incomplete. Earlier revenue still shows, but <b>profit is only calculated from this date onward</b> (with a “partial before” note). Set it to when accurate accounting begins.</p>
         <div className="mt-2 flex items-end gap-2">
           <Field label="Accounting start date"><Input type="date" value={accountingStart} onChange={(e) => set({ accountingStart: e.target.value })} /></Field>
         </div>
@@ -439,7 +439,7 @@ export function PreferencesScreen() {
 
       <Card>
         <Eyebrow>Visible sections</Eyebrow>
-        <p className="mt-1 text-[12px] text-dim">Hide sections you don't use from the navigation. They stay reachable by link — nothing is deleted.</p>
+        <p className="mt-1 text-[12px] text-dim">Hide sections from nav. Still reachable by link — nothing deleted.</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           {HIDEABLE_SECTIONS.map((s) => {
             const visible = !hiddenSections.includes(s.id);

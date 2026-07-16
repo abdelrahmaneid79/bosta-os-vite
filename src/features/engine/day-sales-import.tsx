@@ -48,9 +48,9 @@ const CONF_LABEL: Record<Verification, string> = {
 };
 const READY_LABEL: Record<OcrReadiness, { text: string; tone: "good" | "warn" | "bad" | "pink" }> = {
   checking: { text: "Getting ready…", tone: "warn" },
-  ready: { text: "Reads accurately online · on-device backup when offline", tone: "good" },
-  downloading: { text: "Setting up the offline backup reader…", tone: "pink" },
-  unavailable: { text: "Online reading only right now — offline backup not installed yet", tone: "warn" },
+  ready: { text: "Reads online · on-device backup offline", tone: "good" },
+  downloading: { text: "Setting up offline reader…", tone: "pink" },
+  unavailable: { text: "Online only — offline backup not ready", tone: "warn" },
 };
 
 /** The sale row that already exists for a date (or null): its total + line count. */
@@ -212,7 +212,7 @@ export function DaySalesPhotoImport() {
         } catch (visErr) {
           if (visErr instanceof DayReportAuthError) throw visErr;                 // real sign-in problem — surface it
           const why = visErr instanceof Error ? visErr.message : "";
-          reportError("Reader", new Error(`The accurate reader failed${why ? ` — ${why}` : ""}. Reading on-device instead — check the money carefully.`));
+          reportError("Reader", new Error(`Reader failed${why ? ` — ${why}` : ""}. Reading on-device — check the money.`));
           ({ report, metaRows } = await readLocal());                             // graceful on-device fallback
         }
       } else {
@@ -225,7 +225,7 @@ export function DaySalesPhotoImport() {
       setMeta(metaRows);
       setBranchTotal(report.branch_total_net);
       setDayDate(report.sale_date ?? "");
-      if (!report.line_items.length) reportError("Read photo", new Error("No product lines were read — try a sharper, straight-on photo."));
+      if (!report.line_items.length) reportError("Read photo", new Error("No lines read — try a sharper, straight-on photo."));
     } catch (err) {
       const msg = err instanceof DayReportAuthError ? err.message : (err instanceof Error ? err.message : "Reader failed");
       reportError("Read photo", new Error(msg));
@@ -309,7 +309,7 @@ export function DaySalesPhotoImport() {
 
   return (
     <div className="space-y-4">
-      <Eyebrow>Daily sales · photo → read → check the totals → approve (never auto-saves)</Eyebrow>
+      <Eyebrow>Daily sales · photo → check the totals → approve (never auto-saves)</Eyebrow>
 
       {pendingDraft && !lines && (
         <Card className="!border-pink/40 !bg-pink/5">
@@ -329,7 +329,7 @@ export function DaySalesPhotoImport() {
         /* ───────── Upload ───────── */
         <Card>
           <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-8 text-center">
-            <CardHead title="Snap today's sales report" sub="Photograph the POS day report, or pick a screenshot. It's read accurately for you, then you check the totals before anything is saved. Works on your device as a backup when you're offline." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            <CardHead title="Snap today's sales report" sub="Snap the report — you'll check it before saving" accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
               <label className={`lift flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-pink px-5 py-3 font-display text-sm font-bold text-ink shadow-pink ${busy ? "pointer-events-none opacity-60" : ""}`}>
                 📷 Take photo<input type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} disabled={busy} />
@@ -341,7 +341,7 @@ export function DaySalesPhotoImport() {
             {busy
               ? <div className="flex items-center gap-2 text-[13px] font-medium text-pink"><span className="h-2 w-2 animate-pulse rounded-full bg-pink" />{stage || "Reading…"}</div>
               : <Badge tone={rd.tone}>{rd.text}</Badge>}
-            <p className="text-[12px] text-faint">Have a spreadsheet export instead? <Link to="/sales/product-lines/file" className="text-pink underline">Use the file importer</Link>.</p>
+            <p className="text-[12px] text-faint">Have a spreadsheet instead? <Link to="/sales/product-lines/file" className="text-pink underline">Use the file importer</Link>.</p>
           </div>
         </Card>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
@@ -360,7 +360,7 @@ export function DaySalesPhotoImport() {
             </div>
             {dupMark && (
               <div className="mt-3 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-[12px] text-warn">
-                <span>⚠</span><span>You already imported this exact photo{dupMark.date ? ` (for ${new Date(dupMark.date + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })})` : ""}. Saving again may double-count — check before approving.</span>
+                <span>⚠</span><span>Already imported this photo{dupMark.date ? ` (for ${new Date(dupMark.date + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })})` : ""}. Saving again may double-count.</span>
               </div>
             )}
           </Card>
@@ -390,10 +390,10 @@ export function DaySalesPhotoImport() {
               <span className="mt-px text-base leading-none">{reconciled ? "✓" : branchTotal == null ? "ℹ" : "⚠"}</span>
               <div className="min-w-0">
                 {reconciled
-                  ? <span><b>Everything adds up.</b> The products match your report's total — you're good to approve.</span>
+                  ? <span><b>Everything adds up.</b> Good to approve.</span>
                   : branchTotal == null
-                    ? <span>Type your report's printed total above, then check the lines match it.</span>
-                    : <span><b>Off by {egp(gap)}.</b> Adjust the highlighted lines below until they add up to your report — then approve unlocks.</span>}
+                    ? <span>Type your report's total above, then check the lines.</span>
+                    : <span><b>Off by {egp(gap)}.</b> Fix the highlighted lines to match your report.</span>}
               </div>
             </div>
             {existing.data && !decision?.totalsMatch && (
@@ -438,7 +438,7 @@ export function DaySalesPhotoImport() {
                       className="tnum w-24 flex-shrink-0 rounded-lg border border-line bg-panel2 px-2 py-2 text-right font-display text-[13px] font-bold text-text outline-none focus:border-pink/60 sm:py-1.5" />
                     {l.catalog.qtyRisk && l.catalog.suggestedQty != null && (
                       <button onClick={() => editLine(l.i, "net_qty", String(l.catalog.suggestedQty))}
-                        title={`Set the weight to ${l.catalog.suggestedQty} (line total ÷ catalog price) — keeps your stock count right`}
+                        title={`Set weight to ${l.catalog.suggestedQty} (total ÷ price) — keeps stock right`}
                         className="min-h-[34px] flex-shrink-0 rounded-lg bg-warn/15 px-2 py-1 text-[11px] font-semibold text-warn hover:bg-warn/25">fix weight → {l.catalog.suggestedQty}</button>
                     )}
                     <div className="flex-1" />

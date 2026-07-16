@@ -101,7 +101,7 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
       {unitsDiffer && (
         <Field label={`Base units per sale unit (${baseUnit} in one ${saleUnit})`}>
           <Input type="number" step="any" value={factor} onChange={(e) => setFactor(e.target.value)} placeholder={String(factorHint)} />
-          <p className="mt-1 text-[11px] text-dim">Sales are entered in {saleUnit}; stock is kept in {baseUnit}. Each sold {saleUnit} deducts this many {baseUnit} — e.g. base g, sale kg → 1000. Wrong = stock &amp; cost off by this ratio.</p>
+          <p className="mt-1 text-[11px] text-dim">Each sold {saleUnit} deducts this many {baseUnit} (e.g. g base, kg sale → 1000). Wrong = stock &amp; cost off by this ratio.</p>
         </Field>
       )}
       <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active</label>
@@ -110,7 +110,7 @@ export function ProductForm({ product, onDone }: { product?: Tables<"products">;
         confirmDel ? (
           <div className="rounded-xl border border-bad/40 bg-bad/5 p-3 text-center">
             <div className="text-[13px] text-bad">Delete "{product.name_en}" permanently?</div>
-            <div className="mt-1 text-[11px] text-dim">Only works if it has no purchase/sale history. Otherwise untick Active to retire it.</div>
+            <div className="mt-1 text-[11px] text-dim">Only works with no purchase/sale history. Otherwise untick Active to retire it.</div>
             <div className="mt-2 flex gap-2">
               <Button type="button" variant="ghost" className="flex-1" onClick={() => setConfirmDel(false)}>Cancel</Button>
               <button type="button" disabled={del.isPending} onClick={() => del.mutate()} className="flex-1 rounded-xl bg-bad px-3 py-2 font-display text-sm font-semibold text-white disabled:opacity-60">{del.isPending ? "Deleting…" : "Delete"}</button>
@@ -165,8 +165,8 @@ export function PurchaseForm({ onDone }: { onDone?: () => void }) {
         <Field label="Supplier / note"><Input value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="Bebeto" /></Field>
         <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       </div>
-      <p className="text-[11px] text-dim">Quantity is in {bu} (the product's stock unit). This increases stock and recomputes weighted-average cost.</p>
-      {date < todayCairo() && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Backdated purchase — sales recorded <b>after</b> this date already captured their cost at the time and won't change. Going forward, weighted-average cost reflects this batch.</p>}
+      <p className="text-[11px] text-dim">In {bu}. Increases stock and recomputes weighted-average cost.</p>
+      {date < todayCairo() && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Backdated — sales <b>after</b> this date keep the cost they already captured. Weighted-average cost updates going forward.</p>}
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Add purchase"}</Button>
     </form>
   );
@@ -272,9 +272,9 @@ export function SaleForm({ onDone }: { onDone?: () => void }) {
         </div>
       </div>
 
-      <Field label="Other / untracked sales (optional)"><Input inputMode="decimal" value={other} onChange={(e) => setOther(e.target.value)} placeholder="lump EGP for items not in your catalog" /></Field>
+      <Field label="Other / untracked sales (optional)"><Input inputMode="decimal" value={other} onChange={(e) => setOther(e.target.value)} placeholder="lump EGP for off-catalog items" /></Field>
 
-      <p className="text-[11px] text-dim">Pick a product, type quantity — price auto-fills and totals add up. Each row deducts stock and captures cost (COGS).</p>
+      <p className="text-[11px] text-dim">Each row deducts stock and captures cost (COGS).</p>
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : `Save sale day · ${egp(dayTotal)}`}</Button>
     </form>
   );
@@ -371,7 +371,7 @@ export function ExpenseForm({ onDone }: { onDone?: () => void }) {
         <Field label="Payment"><Select value={pay} onChange={(e) => setPay(e.target.value as Enums<"payment_method">)}>{PAYMENTS.map((p) => <option key={p} value={p}>{p}</option>)}</Select></Field>
       </div>
       <Field label="Note"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" /></Field>
-      <p className="text-[11px] text-dim">Operating expense. For owner cash taken out, use <b>Withdraw</b> on the Cash screen — that's a cash movement, never an expense.</p>
+      <p className="text-[11px] text-dim">Operating expense. For owner cash taken out, use <b>Withdraw</b> on Cash — a cash movement, not an expense.</p>
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Add expense"}</Button>
     </form>
   );
@@ -419,19 +419,19 @@ export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void
       <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       <Field label={label}><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
       <Field label="Note"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" /></Field>
-      {mode === "in" && <p className="text-[11px] text-dim">Cash entering the drawer (owner top-up, change float). Affects cash only — never counted as revenue.</p>}
-      {mode === "out" && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Cash leaving the drawer <b>only</b> — a deposit, transfer, or change. This does <b>not</b> affect profit. To record a business cost that should reduce profit, use <b>Spend → Add expense</b> instead.</p>}
-      {mode === "withdraw" && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Owner taking cash out. Reduces cash <b>only</b> — never counted against profit and never an expense.</p>}
+      {mode === "in" && <p className="text-[11px] text-dim">Cash into the drawer (top-up, float). Affects cash only — never revenue.</p>}
+      {mode === "out" && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Cash leaving the drawer <b>only</b> — deposit, transfer, change. Doesn't affect profit. For a cost that should reduce profit, use <b>Spend → Add expense</b>.</p>}
+      {mode === "withdraw" && <p className="rounded-lg bg-warn/10 px-3 py-2 text-[11px] text-warn">Owner taking cash out. Reduces cash <b>only</b> — never profit, never an expense.</p>}
       {mode === "count" && (
         <>
-          <Field label="Bank / other liquid balance (optional)"><Input type="number" step="any" value={bank} onChange={(e) => setBank(e.target.value)} placeholder="Leave blank if all cash is in the drawer" /></Field>
+          <Field label="Bank / other liquid balance (optional)"><Input type="number" step="any" value={bank} onChange={(e) => setBank(e.target.value)} placeholder="Blank if all cash is in the drawer" /></Field>
           {isFirstCount ? (
             <label className="flex items-start gap-2 rounded-lg bg-panel2 px-3 py-2 text-[11px] text-muted">
               <input type="checkbox" checked={baseline} onChange={(e) => setBaseline(e.target.checked)} className="mt-0.5" />
-              <span>This is the <b>opening baseline</b> — the first verified count. Any gap versus the historical ledger is an <b>opening difference</b> (not an expense, loss or withdrawal). Reconciliation starts fresh from here. {isFirstCount ? "" : ""}</span>
+              <span>The <b>opening baseline</b> — first verified count. Any gap vs the ledger is an <b>opening difference</b> (not an expense, loss or withdrawal). Reconciliation starts fresh here. {isFirstCount ? "" : ""}</span>
             </label>
           ) : (
-            <p className="text-[11px] text-dim">We compare to the expected balance and post a voidable adjustment for any difference.</p>
+            <p className="text-[11px] text-dim">Compares to expected balance; posts a voidable adjustment for any gap.</p>
           )}
         </>
       )}
@@ -474,7 +474,7 @@ export function ChequeForm({ onDone }: { onDone?: () => void }) {
       <Field label="Date received"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
       <Field label="Amount cashed (EGP)"><Input type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 65000" /></Field>
       <Field label="Note"><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" /></Field>
-      <p className="text-[11px] text-dim">Closes the open sales tab up to this date and counts as cash in. Coverage is matched to your sales automatically.</p>
+      <p className="text-[11px] text-dim">Closes the open sales tab and counts as cash in. Coverage matched to sales automatically.</p>
       <Button type="submit" disabled={!ready || m.isPending} className="w-full">{m.isPending ? "Saving…" : "Record cheque"}</Button>
     </form>
   );

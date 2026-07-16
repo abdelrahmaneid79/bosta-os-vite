@@ -176,28 +176,28 @@ export function ProductLineImportScreen() {
 
   return (
     <div className="space-y-4">
-      <Eyebrow>Import product-line sales · preview → approve (never auto-saves)</Eyebrow>
+      <Eyebrow>Product-line sales · preview, then approve (never auto-saves)</Eyebrow>
 
       {!rows ? (
         <Card>
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <CardHead title="Upload a CSV/Excel day export" sub="For the POS daily product-sales export as a spreadsheet. Columns (barcode, name, qty, price, net value) are auto-detected; matched by barcode/name." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            <CardHead title="Upload a day export" sub="Spreadsheet export — columns auto-detected, matched by barcode/name" accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             <label className="lift cursor-pointer rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">
               Choose file<input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onFile} />
             </label>
-            {missingDay.data && <p className="text-[12px] font-semibold text-pink">Next up: {fmtDate(missingDay.data)} has no product lines yet.</p>}
-            <p className="max-w-md text-[12px] text-dim">One export = one day. It reads each product line and the day's grand total, then queues anything unmatched for you to map. Nothing saves until you approve.</p>
-            <p className="text-[12px] text-faint">Have a photo of the report instead? <Link to="/sales/product-lines" className="text-pink underline">Use the photo importer</Link> — it matches by POS code.</p>
+            {missingDay.data && <p className="text-[12px] font-semibold text-pink">Next up: {fmtDate(missingDay.data)} — no product lines yet.</p>}
+            <p className="max-w-md text-[12px] text-dim">One file = one day. Unmatched rows queue for you to map. Nothing saves until you approve.</p>
+            <p className="text-[12px] text-faint">Have a photo instead? <Link to="/sales/product-lines" className="text-pink underline">Use the photo importer</Link> — matches by POS code.</p>
           </div>
         </Card>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
         <>
           {/* Sale date for the whole file (POS report = one day) */}
           <Card>
-            <CardHead title="Sale day" sub="This report covers one day — auto-detected from the file, confirm or change it." accent="pink" icon="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" />
+            <CardHead title="Sale day" sub="One day per file — confirm the date" accent="pink" icon="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" />
             <input type="date" value={dayDate} onChange={(e) => setDayDate(e.target.value)}
               className="w-full max-w-xs rounded-2xl border border-line bg-panel2 px-3.5 py-2.5 text-sm text-text outline-none focus:border-pink/60" />
-            {!dayDate && <p className="mt-2 text-[12px] text-warn">Couldn’t read the date from the file — pick the day these sales belong to.</p>}
+            {!dayDate && <p className="mt-2 text-[12px] text-warn">Couldn’t read the date — pick the day.</p>}
           </Card>
 
           {/* Column mapping */}
@@ -321,15 +321,15 @@ export function ProductCostImportScreen() {
 
   return (
     <div className="space-y-4">
-      <Eyebrow>Product costs · set cost + selling price for the whole catalogue → real margins</Eyebrow>
+      <Eyebrow>Product costs · cost + selling price → real margins</Eyebrow>
       {!rows ? (
         <Card>
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <CardHead title="Upload your product portfolio" sub="CSV/Excel with cost price + selling price per product. Columns (barcode, name, cost, price) are auto-detected; matched by barcode first." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            <CardHead title="Upload your product portfolio" sub="Cost + selling price per product — matched by barcode first" accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             <label className="lift cursor-pointer rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">
               Choose file<input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onFile} />
             </label>
-            <p className="max-w-md text-[12px] text-dim">The cost you give is taken as the real finished-good unit cost. Applying sets each product's cost (drives profit/COGS) + selling price, and refreshes margins everywhere. Nothing saves until you approve.</p>
+            <p className="max-w-md text-[12px] text-dim">Your cost is taken as the real unit cost (drives profit/COGS). Sets cost + selling price and refreshes margins. Nothing saves until you approve.</p>
           </div>
         </Card>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (

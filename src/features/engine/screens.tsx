@@ -38,7 +38,7 @@ function Guarded({ q, children, empty }: { q: { isLoading: boolean; isError: boo
   if (!isEngineConfigured) return <ConnectPanel />;
   if (q.isLoading) return <SkeletonRows rows={6} />;
   if (q.isError) return <ErrorState message={String((q.error as Error)?.message ?? "Read failed")} />;
-  if (empty) return <EmptyState title="No data in range" hint="Nothing recorded for this period yet — add an entry to get started." />;
+  if (empty) return <EmptyState title="No data in range" hint="Nothing recorded for this period yet" />;
   return <>{children}</>;
 }
 
@@ -49,7 +49,7 @@ export function ConnectPanel() {
       <p className="mt-1 text-sm text-muted">
         Add <span className="font-mono text-pink">VITE_SUPABASE_URL</span> and{" "}
         <span className="font-mono text-pink">VITE_SUPABASE_ANON_KEY</span> to a <span className="font-mono">.env</span> file to
-        load your real data, then sign in. All actions run under your authenticated session.
+        load your real data, then sign in.
       </p>
     </Card>
   );
@@ -215,7 +215,7 @@ export function SalesScreen() {
 
   return (
     <div>
-      <PageHdr title="Sales" sub={`Revenue = sum of daily totals (canonical)${d.span ? ` · ${d.span}` : ""}`}
+      <PageHdr title="Sales" sub={`Revenue = sum of daily totals${d.span ? ` · ${d.span}` : ""}`}
         right={<>
           <button className="addbtn" onClick={() => navigate("/sales/import")}>Import receipt</button>
           <button className="qadd" style={{ height: 38 }} onClick={() => setAddOpen(true)}><span>+ New sale</span></button>
@@ -298,7 +298,7 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
           {ok ? "reconciled" : diff > 0 ? `${egp(diff)} unallocated` : `${egp(-diff)} over`}
         </span>
       </div>
-      {missingCogs > 0 && <div className="note" style={{ fontSize: 12.5 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg><div>{missingCogs} line(s) have no cost yet — add a purchase for those products so profit is exact.</div></div>}
+      {missingCogs > 0 && <div className="note" style={{ fontSize: 12.5 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg><div>{missingCogs} line(s) have no cost — add a purchase so profit is exact.</div></div>}
 
       {/* editable product table */}
       {items.isLoading ? <SkeletonRows rows={3} /> : (
@@ -318,7 +318,7 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
                 </td>
               </tr>
             ))}
-            {lines.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "rgb(var(--dim))", padding: "22px 12px" }}>No product lines yet — add what sold below to deduct stock &amp; track profit.</td></tr>}
+            {lines.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "rgb(var(--dim))", padding: "22px 12px" }}>No product lines yet — add what sold below.</td></tr>}
           </tbody>
         </table>
         </div>
@@ -337,10 +337,10 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
 
       {editItem && <Modal open onClose={() => setEditItem(null)} title="Edit line"><SaleItemForm saleId={sale.id} item={editItem} onDone={() => { setEditItem(null); refresh(); }} /></Modal>}
       <Confirm open={confirm?.kind === "line"} title="Void this line?" danger busy={voidLine.isPending}
-        message="This restores the product's stock and removes the line. The day's revenue total is unchanged." confirmLabel="Void line"
+        message="Restores the product's stock and removes the line. The day's revenue total is unchanged." confirmLabel="Void line"
         onConfirm={() => confirm?.kind === "line" && voidLine.mutate(confirm.item.id)} onClose={() => setConfirm(null)} />
       <Confirm open={confirm?.kind === "day"} title="Void the whole sale day?" danger busy={voidDay.isPending}
-        message="This voids the day's sale and reverses every inventory movement it created. It's reversible only by re-entering the day." confirmLabel="Void day"
+        message="Voids the day's sale and reverses every inventory movement it created. Reversible only by re-entering the day." confirmLabel="Void day"
         onConfirm={() => voidDay.mutate()} onClose={() => setConfirm(null)} />
     </div>
   );

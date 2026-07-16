@@ -168,7 +168,7 @@ export function DashboardScreen() {
   }, [rows, month.from, today]);
 
   if (daily.isError) return <ErrorState message={String((daily.error as Error)?.message)} />;
-  if (!en) return <EmptyState title="Sign in to load your deck" hint="Wired to your live data only — never faked." />;
+  if (!en) return <EmptyState title="Sign in to load your deck" hint="Live data only — never faked." />;
 
   const monthNum = +d.monthKey.slice(5, 7), yearNum = +d.monthKey.slice(0, 4);
   const monthLabel = `${MON[monthNum - 1]} ${yearNum}`, monthShort = MON[monthNum - 1];
@@ -227,7 +227,7 @@ export function DashboardScreen() {
     <div className="cdk space-y-5">
       {loadErr && (
         <div style={{ border: "1px solid rgb(var(--warn))", background: "rgba(255,177,62,.08)", color: "rgb(var(--warn))", borderRadius: 12, padding: "8px 14px", fontSize: 12.5, fontWeight: 600 }}>
-          Some deck data failed to load — figures below may be incomplete. Reload to retry.
+          Some data didn't load — figures below may be incomplete. Reload to retry.
         </div>
       )}
       {/* ── ticker ─────────────────────────────────────────────────────── */}
@@ -371,7 +371,7 @@ export function DashboardScreen() {
             {d.best.k && <span className="delta up">peak</span>}
           </div>
           <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 10, fontWeight: 500, lineHeight: 1.5 }}>
-            {topVen ? `Top supplier is ${topVen[0]} at EGP ${money2(topVen[1])} across all purchases — ${venPct}% of stock spend.` : "Add supplier notes on purchases to surface your top supplier."}
+            {topVen ? `Top supplier is ${topVen[0]} at EGP ${money2(topVen[1])} across all purchases — ${venPct}% of stock spend.` : "Add supplier notes on purchases to see your top supplier."}
           </div>
         </div>
       </div>
@@ -423,7 +423,7 @@ export function MissingScreen() {
   if (ins.isError) return <ErrorState message={String((ins.error as Error)?.message)} />;
   const issues = q.data ?? [];
   const risks = ins.data ?? [];
-  if (issues.length === 0 && risks.length === 0) return <EmptyState title="All clear 🎉" hint="No risks flagged and your data looks complete." />;
+  if (issues.length === 0 && risks.length === 0) return <EmptyState title="All clear" hint="Nothing flagged, data looks complete." />;
   return (
     <div className="space-y-5">
       {risks.length > 0 && (
@@ -470,7 +470,7 @@ export function ActivityScreen() {
       </div>
       {feed.isLoading ? <SkeletonRows rows={8} />
         : feed.isError ? <ErrorState message={String((feed.error as Error)?.message)} onRetry={() => feed.refetch()} />
-        : (feed.data?.length ?? 0) === 0 ? <EmptyState title="No events yet" hint="Record a sale, purchase, expense, or cash movement and it appears here." />
+        : (feed.data?.length ?? 0) === 0 ? <EmptyState title="No events yet" hint="Your activity shows up here" />
         : (
         <DeckTile style={{ padding: 0 }}><div className="scroll" style={{ maxHeight: "70vh" }}>
           <table className="tbl">

@@ -169,7 +169,7 @@ export function StrategistScreen() {
   if (!en) return <EmptyState title="Sign in to load the strategist" />;
   if (snapQ.isError) {
     const msg = String((snapQ.error as Error)?.message ?? "");
-    return <ErrorState message={`The snapshot could not be assembled — ${msg}. The strategist needs the read-model to work; reload to retry.`} />;
+    return <ErrorState message={`Couldn't load the snapshot — ${msg}. Reload to retry.`} />;
   }
   if (snapQ.isLoading || !s || !report) return <div className="cdk"><SkeletonRows rows={8} /></div>;
 
@@ -195,7 +195,7 @@ export function StrategistScreen() {
   return (
     <div className="cdk space-y-4">
       {/* ═══ COMMAND HEADER — one glance: what period, how fresh, one setting ═══ */}
-      <PageHdr title="Strategist" sub="Your books, read like an operator — deterministic, evidence-first"
+      <PageHdr title="Strategist" sub="Your books, read like an operator"
         right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
       <FreshnessStrip s={s} />
 
@@ -378,7 +378,7 @@ function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
   if (loading && !exceptions.length) return null;
   if (!exceptions.length) {
     return <DeckTile><div className="th"><span className="tname">Operational exceptions</span><span style={{ marginLeft: "auto" }}><Chip text="all clear" color="var(--green)" /></span></div>
-      <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>No open operational issues. This is the one canonical list — the alert bell and daily brief read from it too.</div></DeckTile>;
+      <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>No open operational issues.</div></DeckTile>;
   }
   return (
     <DeckTile>
@@ -433,7 +433,7 @@ function SalesCatchUpWorkspace({ gaps, loading }: { gaps: SalesGap[]; loading: b
     return (
       <DeckTile>
         <div className="th"><span className="tname">Sales catch-up</span><span style={{ marginLeft: "auto" }}><Chip text="current" color="var(--green)" /></span></div>
-        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>No gaps in the last 30 days — every day has a total, product detail, and nothing awaiting import.</div>
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>No gaps in the last 30 days.</div>
       </DeckTile>
     );
   }
@@ -461,7 +461,7 @@ function SalesCatchUpWorkspace({ gaps, loading }: { gaps: SalesGap[]; loading: b
             </div>
           );
         })}
-        {shown.length > 60 && <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", padding: "6px 2px" }}>+{shown.length - 60} more — narrow with a filter above.</div>}
+        {shown.length > 60 && <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", padding: "6px 2px" }}>+{shown.length - 60} more — use a filter to narrow.</div>}
       </div>
     </DeckTile>
   );
@@ -491,7 +491,7 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: 
             <button className="mbtn" onClick={onOpenSetup}>Edit stand</button>
           </span>
         </div>
-        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>BostaOS has the context it needs right now. Answers make merchandising and packaging advice specific to your stand.</div>
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>Answers make merchandising and packaging advice specific to your stand.</div>
       </DeckTile>
     );
   }
@@ -503,7 +503,7 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: 
           <button className="mbtn" onClick={onOpenSetup}>Set up my stand</button>
         </span>
       </div>
-      <div style={{ fontSize: 12, color: "rgb(var(--faint))", margin: "6px 0 10px" }}>Answering these makes advice specific to your real stand — BostaOS never guesses this.</div>
+      <div style={{ fontSize: 12, color: "rgb(var(--faint))", margin: "6px 0 10px" }}>Makes advice specific to your stand — BostaOS never guesses this.</div>
       <div className="space-y-2">
         {data.questions.map((q) => {
           const field = QUESTION_FIELD[q.id];
@@ -565,7 +565,7 @@ function RetailSetupModal({ open, onClose, onSaved, onError }: { open: boolean; 
   return (
     <Modal open={open} onClose={onClose} title="Set up my stand" wide>
       <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginBottom: 12 }}>
-        Tell BostaOS how your stand is physically merchandised and packaged. Every answer makes advice specific — and it's asked only once.
+        How your stand is merchandised and packaged. Asked once — makes advice specific.
       </div>
 
       <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "rgb(var(--faint))", marginBottom: 6 }}>Packaging formats you offer</div>
@@ -656,11 +656,11 @@ function RetailAdvisor({ result, loading, onExperiment }: {
   return (
     <DeckTile>
       <div className="th"><span className="tname">What I would do</span>
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "rgb(var(--faint))" }}>deterministic · {recs.length} recommendation{recs.length === 1 ? "" : "s"}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "rgb(var(--faint))" }}>{recs.length} recommendation{recs.length === 1 ? "" : "s"}</span>
       </div>
       {recs.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>
-          No high-quality recommendation clears the evidence bar right now{result.facts.basisNote ? ` (${result.facts.basisNote})` : ""}. BostaOS prefers silence to shallow advice.
+          Nothing clears the evidence bar yet{result.facts.basisNote ? ` (${result.facts.basisNote})` : ""}.
         </div>
       ) : (
         <>
@@ -792,7 +792,7 @@ function ExecutiveBriefing({ s, report, weekly }: { s: StrategistSnapshot; repor
 
       {ai?.fallbackReason && (
         <div style={{ margin: "10px 0", fontSize: 12.5, color: "var(--amber)", fontWeight: 600 }}>
-          Language service unavailable — this briefing was written by BostaOS templates instead. ({ai.fallbackReason}) Nothing retries automatically.
+          Language service unavailable — BostaOS templates wrote this briefing. ({ai.fallbackReason}) Nothing retries automatically.
         </div>
       )}
       {ai && cacheIsStale && (
@@ -947,7 +947,7 @@ function EvidenceDrawer({ finding, onClose }: { finding: Finding | null; onClose
             </div>
           )}
           <div style={{ fontSize: 11.5, color: "rgb(var(--faint))" }}>
-            {CONF_LABEL[finding.confidence]} · {finding.impactEgp != null ? `${egp(finding.impactEgp)} estimated at stake` : "impact honestly unquantified"}
+            {CONF_LABEL[finding.confidence]} · {finding.impactEgp != null ? `${egp(finding.impactEgp)} estimated at stake` : "impact not quantified"}
           </div>
         </div>
       )}
@@ -978,7 +978,7 @@ function ActionQueue({ actions, onUpdate }: { actions: ActionRow[]; onUpdate: (i
       <div className="th"><span className="tname">Action queue</span>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>{open.length} open</span>
       </div>
-      {open.length === 0 && <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>Nothing queued. Accept a finding's action above, or add your own below.</div>}
+      {open.length === 0 && <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>Nothing queued. Accept an action above or add your own.</div>}
       <div className="space-y-2" style={{ marginTop: 8 }}>
         {open.map((a) => (
           <div key={a.id} style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", border: "1px solid var(--stroke2)", borderRadius: 10, padding: "9px 12px" }}>
@@ -1157,7 +1157,7 @@ function AnswerCard({ r, messageId, snapshotMeta }: { r: StrategistResponse; mes
     try {
       await recordFeedback("message", messageId, verdict, why ?? null, snapshotMeta ?? null);
       setFb(verdict); setAskReason(false);
-      reportSuccess("Feedback", "Recorded for the evaluation suite — it never silently rewrites rules");
+      reportSuccess("Feedback", "Recorded — it never silently rewrites the rules");
     } catch (e) { reportError("Feedback", e); }
   };
 
@@ -1276,7 +1276,7 @@ function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyRe
   return (
     <DeckTile>
       <div className="th"><span className="tname">Decision mode</span>
-        <span className="eyebrow" style={{ marginLeft: "auto" }}>deterministic numbers first · AI judgment second</span>
+        <span className="eyebrow" style={{ marginLeft: "auto" }}>Numbers first · AI judgment second</span>
       </div>
       <div className="chiprow" style={{ gap: 8, marginTop: 10 }}>
         {([["withdrawal", "Owner withdrawal"], ["stock", "Buy stock"], ["employee", "Hire employee"], ["price", "Price change"], ["other", "Something else"]] as [DecisionKind, string][]).map(([k, label]) => (
@@ -1314,7 +1314,7 @@ function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyRe
                 </div>
               )}
               <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", marginTop: 10 }}>
-                A profitable month does not automatically mean the cash is in the drawer — profit and cash are checked separately above. Next step: {wa.nextStep}
+                A profitable month doesn't mean the cash is in the drawer — profit and cash are checked separately. Next step: {wa.nextStep}
               </div>
             </div>
           )}
@@ -1805,7 +1805,7 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
   return (
     <Modal open={open} onClose={onClose} title="Tune the strategist">
       <div className="space-y-3">
-        <p style={{ fontSize: 12, color: "rgb(var(--dim))" }}>Anything left empty uses a documented default — the strategist says so whenever it relies on one. These settings drive: withdrawal verdicts (cash floor), pricing reviews (margin floor), purchase urgency (stockout/max-cover), dormant flags (dead-stock), outcome reviews (review period) and cheque chasing (overdue age).</p>
+        <p style={{ fontSize: 12, color: "rgb(var(--dim))" }}>Anything left empty uses a documented default — the strategist says so when it relies on one.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
           <Field label="Monthly revenue target (EGP)"><Input type="number" value={form.monthlyRevenueTarget ?? ""} onChange={(e) => setForm({ ...form, monthlyRevenueTarget: num(e.target.value) })} /></Field>
           <Field label="Monthly profit target (EGP)"><Input type="number" value={form.monthlyProfitTarget ?? ""} onChange={(e) => setForm({ ...form, monthlyProfitTarget: num(e.target.value) })} /></Field>
@@ -1854,7 +1854,7 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
 
         <div style={{ borderTop: "1px solid var(--stroke2)", paddingTop: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "rgb(var(--faint))", marginBottom: 8 }}>Products &amp; priorities</div>
-          <p style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 0, marginBottom: 8 }}>The Retail Intelligence engine already reads these — a protected product is never recommended for discontinuation, and a product to grow gets weighted differently in shelf/purchase advice.</p>
+          <p style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 0, marginBottom: 8 }}>A protected product is never suggested for discontinuation; a product to grow is weighted up in shelf and purchase advice.</p>
           <div className="space-y-2">
             <Field label="Strategic products — never recommend discontinuing (comma-separated)">
               <Input value={(form.strategicProducts ?? []).join(", ")}

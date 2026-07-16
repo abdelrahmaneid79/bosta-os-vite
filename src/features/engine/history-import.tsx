@@ -17,9 +17,9 @@ import {
 
 const KINDS: { key: SeedKind; label: string; help: string }[] = [
   { key: "sales", label: "Daily sales", help: "One revenue entry per trading day" },
-  { key: "expenses", label: "Expenses + Stock", help: "Operating costs and stock buys, one Stock bucket" },
-  { key: "cheques", label: "Settlement cheques", help: "Cash received from the mall — a separate ledger, never changes profit" },
-  { key: "products", label: "Product catalogue", help: "Names + barcodes for faster future imports (no stock/cost)" },
+  { key: "expenses", label: "Expenses + Stock", help: "Operating costs + stock buys" },
+  { key: "cheques", label: "Settlement cheques", help: "Mall cash — separate ledger, never changes profit" },
+  { key: "products", label: "Product catalogue", help: "Names + barcodes (no stock/cost)" },
 ];
 
 export function HistoryImportScreen() {
@@ -40,7 +40,7 @@ export function HistoryImportScreen() {
     onSuccess: (res) => {
       setProgress(null); setReport(res);
       const created = Object.values(res).reduce((a, r) => a + r.created, 0);
-      reportSuccess("History loaded", `Created ${created} new entries — open any section to view or edit them.`);
+      reportSuccess("History loaded", `Created ${created} new entries.`);
       qc.invalidateQueries();
     },
     onError: (e) => { setProgress(null); reportError("Load history", e); },
@@ -56,13 +56,11 @@ export function HistoryImportScreen() {
       <Card accent="#F868C8">
         <Eyebrow accent="#F868C8">Load my Bosta Bites history</Eyebrow>
         <p className="mt-2 max-w-2xl text-sm text-dim">
-          This brings in your real numbers — cleaned and de-duplicated by the accounting brain — as
-          ordinary entries you can view, edit or void anywhere in the app. Nothing is hardcoded.
-          Running it again only adds what's missing.
+          Your real numbers, cleaned and de-duplicated, as ordinary entries you can edit or void.
+          Run again to add only what's missing.
         </p>
         <p className="mt-2 max-w-2xl text-[12px] text-faint">
-          Accurate cost accounting starts on your bookkeeping date; everything before it is shown as
-          revenue-only history, so the profit figures stay honest.
+          Before your bookkeeping date, entries are revenue-only — so profit stays honest.
         </p>
       </Card>
 
@@ -93,7 +91,7 @@ export function HistoryImportScreen() {
             </Card>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-dim">Idempotent — already-loaded entries are skipped automatically.</span>
+              <span className="text-xs text-dim">Already-loaded entries are skipped.</span>
               <div className="flex-1" />
               <Button disabled={!anySelected || run.isPending} onClick={() => run.mutate()}>
                 {run.isPending ? "Importing…" : "Load selected history"}

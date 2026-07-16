@@ -66,18 +66,18 @@ export function OpeningBalancesScreen() {
 
       {/* Opening cash */}
       <Card>
-        <CardHead title="Opening cash on hand" sub={`The real cash in the drawer on ${fmtDate(date)}. From here, cash tracks accurately.`} accent="mint" icon="M3 7h18v11H3zM3 11h18M7 15h2" />
+        <CardHead title="Opening cash on hand" sub={`Real cash in the drawer on ${fmtDate(date)}`} accent="mint" icon="M3 7h18v11H3zM3 11h18M7 15h2" />
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Cash on hand (EGP)"><Input inputMode="decimal" value={cash} onChange={(e) => setCash(e.target.value)} placeholder="e.g. 2500" className="!w-48" /></Field>
           <Button disabled={saveCash.isPending || num(cash) == null} onClick={() => saveCash.mutate()}>{saveCash.isPending ? "Saving…" : "Set opening cash"}</Button>
         </div>
-        <p className="mt-2 text-[11px] text-dim">Replaces the carried-forward prior balance. No "drawings" entry — the messy era is simply moved past.</p>
+        <p className="mt-2 text-[11px] text-dim">Replaces the carried-forward prior balance.</p>
       </Card>
 
       {/* Opening stock */}
       <Card className="!p-0">
         <div className="p-5 pb-2">
-          <CardHead title="Opening stock count" sub="Enter what you physically have on hand. Recorded as stock-in so on-hand starts at reality." accent="blue" icon="M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10" />
+          <CardHead title="Opening stock count" sub="Enter what you have on hand" accent="blue" icon="M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10" />
           <div className="flex flex-wrap items-center gap-2">
             <StatCard label="Products to count" accent="violet" icon="M4 7l8-4 8 4v10l-8 4-8-4z" value={active.length} sub="active" />
             <div className="flex-1" />
@@ -98,7 +98,7 @@ export function OpeningBalancesScreen() {
             ))}
           </div>
         )}
-        <p className="px-5 py-3 text-[11px] text-dim">Run this once at setup. Leave a product blank to skip it. Costs flow from your product portfolio (set in Inventory → Product costs).</p>
+        <p className="px-5 py-3 text-[11px] text-dim">Run once at setup. Leave a product blank to skip. Costs come from Inventory → Product costs.</p>
       </Card>
     </div>
   );

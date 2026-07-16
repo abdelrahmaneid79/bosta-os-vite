@@ -224,8 +224,8 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
           <div className="flex flex-col items-center gap-3 py-8 text-center">
             <div className="font-display text-base font-semibold">Add {noun}</div>
             <div className="max-w-md text-sm text-dim">
-              Upload a <b>CSV</b>, <b>Excel</b> file, or a <b>photo / screenshot</b> of your {kind === "sales" ? "sales sheet" : "receipt"}.
-              {kind === "sales" ? " Each dated row becomes a day; you confirm the totals." : " Columns: date, category, amount."}
+              Upload a <b>CSV</b>, <b>Excel</b>, or <b>photo</b> of your {kind === "sales" ? "sales sheet" : "receipt"}.
+              {kind === "sales" ? " Each dated row becomes a day." : " Columns: date, category, amount."}
             </div>
             <label className="lift cursor-pointer rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">
               Choose file
@@ -243,7 +243,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
                 <img src={imgUrl} alt="receipt" className="max-h-56 rounded-lg border border-line object-contain" />
                 <div className="min-w-0 flex-1 text-[12px] text-dim">
                   <div className="font-display text-sm font-semibold text-text">{fileName}</div>
-                  {status ? <div className="mt-1 text-pink">{status}</div> : <div className="mt-1">Confirm the values on the right. Add rows if the sheet has more days.</div>}
+                  {status ? <div className="mt-1 text-pink">{status}</div> : <div className="mt-1">Confirm the values. Add rows for more days.</div>}
                   {rawText && (
                     <details className="mt-2">
                       <summary className="cursor-pointer text-pink">What the reader saw</summary>

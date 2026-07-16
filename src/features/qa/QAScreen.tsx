@@ -51,7 +51,7 @@ export function QAScreen() {
           <Button variant="outline" onClick={copyResults}>Copy results</Button>
           <Button variant="ghost" onClick={reset}>Reset</Button>
         </div>
-        <p className="mt-2 text-[12px] text-dim">Run each flow against your live Supabase, then mark it. Status is saved in this browser only. If a write fails, copy diagnostics below and send them over.</p>
+        <p className="mt-2 text-[12px] text-dim">Run each flow live, then mark it. Status saved in this browser. If a write fails, copy diagnostics below and send them.</p>
       </Card>
 
       {/* Checklist by group */}
@@ -74,7 +74,7 @@ export function QAScreen() {
           </div>
         </div>
         {diagnostics.length === 0 ? (
-          <Card><p className="text-sm text-dim">Nothing yet. Perform a write — successes and errors will appear here with copyable details.</p></Card>
+          <Card><p className="text-sm text-dim">Nothing yet. Writes appear here with copyable details.</p></Card>
         ) : (
           <Card className="!p-0"><div className="divide-y divide-line">
             {diagnostics.map((d) => (

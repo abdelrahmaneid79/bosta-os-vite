@@ -147,7 +147,7 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
         <Stat label="Days of cover" value={p.daysCover == null ? "—" : `≈${Math.round(p.daysCover)}d`} accent={p.daysCover != null && p.daysCover < 7 ? "text-warn" : "text-text"} />
       </div>
       {p.missingCostLines > 0 && (
-        <Card><div className="text-sm text-warn">⚠ {p.missingCostLines} sold line(s) have no recorded cost — gross profit is withheld. Add a purchase to set this product's cost.</div></Card>
+        <Card><div className="text-sm text-warn">⚠ {p.missingCostLines} sold line(s) have no cost — gross profit withheld. Add a purchase to set cost.</div></Card>
       )}
       {p.unitsPerDay != null && p.unitsPerDay > 0 && (
         <p className="text-[12px] text-dim">Selling ≈{Math.round(p.unitsPerDay * 10) / 10} {p.baseUnit}/day in this range{p.daysCover != null ? ` · ~${Math.round(p.daysCover)} days of stock left` : ""}.</p>
@@ -155,7 +155,7 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
 
       {/* Sale lines */}
       <Eyebrow>Sale lines · {p.saleLines.length}</Eyebrow>
-      {p.saleLines.length === 0 ? <Card><p className="text-sm text-dim">No sales of this product in range.</p></Card> : (
+      {p.saleLines.length === 0 ? <Card><p className="text-sm text-dim">No sales in range.</p></Card> : (
         <Card className="!p-0"><div className="scroll" style={{ maxHeight: 360 }}>
           <table className="tbl">
             <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Unit price</th><th className="r">Amount</th></tr></thead>
@@ -175,7 +175,7 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
 
       {/* Purchases */}
       <Eyebrow>Purchase batches · {p.purchases.length}</Eyebrow>
-      {p.purchases.length === 0 ? <Card><p className="text-sm text-dim">No purchases of this product in range.</p></Card> : (
+      {p.purchases.length === 0 ? <Card><p className="text-sm text-dim">No purchases in range.</p></Card> : (
         <Card className="!p-0"><div className="scroll" style={{ maxHeight: 360 }}>
           <table className="tbl">
             <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Unit cost</th><th className="r">Total</th></tr></thead>
