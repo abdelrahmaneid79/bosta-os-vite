@@ -37,11 +37,31 @@ export async function getSearchableProducts(): Promise<(SearchableProduct & { ac
 
 /** Products with their POS item code, for the vision-direct day-sales importer's
  *  exact code matching. name_ar/name_en come along for the review display. */
-export async function getCodedProducts(): Promise<{ id: string; nameEn: string; nameAr: string | null; posCode: string | null; marketCode: string | null; altCodes: string[] }[]> {
+export async function getCodedProducts(): Promise<{ id: string; nameEn: string; nameAr: string | null; posCode: string | null; marketCode: string | null; altCodes: string[]; sellingPrice: number | null }[]> {
   const { data, error } = await requireEngine()
-    .from("products").select("id,name_en,name_ar,pos_code,market_code,alt_pos_codes").order("name_en");
+    .from("products").select("id,name_en,name_ar,pos_code,market_code,alt_pos_codes,selling_price").order("name_en");
   if (error) throw error;
-  return (data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, posCode: p.pos_code, marketCode: p.market_code, altCodes: p.alt_pos_codes ?? [] }));
+  // selling_price is the catalog per-unit price — the day-sales importer uses it
+  // to sanity-check OCR'd prices/quantities and protect inventory + COGS.
+  return (data ?? []).map((p) => ({ id: p.id, nameEn: p.name_en, nameAr: p.name_ar, posCode: p.pos_code, marketCode: p.market_code, altCodes: p.alt_pos_codes ?? [], sellingPrice: p.selling_price == null ? null : Number(p.selling_price) }));
+}
+
+/** Most-recent sold unit price per product, from non-voided sale_items. The
+ *  day-sales importer's weight-check uses this as a fallback reference price when
+ *  a product has no catalog selling_price set — so the "weight looks off" guard
+ *  works out of the box. Bounded to recent history for speed. */
+export async function getProductReferencePrices(): Promise<Map<string, number>> {
+  const { data, error } = await requireEngine()
+    .from("sale_items").select("product_id,unit_price,created_at")
+    .is("voided_at", null).not("product_id", "is", null)
+    .order("created_at", { ascending: false }).limit(4000);
+  if (error) throw error;
+  const latest = new Map<string, number>();
+  for (const r of data ?? []) {
+    if (!r.product_id || r.unit_price == null) continue;
+    if (!latest.has(r.product_id)) latest.set(r.product_id, Number(r.unit_price)); // first seen = most recent
+  }
+  return latest;
 }
 
 export interface ProductProfit {
