@@ -1,12 +1,12 @@
-/** DAILY SALES PHOTO IMPORT — LOCAL, offline, on-device OCR.
- *  Snap/upload the POS daily product report → it is read ENTIRELY on this device
- *  (Tesseract in a web worker, self-hosted assets, no cloud, no API credits) →
+/** DAILY SALES PHOTO IMPORT.
+ *  Snap/upload the POS daily product report → it's read ACCURATELY by the vision
+ *  reader (read-day-report edge function) when online, or ON-DEVICE (Tesseract in
+ *  a web worker, self-hosted assets) as a fallback when offline / not signed in →
  *  the same pure pipeline (core/import/day-sales) validates arithmetic + the
  *  branch total, matches each line to a product by code/barcode, and decides
- *  attach/create/duplicate. Product identity + the day read reliably; the money
- *  is a best-effort draft you verify — every uncertain line is flagged and the
- *  totals must reconcile before Approve unlocks. Nothing saves until you approve;
- *  writes go through the existing create_sale_item RPC (money math untouched). */
+ *  attach/create/duplicate. Every uncertain line is flagged and the totals must
+ *  reconcile before Approve unlocks. Nothing saves until you approve; writes go
+ *  through the existing create_sale_item RPC (money math untouched). */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,8 +21,9 @@ import { createSale, addSaleItem, setProductCodes } from "@/core/db/mutations";
 import {
   buildCodeIndex, analyzeDayReport, decideDayAction, actionCanSave,
   marketCodeFromBarcode,
-  type RawDayLine, type ExistingDay, type Verification,
+  type RawDayLine, type RawDayReport, type ExistingDay, type Verification,
 } from "@/core/import/day-sales";
+import { readDayReportPhoto, DayReportAuthError } from "@/core/import/day-report-ai";
 import { runLocalDayReportOCR } from "@/features/local-ocr/engine/run-local-ocr";
 import { signalRows, lineProvenance } from "@/features/local-ocr/adapter/to-raw-day-report";
 import { checkAgainstCatalog } from "@/features/local-ocr/validation/catalog-check";
@@ -46,10 +47,10 @@ const CONF_LABEL: Record<Verification, string> = {
   unverified: "needs you",
 };
 const READY_LABEL: Record<OcrReadiness, { text: string; tone: "good" | "warn" | "bad" | "pink" }> = {
-  checking: { text: "Checking local reader…", tone: "warn" },
-  ready: { text: "Local reader ready · works offline", tone: "good" },
-  downloading: { text: "Downloading local reader (one-time)…", tone: "pink" },
-  unavailable: { text: "Local reader unavailable offline — reconnect once to install it", tone: "bad" },
+  checking: { text: "Getting ready…", tone: "warn" },
+  ready: { text: "Reads accurately online · on-device backup when offline", tone: "good" },
+  downloading: { text: "Setting up the offline backup reader…", tone: "pink" },
+  unavailable: { text: "Online reading only right now — offline backup not installed yet", tone: "warn" },
 };
 
 /** The sale row that already exists for a date (or null): its total + line count. */
@@ -183,23 +184,51 @@ export function DaySalesPhotoImport() {
     setPendingDraft(null);
     setBusy(true);
     imageBlobRef.current = f;
+    setImgUrl(URL.createObjectURL(f));
     // fingerprint the photo → warn if this exact image was imported before
     hashImage(f).then((h) => { imageHashRef.current = h; return findImportedImage(h); }).then((m) => { if (m) setDupMark(m); }).catch(() => {});
-    try {
-      const { extraction, report, image } = await runLocalDayReportOCR(f, setStage);
-      setImgUrl(image.previewUrl);
+
+    // Read locally (on-device) as a fallback source when the accurate reader
+    // can't run (offline / not signed in).
+    const readLocal = async (): Promise<{ report: RawDayReport; metaRows: LineMeta[]; unknown: boolean }> => {
+      const { extraction, report } = await runLocalDayReportOCR(f, setStage);
       const rows = signalRows(extraction);
+      return {
+        report,
+        metaRows: rows.map((r) => { const p = lineProvenance(r); return { conf: p.confidence, warnings: [...p.warnings, "read on-device — check the money"] }; }),
+        unknown: extraction.receiptType === "unknown",
+      };
+    };
+
+    try {
+      const online = typeof navigator === "undefined" || navigator.onLine;
+      let report: RawDayReport;
+      let metaRows: LineMeta[];
+      if (online) {
+        try {
+          setStage("Reading the report…");
+          report = await readDayReportPhoto(f);                                   // ACCURATE reader (vision)
+          metaRows = report.line_items.map(() => ({ conf: 0.95, warnings: [] }));
+        } catch (visErr) {
+          if (visErr instanceof DayReportAuthError) throw visErr;                 // real sign-in problem — surface it
+          const why = visErr instanceof Error ? visErr.message : "";
+          reportError("Reader", new Error(`The accurate reader failed${why ? ` — ${why}` : ""}. Reading on-device instead — check the money carefully.`));
+          ({ report, metaRows } = await readLocal());                             // graceful on-device fallback
+        }
+      } else {
+        setStage("Offline — reading on this device…");
+        const local = await readLocal();
+        report = local.report; metaRows = local.metaRows;
+      }
+      setStage("");
       setLines(report.line_items);
-      setMeta(rows.map((r) => { const p = lineProvenance(r); return { conf: p.confidence, warnings: p.warnings }; }));
+      setMeta(metaRows);
       setBranchTotal(report.branch_total_net);
       setDayDate(report.sale_date ?? "");
-      if (extraction.receiptType === "unknown") {
-        reportError("Read photo", new Error("This layout isn't recognized yet — review the extracted rows, or import a clearer, straight-on photo."));
-      } else if (!report.line_items.length) {
-        reportError("Read photo", new Error("No product lines were read — try a sharper, straight-on photo."));
-      }
+      if (!report.line_items.length) reportError("Read photo", new Error("No product lines were read — try a sharper, straight-on photo."));
     } catch (err) {
-      reportError("Read photo", err instanceof Error ? err : new Error("Local reader failed"));
+      const msg = err instanceof DayReportAuthError ? err.message : (err instanceof Error ? err.message : "Reader failed");
+      reportError("Read photo", new Error(msg));
     } finally { setBusy(false); setStage(""); }
   }
 
@@ -280,7 +309,7 @@ export function DaySalesPhotoImport() {
 
   return (
     <div className="space-y-4">
-      <Eyebrow>Daily sales — read on your device, nothing leaves your phone</Eyebrow>
+      <Eyebrow>Daily sales · photo → read → check the totals → approve (never auto-saves)</Eyebrow>
 
       {pendingDraft && !lines && (
         <Card className="!border-pink/40 !bg-pink/5">
@@ -300,7 +329,7 @@ export function DaySalesPhotoImport() {
         /* ───────── Upload ───────── */
         <Card>
           <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-8 text-center">
-            <CardHead title="Snap today's sales report" sub="Photograph the POS day report, or pick a screenshot. It's read right here on your phone — no internet needed, no photo sent anywhere. You'll check it before anything is saved." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            <CardHead title="Snap today's sales report" sub="Photograph the POS day report, or pick a screenshot. It's read accurately for you, then you check the totals before anything is saved. Works on your device as a backup when you're offline." accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
               <label className={`lift flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-pink px-5 py-3 font-display text-sm font-bold text-ink shadow-pink ${busy ? "pointer-events-none opacity-60" : ""}`}>
                 📷 Take photo<input type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} disabled={busy} />
