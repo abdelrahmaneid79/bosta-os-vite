@@ -41,6 +41,40 @@ export async function getCheques(): Promise<ChequeView[]> {
   }));
 }
 
+/** The cheque ledger: every cheque with the EXACT sales cycle it settled
+ *  (cycle_start → cycle_end, stored from the mall statements), the mall gross for
+ *  that cycle, the cut (gross − net) and the net received. One row per cheque, so
+ *  each pound traces to a specific run of days. READ-ONLY. */
+export interface ChequeLedgerRow {
+  id: string; receivedDate: string | null;
+  cycleStart: string | null; cycleEnd: string | null; cycleDays: number | null;
+  gross: number | null; deductions: number | null; net: number;
+  status: Tables<"cheques">["status"];
+}
+export async function getChequeLedger(): Promise<ChequeLedgerRow[]> {
+  const { data, error } = await requireEngine()
+    .from("cheques")
+    .select("id,received_date,cycle_start,cycle_end,cycle_gross,amount_received,status")
+    .is("voided_at", null)
+    .order("cycle_start", { ascending: false, nullsFirst: false });
+  if (error) throw error;
+  return (data ?? [])
+    .filter((c) => c.amount_received != null)
+    .map((c) => {
+      const net = Number(c.amount_received);
+      const gross = c.cycle_gross != null ? Number(c.cycle_gross) : null;
+      const days = c.cycle_start && c.cycle_end
+        ? Math.round((Date.parse(c.cycle_end) - Date.parse(c.cycle_start)) / 86_400_000) + 1
+        : null;
+      return {
+        id: c.id, receivedDate: c.received_date,
+        cycleStart: c.cycle_start, cycleEnd: c.cycle_end, cycleDays: days,
+        gross, deductions: gross != null ? Math.round((gross - net) * 100) / 100 : null,
+        net, status: c.status,
+      };
+    });
+}
+
 /** Monthly settlement statement: the trigger-maintained period cache broken into
  *  its stored deduction rows (flat rent + 3% charge + any other) and matched to
  *  its received cheque(s). Every figure is read straight from the DB — revenue,
