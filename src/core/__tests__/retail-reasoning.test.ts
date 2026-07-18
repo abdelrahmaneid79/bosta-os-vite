@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { runRetailReasoning } from "@/core/strategist/retail/reasoning";
 import { gateRecommendation, isLowValue } from "@/core/strategist/retail/quality-gate";
+import { expectedValue } from "@/core/strategist/retail/objective";
 import { renderRecommendation, BANNED_FILLER } from "@/core/strategist/retail/nlg";
 import { composeRetailFacts } from "@/core/strategist/retail/facts";
 import type { ProductFact, RetailBusinessFacts, RetailRecommendation } from "@/core/strategist/retail/contract";
@@ -16,7 +17,7 @@ const F = (products: ProductFact[], o: Partial<RetailBusinessFacts> = {}): Retai
   period: "2026-05", comparePeriod: "2026-04", products, totalRevenue: 20000, totalGrossProfit: 8000,
   coveragePct: 92, inventoryTracked: true, stockCountAgeDays: 3, cashCountFresh: true, marginFloorPct: 30,
   maxCoverDays: 45, deadStockDays: 60, strategicProducts: [], cashForPurchases: 5000, nextChequeEta: "2026-05-25",
-  season: null, offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [], operationalConstraints: [], commonlyBoughtTogether: [], isStale: false, staleDays: 0, basisNote: "", ...o,
+  season: null, nextSeason: null, zones: [], observations: [], locationProfile: null, offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [], operationalConstraints: [], commonlyBoughtTogether: [], isStale: false, staleDays: 0, basisNote: "", ...o,
 });
 const OPTS = { today: "2026-05-15", maxRecommendations: 30 };
 const run = (f: RetailBusinessFacts) => runRetailReasoning(f, OPTS);
@@ -128,7 +129,8 @@ describe("quality gate", () => {
     affectedProducts: ["X"], affectedProductIds: [], affectedCategory: null, affectedLocation: null,
     observedFacts: ["fact"], principles: ["p"], reasoning: ["r"], truthLevel: "measured_conclusion",
     proposedAction: "do", implementationSteps: [], timing: "now", durationDays: null, effort: "low",
-    mechanism: "m", expectedBenefitType: "b", financialImpactEgp: 1000, risks: [], contraindications: [],
+    mechanism: "m", expectedBenefitType: "b", financialImpactEgp: 1000, impact: null, brandEffect: "neutral",
+    risks: [], contraindications: [], sharpenWith: null,
     assumptions: [], missingInformation: [], confidence: "high", confidenceCeiling: "high",
     evidence: [{ label: "L", value: "V", source: "s", period: "p", screenLink: "/" }], screenLink: "/",
     testDesign: null, baselineMetrics: [], successCriteria: ["done"], failureCriteria: [], stopCondition: "x",
@@ -147,9 +149,27 @@ describe("quality gate", () => {
   it("rejects a recommendation with no success condition", () => {
     expect(gateRecommendation(base({ successCriteria: [], type: "pause_purchasing" }), f).ok).toBe(false);
   });
-  it("suppresses low-value noise", () => {
-    expect(isLowValue(base({ confidence: "low", financialImpactEgp: null, truthLevel: "strong_inference" }))).toBe(true);
-    expect(isLowValue(base({ confidence: "low", financialImpactEgp: null, truthLevel: "experiment_hypothesis" }))).toBe(false);
+  it("rejects an impact figure with no stated arithmetic", () => {
+    expect(gateRecommendation(base({ impact: { monthlyEgp: 4000, basis: "trust me", kind: "arithmetic", lever: "revenue" } }), f).ok).toBe(false);
+    expect(gateRecommendation(base({ impact: { monthlyEgp: 4000, basis: "40 dead facings x your 71 EGP/facing/month table average", kind: "arithmetic", lever: "revenue" } }), f).ok).toBe(true);
+  });
+  it("rejects a brand-damaging move that earns nothing", () => {
+    expect(gateRecommendation(base({ brandEffect: "risks", impact: null, financialImpactEgp: null }), f).ok).toBe(false);
+  });
+
+  // THE REBUILD'S CENTRAL RULE: uncertainty is disclosed, never silenced.
+  // The old engine deleted every low-confidence recommendation without an EGP
+  // figure, which on thin books deleted the entire list and left the owner
+  // staring at "nothing clears the evidence bar".
+  it("never suppresses advice for being uncertain or unpriced", () => {
+    const thin = base({ confidence: "low", financialImpactEgp: null, impact: null, truthLevel: "strong_inference" });
+    expect(isLowValue(thin)).toBe(false);
+    expect(gateRecommendation(thin, f).ok).toBe(true);
+  });
+  it("ranks traceable money above unpriced judgement", () => {
+    const priced = base({ impact: { monthlyEgp: 3000, basis: "measured from your own product lines", kind: "measured", lever: "revenue" } });
+    const unpriced = base({ confidence: "high", financialImpactEgp: null, impact: null, brandEffect: "builds" });
+    expect(expectedValue(priced)).toBeGreaterThan(expectedValue(unpriced));
   });
 });
 
@@ -185,7 +205,7 @@ describe("facts composition", () => {
       stockRisk: [{ name: "A", daysCover: 12, onHand: 40 }],
       periodDays: 20, merch: new Map(), totalRevenue: 10000, totalGrossProfit: 4000, coveragePct: 90,
       inventoryTracked: true, stockCountAgeDays: 2, cashCountFresh: true, marginFloorPct: 30, maxCoverDays: 45,
-      deadStockDays: 60, strategicProducts: [], cashForPurchases: null, nextChequeEta: null, season: null,
+      deadStockDays: 60, strategicProducts: [], cashForPurchases: null, nextChequeEta: null, season: null, nextSeason: null, zones: [], observations: [], locationProfile: null,
       offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [], operationalConstraints: [], commonlyBoughtTogether: [],
       isStale: false, staleDays: 0,
     });

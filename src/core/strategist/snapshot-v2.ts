@@ -43,7 +43,7 @@ export interface SnapshotInputs {
   stock: StockSummary;
   cashPos: CashPosition;
   cashSummary: CashSummary;
-  latestCashCount: { date: string; counted: number; expected: number } | null;
+  latestCashCount: { date: string; counted: number; expected: number; bankBalance: number | null } | null;
   cycle: ChequeCycle;
   statements: SettlementStatement[];
   expenseTrends: ExpenseCatStat[];
@@ -321,6 +321,7 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
       countAgeDays: i.latestCashCount
         ? metric(Math.max(0, Math.round((Date.parse(i.today) - Date.parse(i.latestCashCount.date)) / 86_400_000)), "cash_reconciliations", "latest", "/money", { basis: "calculated" })
         : missing("cash_reconciliations", "all-time", "/money", "never counted"),
+      bankBalanceRecorded: i.latestCashCount?.bankBalance != null,
       hasLiveData: cashHasData,
     },
     cheques: {
@@ -371,8 +372,6 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
       issues: dq,
       missingCostLines: metric(i.profitPeriod.missingCostLines, PROFIT, P, "/costs"),
       uncoveredRevenueAllTime: metric(r0(i.profitPeriod.uncoveredRevenue), PROFIT, P, "/reconcile"),
-      lineCoverageWindow: metric("2024-11-01→2025-06-30", "sale_items coverage", "all-time", "/sales/product-lines", { note: "product-line detail exists inside this window; later months are day-totals only" }),
-      unknownProductCodes: metric([], "importer logs", "latest run", "/sales/product-lines", { note: "see COMPLETION_BOARD for the current unknown-code list" }),
       missingOwnerInputs: [
         ...(i.ownerAnswers ? [] : ["strategy targets (grouped questions sent 2026-07-13 — using documented defaults)"]),
         ...(i.latestCashCount ? [] : ["first cash drawer count"]),
@@ -404,11 +403,12 @@ async function loadLiveOps(): Promise<LiveOpsConfig> {
 
 async function getLatestCashCount(): Promise<SnapshotInputs["latestCashCount"]> {
   const { data, error } = await requireEngine()
-    .from("cash_reconciliations").select("count_date,counted_amount,expected_balance")
+    .from("cash_reconciliations").select("count_date,counted_amount,expected_balance,bank_balance")
+    .is("voided_at", null)
     .order("count_date", { ascending: false }).limit(1);
   if (error) throw error;
   const r = data?.[0];
-  return r ? { date: r.count_date, counted: r.counted_amount, expected: r.expected_balance } : null;
+  return r ? { date: r.count_date, counted: r.counted_amount, expected: r.expected_balance, bankBalance: r.bank_balance ?? null } : null;
 }
 
 function monthBounds(ym: string): { from: string; to: string } {

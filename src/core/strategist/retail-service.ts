@@ -5,14 +5,18 @@ import { requireEngine } from "@/core/db/engine";
 import { todayCairo } from "@/core/time";
 import type { StrategistSnapshot } from "./contract";
 import type { StrategyReport } from "./analysis/report";
-import type { RetailRecommendation, RetailBusinessFacts } from "./retail/contract";
+import type { RetailBusinessFacts } from "./retail/contract";
 import { assembleRetailFacts } from "./retail/facts";
 import { runRetailReasoning } from "./retail/reasoning";
 import { applyLearning, priorsFromExperiments } from "./retail/learning";
+import { scoreRecommendations, summariseObjective, type ScoredRecommendation, type ObjectiveSummary } from "./retail/objective";
 import { listExperiments, openExperimentDedupeKeys } from "./persistence/experiments";
 
 export interface RetailResult {
-  recommendations: RetailRecommendation[];
+  /** ranked by what each move is worth per month — never by data completeness */
+  recommendations: ScoredRecommendation[];
+  /** the size of the prize, split into the two levers of the objective */
+  objective: ObjectiveSummary;
   facts: RetailBusinessFacts;
 }
 
@@ -34,7 +38,8 @@ export async function assembleRetailRecommendations(s: StrategistSnapshot, repor
   const priors = priorsFromExperiments(experiments, nameById);
   recommendations = applyLearning(recommendations, priors);
 
-  return { recommendations, facts };
+  const scored = scoreRecommendations(recommendations, { seasonLive: facts.season != null });
+  return { recommendations: scored, objective: summariseObjective(scored), facts };
 }
 
 async function productNameById(): Promise<Map<string, string>> {

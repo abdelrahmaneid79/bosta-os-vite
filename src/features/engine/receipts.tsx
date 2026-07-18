@@ -125,14 +125,14 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
     const ok = (r: SaleEdit) => toIso(r.date) && toNum(r.total) != null;
     const bad = rows.filter((r) => !ok(r));
     const { clean, dropped } = dedupeDailySales(rows.filter(ok).map((r) => ({ date: toIso(r.date), total: toNum(r.total) })));
-    if (dropped > 0) toast(`Brain removed ${dropped} duplicate day(s)`, "info");
+    if (dropped > 0) toast(`Skipped ${dropped} duplicate day${dropped === 1 ? "" : "s"}`, "info");
     return [...clean.map((c) => ({ date: c.date, total: String(c.total) })), ...bad];
   }
   function brainExp(rows: ExpenseEdit[]): ExpenseEdit[] {
     const ok = (r: ExpenseEdit) => toIso(r.date) && toNum(r.amount) != null;
     const bad = rows.filter((r) => !ok(r));
     const { clean, dropped } = dedupeExpenses(rows.filter(ok).map((r) => ({ date: toIso(r.date), category: r.category, amount: toNum(r.amount), vendor: null })));
-    if (dropped > 0) toast(`Brain removed ${dropped} duplicate expense(s)`, "info");
+    if (dropped > 0) toast(`Skipped ${dropped} duplicate expense${dropped === 1 ? "" : "s"}`, "info");
     return [...clean.map((c) => ({ date: c.date, category: c.category, amount: String(c.amount) })), ...bad];
   }
   const remapSales = (m: SalesMap) => { setSMap(m); saveMap("sales", m); if (raw) setSales(brainSales(rowsWithSalesMap(raw, m))); };

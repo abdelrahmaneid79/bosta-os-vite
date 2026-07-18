@@ -182,6 +182,8 @@ export interface CashBlock {
   lastCountDate: Metric<string>;
   /** days since the latest count; null = never counted */
   countAgeDays: Metric;
+  /** true once a cash count has also recorded a bank/other-liquid balance */
+  bankBalanceRecorded: boolean;
   hasLiveData: boolean;        // false today: no live movements/counts
 }
 
@@ -207,8 +209,6 @@ export interface DataQualityBlock {
   issues: DataQualityIssue[];
   missingCostLines: Metric;
   uncoveredRevenueAllTime: Metric;
-  lineCoverageWindow: Metric<string>;   // e.g. "2024-11-01→2025-06-30"
-  unknownProductCodes: Metric<string[]>;
   missingOwnerInputs: string[];
 }
 

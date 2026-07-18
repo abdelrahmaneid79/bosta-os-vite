@@ -1,23 +1,17 @@
 import { useMemo, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
-import { DeckTile } from "./deck";
 import { BarChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
-import { egp, egpShort, egpShortBare } from "@/core/utils/format";
+import { egpShort, egpShortBare } from "@/core/utils/format";
 import { ALL_TIME_FROM } from "@/core/range";
 import { getPurchaseTotal } from "@/core/read/purchases";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
-import { getMissingData } from "@/core/read/missing";
-import { getRiskInsights } from "@/core/read/insights";
-import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getExpenses } from "@/core/read/expenses";
 import { getChequeCycle } from "@/core/read/settlements";
 import { todayCairo, monthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
-import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
 
@@ -168,7 +162,7 @@ export function DashboardScreen() {
   }, [rows, month.from, today]);
 
   if (daily.isError) return <ErrorState message={String((daily.error as Error)?.message)} />;
-  if (!en) return <EmptyState title="Sign in to load your deck" hint="Live data only — never faked." />;
+  if (!en) return <EmptyState title="Sign in to load your deck" />;
 
   const monthNum = +d.monthKey.slice(5, 7), yearNum = +d.monthKey.slice(0, 4);
   const monthLabel = `${MON[monthNum - 1]} ${yearNum}`, monthShort = MON[monthNum - 1];
@@ -211,7 +205,7 @@ export function DashboardScreen() {
   // this week — daily bars ending at the latest recorded day
   const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const weekDays = isoRange(isoDaysAgo(d.latest, 6), d.latest);
-  const weekBars = weekDays.map((x) => ({ label: WD[new Date(x + "T00:00:00Z").getUTCDay()], full: fmtDate(x, "EEE d MMM"), value: byDay.get(x) ?? 0 }));
+  const weekBars = weekDays.map((x) => ({ label: WD[new Date(x + "T00:00:00Z").getUTCDay()], full: fmtDate(x, "EEE d MMM yyyy"), value: byDay.get(x) ?? 0 }));
   const weekTotal = weekBars.reduce((s, b) => s + b.value, 0);
   const priorTotal = isoRange(isoDaysAgo(d.latest, 13), isoDaysAgo(d.latest, 7)).reduce((s, x) => s + (byDay.get(x) ?? 0), 0);
   const weekDelta = pctDelta(weekTotal, priorTotal);
@@ -256,7 +250,7 @@ export function DashboardScreen() {
           <div className="orb" />
           <div className="heronut"><img src="/assets/bosta-mascot.svg" alt="" /></div>
           <div className="th"><span className="eyebrow">Revenue · {monthLabel}</span></div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 2 }}>Latest reporting month · {tradingDays} trading days</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 2 }}>{tradingDays} trading days</div>
           <div className="hv tnum" style={{ marginTop: "auto" }}><span className="hcur">EGP</span>{money2(d.monthRev)}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
             {revDelta != null && (
@@ -275,14 +269,14 @@ export function DashboardScreen() {
           <div className="th"><span className="tname">Spend · {monthShort}</span></div>
           <div className="bn tnum"><small>EGP</small>{money2(monthSpend)}</div>
           <div className="bar" style={{ marginTop: 18 }}><i style={{ width: `${spendRatio}%`, background: "linear-gradient(90deg,rgb(var(--violet)),var(--mag))" }} /></div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of {monthShort} revenue · {stockShare}% stock</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of revenue · {stockShare}% on stock</div>
         </div>
 
         {/* net cash */}
         <div className="tile netcash">
           <div className="th"><span className="tname">Net cash · {monthShort}</span></div>
           <div className="bn tnum" style={{ color: netCash >= 0 ? "var(--green)" : "var(--red)" }}><small>EGP</small>{money2(netCash)}</div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 18 }}>{marginPct}% cash margin · revenue − expenses − stock buys</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 18 }}>{marginPct}% kept from every pound</div>
         </div>
 
         {/* performance gauge */}
@@ -325,7 +319,7 @@ export function DashboardScreen() {
             <span className="disp" style={{ fontWeight: 700, fontSize: 27, letterSpacing: "-.02em" }}>EGP {money2(weekTotal)}</span>
             {weekDelta != null && <span className={`delta ${weekDelta >= 0 ? "up" : "down"}`}>{weekDelta >= 0 ? "+" : ""}{weekDelta.toFixed(1)}%</span>}
           </div>
-          <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM")} · vs EGP {money2(priorTotal)} prior 7 days</div>
+          <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM yyyy")} · was EGP {money2(priorTotal)}</div>
           <div style={{ marginTop: 14 }}><BarChart data={weekBars} height={150} /></div>
         </div>
 
@@ -371,41 +365,11 @@ export function DashboardScreen() {
             {d.best.k && <span className="delta up">peak</span>}
           </div>
           <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 10, fontWeight: 500, lineHeight: 1.5 }}>
-            {topVen ? `Top supplier is ${topVen[0]} at EGP ${money2(topVen[1])} across all purchases — ${venPct}% of stock spend.` : "Add supplier notes on purchases to see your top supplier."}
+            {topVen ? `${topVen[0]} is your biggest supplier — EGP ${money2(topVen[1])}, ${venPct}% of stock spend.` : "Add supplier notes on purchases to see your top supplier."}
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   The remaining screens (Health, Gaps, Activity) keep the existing kit — they
-   are separate routes, ported in a later pass.
-   ═════════════════════════════════════════════════════════════════════════ */
-
-const dot = (s: string) => (s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : "bg-dim");
-const sevDot = (s: Severity) => (s === "critical" ? "bg-bad" : s === "warning" ? "bg-warn" : "bg-dim");
-const confLabel: Record<Insight["confidence"], string> = { high: "", estimate: "estimate", "low-data": "needs data" };
-const kindGlyph: Record<ActivityEvent["kind"], string> = { sale: "🟢", purchase: "📦", expense: "🧾", cash: "💵", withdrawal: "🏷️", cheque: "🏦", count: "🔢", close: "✅", exception: "⚠️" };
-
-/** Compact insight row — title, why, action, honest confidence chip. */
-export function InsightRow({ i }: { i: Insight }) {
-  return (
-    <Link to={i.route} className="row-hover block rounded-2xl border border-line p-3.5">
-      <div className="flex items-start gap-2.5">
-        <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${sevDot(i.severity)}`} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-display text-sm font-bold text-text">{i.title}</span>
-            {confLabel[i.confidence] && <Badge tone={i.confidence === "low-data" ? "neutral" : "warn"}>{confLabel[i.confidence]}</Badge>}
-            {i.metric && <span className="ml-auto tnum text-[11px] text-dim">{i.metric}</span>}
-          </div>
-          <div className="mt-1 text-[12.5px] leading-relaxed text-muted">{i.detail}</div>
-          <div className="mt-1.5 text-[12px] font-semibold text-pink">→ {i.action}</div>
-        </div>
-      </div>
-    </Link>
   );
 }
 
@@ -413,80 +377,3 @@ function Note({ children }: { children: React.ReactNode }) {
   return <div className="py-1 text-sm" style={{ color: "rgb(var(--dim))" }}>{children}</div>;
 }
 
-/* ─ Gaps: risks & signals + data gaps ──────────────────────────────────── */
-export function MissingScreen() {
-  const q = useQuery({ queryKey: ["missing"], queryFn: getMissingData, enabled: en });
-  const ins = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
-  if (!en) return <EmptyState title="Sign in to scan for gaps" />;
-  if (q.isLoading || ins.isLoading) return <SkeletonRows rows={5} />;
-  if (q.isError) return <ErrorState message={String((q.error as Error)?.message)} />;
-  if (ins.isError) return <ErrorState message={String((ins.error as Error)?.message)} />;
-  const issues = q.data ?? [];
-  const risks = ins.data ?? [];
-  if (issues.length === 0 && risks.length === 0) return <EmptyState title="All clear" hint="Nothing flagged, data looks complete." />;
-  return (
-    <div className="space-y-5">
-      {risks.length > 0 && (
-        <div className="space-y-2">
-          <Eyebrow>Risks &amp; signals · {risks.length}</Eyebrow>
-          {risks.map((i) => <InsightRow key={i.key} i={i} />)}
-        </div>
-      )}
-      {issues.length > 0 && (
-        <div className="space-y-3">
-          <Eyebrow>Data gaps · {issues.length}</Eyebrow>
-          {issues.map((i) => (
-            <Card key={i.key}>
-              <div className="flex items-start gap-3">
-                <span className={`mt-1 h-2.5 w-2.5 rounded-full ${dot(i.severity)}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display font-bold">{i.title}</span>
-                    <Pill tone={i.severity === "high" ? "bad" : i.severity === "medium" ? "warn" : "neutral"}>{i.count}</Pill>
-                  </div>
-                  <div className="mt-1 text-sm text-muted">{i.detail}</div>
-                  <div className="mt-1.5 text-[12px] font-semibold text-pink">→ {i.action}</div>
-                </div>
-                <Link to={i.route} className="lift flex-shrink-0 rounded-2xl border border-line bg-panel px-3.5 py-2 text-xs font-semibold text-text hover:bg-panel2">Fix</Link>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─ Activity — full business event feed ────────────────────────────────── */
-export function ActivityScreen() {
-  const navigate = useNavigate();
-  const feed = useQuery({ queryKey: ["activity-full"], queryFn: () => getActivityFeed(60, 200), enabled: en });
-  if (!en) return <EmptyState title="Sign in to see activity" />;
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Eyebrow>Recent activity</Eyebrow>
-        <Button variant="outline" size="sm" disabled={feed.isFetching} onClick={() => feed.refetch()}>{feed.isFetching ? "Refreshing…" : "Refresh"}</Button>
-      </div>
-      {feed.isLoading ? <SkeletonRows rows={8} />
-        : feed.isError ? <ErrorState message={String((feed.error as Error)?.message)} onRetry={() => feed.refetch()} />
-        : (feed.data?.length ?? 0) === 0 ? <EmptyState title="No events yet" hint="Your activity shows up here" />
-        : (
-        <DeckTile style={{ padding: 0 }}><div className="scroll" style={{ maxHeight: "70vh" }}>
-          <table className="tbl">
-            <thead><tr><th>Date</th><th>Event</th><th className="r">Amount</th></tr></thead>
-            <tbody>
-              {feed.data!.map((e) => (
-                <tr key={`${e.kind}-${e.id}`} className="prodcell" onClick={() => navigate(e.route)}>
-                  <td style={{ whiteSpace: "nowrap", color: "rgb(var(--dim))" }}>{fmtDate(e.date, "d MMM yyyy")}</td>
-                  <td><span style={{ marginRight: 8 }}>{kindGlyph[e.kind]}</span>{e.label}</td>
-                  <td className="r" style={{ color: e.amount > 0 ? "var(--green)" : "rgb(var(--muted))" }}>{e.amount !== 0 ? `${e.amount > 0 ? "+" : "−"}${egp(Math.abs(e.amount))}` : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div></DeckTile>
-      )}
-    </div>
-  );
-}

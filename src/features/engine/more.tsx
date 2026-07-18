@@ -1,204 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, Eyebrow, Stat, Button, Field, Input, Badge, Select } from "@/components/ui";
+import { Card, Eyebrow, Button, Field, Input, Select } from "@/components/ui";
 import { Confirm } from "@/components/ui/Confirm";
-import { EmptyState, PartialNote } from "@/components/feedback";
+import { EmptyState } from "@/components/feedback";
 import { usePrefs } from "@/store/prefs";
-import { useBooksStartDate } from "@/store/books";
 import { LANDING_OPTIONS, HIDEABLE_SECTIONS } from "@/core/nav";
 import { RANGE_PRESETS } from "@/core/range";
-import { egp, egpShort, pct } from "@/core/utils/format";
-import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured, sb } from "@/core/db/engine";
 import { useAuth, SignOutButton } from "@/features/auth/auth";
-import { todayCairo, priorRange } from "@/core/time";
-import { rangeLabel } from "@/core/range";
-import { useActiveRange, useFilters } from "@/store/filters";
-import { DateRangePicker } from "@/components/DateRangePicker";
-import { getStockSummary } from "@/core/read/stock";
-import { getSalesStats } from "@/core/read/sales";
-import { getProfitReadout } from "@/core/read/profit";
-import { getProductProfit, getLifetimeProducts, getCostUpliftPct } from "@/core/read/products";
+import { todayCairo } from "@/core/time";
+import { getCostUpliftPct } from "@/core/read/products";
 import { getTargets } from "@/core/read/budgets";
-import { getPurchaseTotal } from "@/core/read/purchases";
-import { getSettings, getExpenses, getExpenseCategoryTrends } from "@/core/read/expenses";
-import { getCheques } from "@/core/read/settlements";
+import { getSettings } from "@/core/read/expenses";
 import { getLocations } from "@/core/read/common";
 import { setAppSetting, setLocationTerm, setCostUplift } from "@/core/db/mutations";
 import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
-
-function downloadCSV(name: string, rows: Record<string, unknown>[]) {
-  if (!rows.length) return;
-  const headers = Object.keys(rows[0]);
-  const esc = (v: unknown) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const csv = [headers.join(","), ...rows.map((r) => headers.map((h) => esc(r[h])).join(","))].join("\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-  const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
-}
-
-// ── Reports ─────────────────────────────────────────────────────────────────
-export function ReportsScreen() {
-  const r = useActiveRange();
-  const rk = useFilters((s) => s.rangeKey);
-  const accStart = useBooksStartDate();
-  const prior = priorRange(r);
-  const stock = useQuery({ queryKey: ["stock"], queryFn: getStockSummary, enabled: en });
-  const sales = useQuery({ queryKey: ["salesStats", r], queryFn: () => getSalesStats(r), enabled: en });
-  const profit = useQuery({ queryKey: ["profit", r, accStart], queryFn: () => getProfitReadout(r, accStart), enabled: en });
-  const purch = useQuery({ queryKey: ["purchaseTotal", r], queryFn: () => getPurchaseTotal(r), enabled: en });
-  const expenses = useQuery({ queryKey: ["expenses", r], queryFn: () => getExpenses(r), enabled: en });
-  const expTrends = useQuery({ queryKey: ["expTrends", r, prior], queryFn: () => getExpenseCategoryTrends(r, prior), enabled: en });
-  const cheques = useQuery({ queryKey: ["cheques"], queryFn: getCheques, enabled: en });
-  const products = useQuery({ queryKey: ["productProfit", r], queryFn: () => getProductProfit(r), enabled: en });
-  const lifetime = useQuery({ queryKey: ["lifetime-products"], queryFn: getLifetimeProducts, enabled: en });
-  if (!en) return <EmptyState title="Sign in to build reports" />;
-  const p = profit.data;
-  const prods = products.data ?? [];
-  const lifeProds = (lifetime.data ?? []).slice().sort((a, b) => b.revenue - a.revenue);
-  const cats = expTrends.data ?? [];
-  const failed = [stock, sales, profit, purch, expenses, expTrends, cheques, products, lifetime].filter((q) => q.isError).length;
-  return (
-    <div className="space-y-4">
-      {failed > 0 && (
-        <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-2 text-[12.5px] font-semibold text-warn">
-          {failed} report read(s) failed — dashes below may hide real numbers. Reload to retry.
-        </div>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Eyebrow>P&L · {rangeLabel(rk, r)} · vs prior {fmtDate(prior.from)} → {fmtDate(prior.to)}</Eyebrow>
-        <DateRangePicker />
-      </div>
-      {p?.partialBefore && <PartialNote since={p.partialBefore} />}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Revenue" value={p ? egp(p.revenue) : "—"} />
-        <Stat label="COGS" value={p ? egp(p.cogs) : "—"} />
-        <Stat label="Gross profit" value={p ? (p.grossProfit == null ? "unknown" : egp(p.grossProfit)) : "—"} accent="text-good" />
-        <Stat label="Gross margin" value={p ? (p.margin == null ? "unknown" : pct(p.margin)) : "—"} />
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Operating expenses" value={p ? egp(p.operatingExpenses) : "—"} accent="text-warn" />
-        <Stat label="Net profit" value={p ? (p.netProfit == null ? "unknown" : egp(p.netProfit)) : "—"} accent="text-good" />
-        <Stat label="Sales days" value={sales.data ? sales.data.days : "—"} />
-        <Stat label="Purchases" value={purch.data != null ? egpShort(purch.data) : "—"} />
-      </div>
-      <Card>
-        <Eyebrow>Export</Eyebrow>
-        <div className="mt-1 flex flex-wrap gap-2">
-          <Button variant="outline" disabled={!stock.data}
-            onClick={() => downloadCSV("stock-report.csv", (stock.data?.positions ?? []).map((x) => ({
-              product: x.nameEn, on_hand: x.onHand, unit: x.baseUnit, avg_cost: x.avgCost, stock_value: Math.round(x.stockValue), missing_cost: !x.hasCost,
-            })))}>⤓ Stock CSV</Button>
-          <Button variant="outline" disabled={!p}
-            onClick={() => downloadCSV("pnl-report.csv", p ? [{ range: rangeLabel(rk, r), revenue: Math.round(p.revenue), cogs: Math.round(p.cogs), gross_profit: p.grossProfit == null ? "unknown" : Math.round(p.grossProfit), gross_margin_pct: p.margin == null ? "unknown" : p.margin.toFixed(1), operating_expenses: Math.round(p.operatingExpenses), net_profit: p.netProfit == null ? "unknown" : Math.round(p.netProfit), net_margin_pct: p.netMargin == null ? "unknown" : p.netMargin.toFixed(1) }] : [])}>⤓ P&L CSV</Button>
-          <Button variant="outline" disabled={!expenses.data?.length}
-            onClick={() => downloadCSV("expenses-report.csv", (expenses.data ?? []).map((e) => ({ date: e.date, category: e.category, amount: Math.round(e.amount), payment: e.paymentMethod, notes: e.notes ?? "" })))}>⤓ Expenses CSV</Button>
-          <Button variant="outline" disabled={!cheques.data?.length}
-            onClick={() => downloadCSV("cheques-report.csv", (cheques.data ?? []).map((c) => ({ received_date: c.receivedDate ?? "", expected: Math.round(c.expected), received: c.received ?? "", difference: c.difference ?? "", status: c.status })))}>⤓ Cheques CSV</Button>
-          <Button variant="outline" disabled={!prods.length}
-            onClick={() => downloadCSV("product-profit.csv", prods.map((x) => ({ product: x.name, units: x.units, revenue: Math.round(x.revenue), cogs: Math.round(x.cogs), gross_profit: x.grossProfit == null ? "unknown" : Math.round(x.grossProfit), margin_pct: x.margin == null ? "unknown" : x.margin.toFixed(1) })))}>⤓ Products CSV</Button>
-        </div>
-      </Card>
-
-      {prods.length === 0 && lifeProds.length > 0 && (
-        <Card className="!p-0">
-          <div className="flex items-center justify-between px-4 pt-4">
-            <Eyebrow>Top products · revenue (lifetime)</Eyebrow>
-            <Badge tone="neutral">since launch</Badge>
-          </div>
-          <p className="px-4 pt-1 text-[11px] text-dim">Lifetime sales × supplier-bill cost. <span className="text-faint">* margin estimated on raw nut/seed cost — excludes roasting + packaging. No confident cost shows “cost n/a”.</span></p>
-          <div className="mt-2 divide-y divide-line">
-            {lifeProds.slice(0, 12).map((x, i) => {
-              const top = lifeProds[0]?.revenue ?? 0;
-              const w = top > 0 ? Math.max(2, (x.revenue / top) * 100) : 0;
-              return (
-                <div key={x.barcode || x.name} className="px-4 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 text-center font-display text-xs font-bold text-dim">{i + 1}</span>
-                    <div className="min-w-0 flex-1"><div dir="auto" className="truncate text-sm text-text">{x.name}</div><div className="text-[11px] text-dim">{Math.round(x.units)} units · {x.margin == null ? "cost n/a" : `${pct(x.margin)} margin${x.costSource === "estimate" ? "*" : ""}`}</div></div>
-                    <div className="text-right">
-                      <div className="tnum font-display text-sm font-bold text-good">{egp(x.revenue)}</div>
-                      {x.grossProfit != null && <div className="tnum text-[11px] text-dim">+{egp(x.grossProfit)} profit</div>}
-                    </div>
-                  </div>
-                  <div className="ml-7 mt-1.5 h-1.5 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-pink" style={{ width: `${w}%` }} /></div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
-      <Card className="!p-0">
-        <div className="flex items-center justify-between px-4 pt-4">
-          <Eyebrow>Most profitable products</Eyebrow>
-          {prods.length > 0 && <span className="text-[11px] text-dim">{prods.length} sold</span>}
-        </div>
-        {products.isLoading ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Loading…</div>
-          : prods.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Needs daily product lines. Lifetime ranking shown above.</div>
-          : (
-          <div className="mt-2 divide-y divide-line">
-            {prods.slice(0, 12).map((x, i) => {
-              const top = prods[0]?.grossProfit ?? 0;
-              const w = x.grossProfit != null && top > 0 ? Math.max(2, (x.grossProfit / top) * 100) : 0;
-              return (
-                <div key={x.productId} className="px-4 py-2.5">
-                  <Link to={x.productId === "__unmapped__" ? "/sales" : `/product/${x.productId}`} className="row-hover -mx-2 flex items-center gap-2 rounded-lg px-2 py-0.5">
-                    <span className="w-5 text-center font-display text-xs font-semibold text-dim">{i + 1}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-text">{x.name}</div>
-                      <div className="text-[11px] text-dim">{x.units} sold · {egp(x.revenue)} revenue{x.margin != null ? ` · ${pct(x.margin)} margin` : ""}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-display text-sm font-semibold text-good">{x.grossProfit == null ? "—" : egp(x.grossProfit)}</div>
-                      {x.missingCostLines > 0 && <Badge tone="warn">no cost</Badge>}
-                    </div>
-                  </Link>
-                  {w > 0 && <div className="ml-7 mt-1.5 h-1.5 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-pink" style={{ width: `${w}%` }} /></div>}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      <Card className="!p-0">
-        <div className="flex items-center justify-between px-4 pt-4">
-          <Eyebrow>Expenses by category · vs prior period</Eyebrow>
-          <Button variant="ghost" disabled={!cats.length}
-            onClick={() => downloadCSV("expense-categories.csv", cats.map((c) => ({ category: c.category, amount: Math.round(c.amount), prior: Math.round(c.prior), share_pct: c.sharePct.toFixed(1), change_pct: c.changePct == null ? "n/a" : c.changePct.toFixed(1) })))}>⤓ CSV</Button>
-        </div>
-        {expTrends.isLoading ? <div className="px-4 pb-4 pt-2 text-sm text-dim">Loading…</div>
-          : cats.length === 0 ? <div className="px-4 pb-4 pt-2 text-sm text-dim">No expenses in this range.</div>
-          : (
-          <div className="mt-2 divide-y divide-line">
-            {cats.slice(0, 12).map((c) => (
-              <div key={c.category} className="px-4 py-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm capitalize text-text">{c.category}</div>
-                    <div className="text-[11px] text-dim">{pct(c.sharePct)} of spend{c.prior > 0 ? ` · was ${egp(c.prior)}` : " · new this period"}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-display text-sm font-semibold text-bad">−{egp(c.amount)}</div>
-                    {c.changePct != null && (
-                      <span className={`tnum text-[11px] ${c.changePct > 0 ? "text-bad" : "text-good"}`}>
-                        {c.changePct > 0 ? "▲ +" : "▼ −"}{Math.abs(Math.round(c.changePct))}%
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-panel2"><div className="h-full rounded-full bg-warn/70" style={{ width: `${Math.max(2, Math.min(100, c.sharePct))}%` }} /></div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
 
 // ── System Check ──────────────────────────────────────────────────────────
 type Chk = { name: string; ok: boolean | null; detail: string };
@@ -299,8 +118,8 @@ function CostingCard() {
   });
   return (
     <Card>
-      <Eyebrow>Costing — roasting + packaging uplift</Eyebrow>
-      <p className="mt-1 text-[12px] text-dim">Uplifts raw nut/seed cost to finished-good COGS for roasting loss + packaging. Resale goods (jelly, pretzels…) unaffected.</p>
+      <Eyebrow>Cost uplift for roasting + packaging</Eyebrow>
+      <p className="mt-1 text-[12px] text-dim">Adds a % onto raw nut/seed cost to cover roasting loss and packaging. Ready-made goods (jelly, pretzels…) aren&rsquo;t touched.</p>
       <div className="mt-2 flex items-end gap-2">
         <Field label="Uplift % on raw costs"><Input type="number" step="any" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="15" /></Field>
         <Button variant="outline" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
@@ -358,7 +177,7 @@ export function SettingsScreen() {
       <Card>
         <Eyebrow>Account</Eyebrow>
         <Row label="Signed in" value={email ?? "—"} />
-        <Row label="Backend" value="Verified Supabase engine" last />
+        <Row label="Data" value="Live · your account only" last />
         <div className="mt-3"><SignOutButton /></div>
       </Card>
 

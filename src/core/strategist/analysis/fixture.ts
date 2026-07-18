@@ -91,7 +91,7 @@ export function makeSnapshot(over: DeepPartial<StrategistSnapshot> = {}): Strate
       expectedBalance: metric(60_000, "read/money.getCashPosition", "now", "/money"), latestCount: m(59_500), unexplainedDifference: m(-500),
       inflows: m(120_000), outflows: m(70_000), withdrawals: m(5_000),
       injections: missing("test", P, "/money", "none recorded"),
-      lastCountDate: m("2026-05-30"), countAgeDays: m(3), hasLiveData: true,
+      lastCountDate: m("2026-05-30"), countAgeDays: m(3), bankBalanceRecorded: false, hasLiveData: true,
     },
     cheques: {
       totalReceived: m(2_594_202), openTabGross: m(95_000), openTabEstimatedNet: m(78_000),
@@ -102,7 +102,6 @@ export function makeSnapshot(over: DeepPartial<StrategistSnapshot> = {}): Strate
     },
     dataQuality: {
       issues: [], missingCostLines: m(0), uncoveredRevenueAllTime: m(4_000),
-      lineCoverageWindow: m("2024-11-01→2025-06-30"), unknownProductCodes: m([] as string[]),
       missingOwnerInputs: [],
     },
     context: composeContext(null, P),

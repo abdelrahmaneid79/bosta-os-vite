@@ -81,7 +81,7 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
               {!p.active && <Badge>inactive</Badge>}
               {p.isNegative && <Badge tone="bad">negative</Badge>}
               {!p.isNegative && p.isLow && <Badge tone="warn">low</Badge>}
-              {p.onHand > 0 && !p.hasCost && <Badge tone="warn">no COGS</Badge>}
+              {p.onHand > 0 && !p.hasCost && <Badge tone="warn">no cost</Badge>}
             </div>
           </div>
           <div className="flex gap-2">
@@ -116,16 +116,16 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
         <>
           <div className="flex items-center justify-between">
             <Eyebrow>Lifetime · since launch</Eyebrow>
-            {life.costSource === "estimate" ? <Badge tone="warn">cost estimate</Badge> : life.costSource === "verified" ? <Badge tone="good">verified cost</Badge> : <Badge tone="neutral">no cost yet</Badge>}
+            {life.costSource === "estimate" ? <Badge tone="warn">cost is an estimate</Badge> : life.costSource === "verified" ? <Badge tone="good">cost confirmed</Badge> : <Badge tone="neutral">no cost yet</Badge>}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Lifetime revenue" value={egpShort(life.revenue)} accent="text-good" sub={`${num(life.units)} units · #${lifeIdx + 1}`} />
-            <Stat label="Lifetime COGS" value={life.cogs == null ? "—" : egpShort(life.cogs)} accent="text-bad" />
-            <Stat label="Gross profit" value={life.grossProfit == null ? "unknown" : egpShort(life.grossProfit)} accent="text-good" />
+            <Stat label="Total cost" value={life.cogs == null ? "—" : egpShort(life.cogs)} accent="text-bad" />
+            <Stat label="Gross profit" value={life.grossProfit == null ? "—" : egpShort(life.grossProfit)} accent="text-good" />
             <Stat label="Margin" value={life.margin == null ? "—" : pct(life.margin)} accent={life.margin != null && life.margin < 20 ? "text-warn" : "text-text"} />
           </div>
           {life.costSource !== "unknown" && life.unitCost != null && (
-            <p className="text-[11px] text-dim">Cost {egp(life.unitCost)}/unit from supplier bills{life.costSource === "estimate" ? " · estimate — raw material cost, excludes roasting loss + packaging" : " · verified resale cost"}.</p>
+            <p className="text-[11px] text-dim">Costs you {egp(life.unitCost)}/unit{life.costSource === "estimate" ? " · raw cost only" : ""}.</p>
           )}
         </>
       )}
@@ -137,17 +137,17 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Units sold" value={`${num(p.unitsSold)} ${p.baseUnit}`} />
         <Stat label="Revenue" value={egp(p.revenue)} accent="text-good" />
-        <Stat label="COGS" value={egp(p.cogs)} accent="text-bad" />
-        <Stat label="Gross profit" value={p.grossProfit == null ? "unknown" : egp(p.grossProfit)} accent="text-good" />
+        <Stat label="Cost" value={egp(p.cogs)} accent="text-bad" />
+        <Stat label="Gross profit" value={p.grossProfit == null ? "—" : egp(p.grossProfit)} accent="text-good" />
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Margin" value={p.margin == null ? "unknown" : pct(p.margin)} />
+        <Stat label="Margin" value={p.margin == null ? "—" : pct(p.margin)} />
         <Stat label="Bought (range)" value={`${num(p.purchaseQty)} ${p.baseUnit}`} />
         <Stat label="Purchase cost" value={egp(p.purchaseCost)} />
         <Stat label="Days of cover" value={p.daysCover == null ? "—" : `≈${Math.round(p.daysCover)}d`} accent={p.daysCover != null && p.daysCover < 7 ? "text-warn" : "text-text"} />
       </div>
       {p.missingCostLines > 0 && (
-        <Card><div className="text-sm text-warn">⚠ {p.missingCostLines} sold line(s) have no cost — gross profit withheld. Add a purchase to set cost.</div></Card>
+        <Card><div className="text-sm text-warn">Profit isn&rsquo;t final — {p.missingCostLines} sold {p.missingCostLines === 1 ? "day has" : "days have"} no cost yet. Add a purchase to set it.</div></Card>
       )}
       {p.unitsPerDay != null && p.unitsPerDay > 0 && (
         <p className="text-[12px] text-dim">Selling ≈{Math.round(p.unitsPerDay * 10) / 10} {p.baseUnit}/day in this range{p.daysCover != null ? ` · ~${Math.round(p.daysCover)} days of stock left` : ""}.</p>

@@ -15,8 +15,10 @@
     <meta name="apple-mobile-web-app-title" content="BostaOS" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
-    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@600,700&f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet" />
+    <!-- Identity fonts are self-hosted (see index.css); preload the heaviest-used weights -->
+    <link rel="preload" href="/fonts/clash-display-700.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/clash-display-600.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/satoshi-500.woff2" as="font" type="font/woff2" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
