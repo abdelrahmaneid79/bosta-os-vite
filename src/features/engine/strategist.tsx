@@ -28,6 +28,7 @@ import { selectWeeklyPriority } from "@/core/strategist/analysis/priority";
 import { MIN_ATTRIBUTION_COVERAGE } from "@/core/strategist/analysis/products";
 import type { ActivationChecklist } from "@/core/strategist/analysis/activation";
 import { detectCloseState, type CloseEvaluation } from "@/core/strategist/analysis/daily-close";
+import { BreakEvenPanel } from "./BreakEvenPanel";
 import { assembleCloseFacts, closeSourceDataAt, type CloseSignals } from "@/core/read/daily-close";
 import { confirmLiveStart, saveClose, reopenDailyClose, confirmNoTradingDay, getRecentCloses, loadAcceptedCommitments } from "@/core/strategist/persistence/operations";
 import { refreshOperationalExceptions } from "@/core/strategist/exceptions-service";
@@ -198,6 +199,9 @@ export function StrategistScreen() {
       <PageHdr title="Strategist" sub="Your books, read like an operator"
         right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
       <FreshnessStrip s={s} />
+
+      {/* ═══ EARN — am I actually making money this month, and what's left to do ═══ */}
+      <BreakEvenPanel />
 
       {/* ═══ DECIDE — the focal point: today's verdict + what I would do ═══ */}
       <DailyBriefCard brief={opsQ.data?.brief ?? null} loading={opsQ.isLoading} />

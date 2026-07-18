@@ -370,6 +370,43 @@
 /* large monetary values stay inside 320–390px tiles */
 @media (max-width:390px){ .cdk .kv{font-size:25px} .cdk .kv small{font-size:13px} }
 
+/* ── Break-even panel (Strategist) ────────────────────────────────────────────
+   One hero number, then the bar that gives it context, then the three levers.
+   Status is a labelled chip + icon so it never depends on colour alone. */
+.cdk .be-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.cdk .be-chip{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:11.5px;font-weight:700;
+  letter-spacing:.02em;border:1px solid;border-radius:999px;padding:4px 11px;white-space:nowrap}
+.cdk .be-chip svg{width:13px;height:13px;flex-shrink:0}
+.cdk .be-hero{margin-bottom:16px}
+.cdk .be-hero-v{font-family:'Clash Display','Satoshi',sans-serif;font-weight:700;font-size:44px;line-height:1;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px}
+.cdk .be-hero-v small{font-size:16px;color:var(--cd-dim);font-weight:600;letter-spacing:0}
+.cdk .be-hero-l{font-size:13.5px;color:var(--cd-muted);margin-top:8px;max-width:34ch;line-height:1.45}
+.cdk .be-bar{height:10px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden;border:1px solid var(--stroke2)}
+.cdk .be-bar i{display:block;height:100%;border-radius:6px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.cdk .be-scale{display:flex;justify-content:space-between;margin-top:8px;font-size:11.5px;color:var(--cd-faint);
+  font-variant-numeric:tabular-nums;font-weight:600}
+.cdk .be-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}
+.cdk .be-metric{background:var(--surface2);border:1px solid var(--stroke);border-radius:14px;padding:13px 14px;min-width:0}
+.cdk .be-metric-v{font-family:'Clash Display','Satoshi',sans-serif;font-weight:600;font-size:21px;line-height:1;
+  letter-spacing:-.01em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.cdk .be-metric-l{font-size:11.5px;color:var(--cd-muted);font-weight:600;margin-top:6px}
+.cdk .be-metric-h{font-size:10.5px;color:var(--cd-faint);margin-top:3px}
+.cdk .be-foot{margin-top:18px;padding-top:14px;border-top:1px solid var(--stroke2);font-size:13px;
+  color:var(--cd-muted);line-height:1.55}
+.cdk .be-foot b{color:var(--cd-text);font-weight:600}
+.cdk .be-note{display:block;font-size:11.5px;color:var(--cd-faint);margin-top:6px}
+@media (max-width:767px){
+  .cdk .be-hero-v{font-size:34px}
+  .cdk .be-hero-v small{font-size:14px}
+  .cdk .be-metrics{grid-template-columns:1fr;gap:8px}
+  .cdk .be-metric{display:flex;align-items:baseline;gap:10px;padding:11px 13px}
+  .cdk .be-metric-v{font-size:19px}
+  .cdk .be-metric-l{margin-top:0}
+  .cdk .be-metric-h{margin-top:0;margin-left:auto;text-align:right}
+}
+@media (prefers-reduced-motion:reduce){ .cdk .be-bar i{transition:none} }
+
 /* ── Cheque settlement timeline (Money → Cheques) ─────────────────────────────
    Each cheque is a block; block width ∝ the run of days it settled. Hover/tap a
    block to see that cheque; the trace box resolves any single day to its cheque. */
