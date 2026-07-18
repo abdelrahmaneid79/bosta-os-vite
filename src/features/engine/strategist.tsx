@@ -9,7 +9,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { DeckTile, PageHdr, Section } from "./deck";
+import { DeckTile, PageHdr } from "./deck";
 import { Button, Field, Input } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/core/utils/cn";
@@ -39,8 +39,7 @@ import type { ReconciledException } from "@/core/strategist/analysis/exceptions"
 import type { DailyBrief } from "@/core/strategist/analysis/brief";
 import { detectOperationalIntent, answerOperationalQuestion, type OperationalAnswerCtx } from "@/core/strategist/analysis/operational-answers";
 import { getStaleCloses } from "@/core/read/daily-close";
-import { assembleRetailRecommendations } from "@/core/strategist/retail-service";
-import { renderRecommendation } from "@/core/strategist/retail/nlg";
+import { assembleRetailRecommendations, type RetailResult } from "@/core/strategist/retail-service";
 import type { RetailRecommendation } from "@/core/strategist/retail/contract";
 import { createExperiment } from "@/core/strategist/persistence/experiments";
 import { nextQuestions, interviewProgress, type PendingQuestion } from "@/core/strategist/retail/interview";
@@ -225,11 +224,11 @@ export function StrategistScreen() {
         right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
       <FreshnessStrip s={s} />
 
+      {/* ═══ FIRST THING SEEN — where the business stands today ═══ */}
+      <DailyBriefCard brief={opsQ.data?.brief ?? null} loading={opsQ.isLoading} />
+
       {/* ═══ EARN — am I actually making money this month, and what's left to do ═══ */}
       <BreakEvenPanel />
-
-      {/* ═══ DECIDE — the focal point: today's verdict + what I would do ═══ */}
-      <DailyBriefCard brief={opsQ.data?.brief ?? null} loading={opsQ.isLoading} />
       <RetailAdvisor result={retailQ.data ?? null} loading={retailQ.isLoading}
         onExperiment={async (r) => {
           await createExperiment({
@@ -309,12 +308,9 @@ export function StrategistScreen() {
         <CashIntelligence report={report} />
       </Modal>
 
-      {/* ═══ ASK & DECIDE — conversation and structured decisions ═══ */}
-      <Section title="Ask & decide" sub="questions · withdrawal & affordability" defaultOpen keepMounted>
-        <AskStrategist s={s} report={report} actions={actionsQ.data ?? []} insights={insights}
-          brief={opsQ.data?.brief ?? null} exceptions={exceptions} />
-        <DecisionMode s={s} report={report} />
-      </Section>
+      {/* ═══ ASK — one surface for questions AND decisions ═══ */}
+      <AskDecide s={s} report={report} actions={actionsQ.data ?? []} insights={insights}
+        brief={opsQ.data?.brief ?? null} exceptions={exceptions} />
 
       <RetailSetupModal open={setupOpen} onClose={() => setSetupOpen(false)}
         onSaved={() => { qc.invalidateQueries({ queryKey: ["strategist-interview"] }); qc.invalidateQueries({ queryKey: ["strategist-retail"] }); }}
@@ -330,28 +326,18 @@ export function StrategistScreen() {
 /* ═══ FRESHNESS ═══════════════════════════════════════════════════════ */
 
 function FreshnessStrip({ s }: { s: StrategistSnapshot }) {
-  const items: { label: string; value: string; warn?: boolean }[] = [
-    { label: "Books to", value: s.meta.lastDataDate ? fmtDate(s.meta.lastDataDate) : "no sales", warn: s.meta.isStale },
-    { label: "Period", value: s.meta.period.label },
-    { label: "COGS coverage", value: s.products.coveragePct.value != null ? `${Math.round(s.products.coveragePct.value)}% of revenue` : "none", warn: (s.products.coveragePct.value ?? 0) < 60 },
-    { label: "Cash data", value: s.cash.hasLiveData ? (s.cash.lastCountDate.value ? `counted ${fmtDate(s.cash.lastCountDate.value)}` : "partial") : "not tracked", warn: !s.cash.hasLiveData },
-    { label: "Inventory", value: s.inventory.hasLiveData ? "tracked" : "not tracked", warn: !s.inventory.hasLiveData },
-    { label: "Completeness", value: `${s.meta.completenessScore}/100`, warn: s.meta.completenessScore < 60 },
-  ];
-  // A quiet metadata line, not a boxed bar — freshness is context, never the
-  // focal point. Warnings keep their amber; everything else recedes.
+  // Three chips only: how fresh, how far behind, how trustworthy. The full
+  // data-health detail lives in the brief's Trust card, not up here.
+  const score = s.meta.completenessScore;
   return (
-    <div className="metaline">
-      {items.map((it) => (
-        <span key={it.label}>
-          {it.label} <b className={it.warn ? "warn" : undefined} style={it.warn ? { color: "var(--amber)" } : undefined}>{it.value}</b>
-        </span>
-      ))}
+    <div className="fs-row">
+      <span className={cn("fs-chip", s.meta.isStale && "warn")}>
+        <i />{s.meta.lastDataDate ? `Books to ${fmtDate(s.meta.lastDataDate)}` : "No sales yet"}
+      </span>
       {s.meta.isStale && s.meta.staleDays != null && (
-        <span style={{ color: "var(--amber)", fontWeight: 700 }}>
-          ⚠ {s.meta.staleDays} days behind — numbers are as of {s.meta.lastDataDate ? fmtDate(s.meta.lastDataDate) : "—"}, not today
-        </span>
+        <span className="fs-chip warn"><i />{s.meta.staleDays} days behind</span>
       )}
+      <span className={cn("fs-chip", score < 60 && "warn")}><i />Trust {score}/100</span>
     </div>
   );
 }
@@ -366,35 +352,125 @@ const HEALTH_META: Record<DailyBrief["health"], { label: string; color: string }
   stale: { label: "Books stale", color: "var(--amber)" },
 };
 
+/** The brief as a deck of cards — one idea per card, thumbed through like
+ *  flashcards. Tap the card, swipe, use the arrows, or press ←/→. */
 function DailyBriefCard({ brief, loading }: { brief: DailyBrief | null; loading: boolean }) {
+  const [idx, setIdx] = useState(0);
+  const [dir, setDir] = useState<"r" | "l">("r");
+  const touchX = useRef<number | null>(null);
+  // a swipe also fires the click that follows pointerup — swallow that click
+  const swiped = useRef(false);
   if (loading && !brief) return <DeckTile><div style={{ fontSize: 13, color: "rgb(var(--dim))" }}>Composing today's brief…</div></DeckTile>;
   if (!brief) return null;
   const hm = HEALTH_META[brief.health];
-  const Col = ({ title, lines }: { title: string; lines: string[] }) => (
-    <div style={{ flex: "1 1 200px", minWidth: 180 }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.3, textTransform: "uppercase", color: "rgb(var(--faint))", marginBottom: 6 }}>{title}</div>
-      <div className="space-y-1">{lines.map((l, i) => <div key={i} style={{ fontSize: 12.5, color: "rgb(var(--muted))" }}>{l}</div>)}</div>
+
+  type BriefSlide = { eyebrow: string; dot?: string; body: React.ReactNode };
+  const lines = (ls: string[]) => ls.map((l, i) => <div key={i} className="bd-line">{l}</div>);
+  const y = brief.yesterday.stats;
+
+  /** A figure, laid out as data. `tone` carries meaning without relying on colour. */
+  const Fig = ({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) => (
+    <div className="bd-fig">
+      <div className="bd-fig-l">{label}</div>
+      <div className="bd-fig-v tnum" style={tone ? { color: tone } : undefined}>{value}</div>
+      {sub && <div className="bd-fig-s">{sub}</div>}
     </div>
   );
+
+  const cards: BriefSlide[] = [
+    { eyebrow: "Verdict", dot: hm.color, body: <div className="bd-head">{brief.headline}</div> },
+    {
+      eyebrow: `Yesterday${brief.yesterday.date ? ` · ${fmtDate(brief.yesterday.date)}` : ""}`,
+      body: (
+        <div className="bd-figs">
+          <Fig label="Sold" value={y.revenue != null ? egp(y.revenue) : "—"} />
+          <Fig label="Profit"
+            value={y.grossProfit != null && y.grossProfitCovered ? egp(y.grossProfit) : "—"}
+            sub={y.grossProfitCovered ? undefined : "needs product costs"} />
+          <Fig label="Spent" value={y.expenses != null ? egp(y.expenses) : "—"} />
+          <Fig label="Day" value={y.closeStatus === "complete" ? "Closed" : y.closeStatus === "open" ? "Open" : y.closeStatus}
+            tone={y.closeStatus === "complete" ? "var(--green)" : "var(--amber)"} />
+        </div>
+      ),
+    },
+    { eyebrow: "Today", body: lines(brief.today.lines) },
+    {
+      eyebrow: "Trust",
+      body: (
+        <div className="bd-figs">
+          <Fig label="Cash" value={brief.trust.cash === "none" ? "Not counted" : brief.trust.cash}
+            tone={brief.trust.cash === "none" ? "var(--amber)" : "var(--green)"} />
+          <Fig label="Stock" value={brief.trust.inventory === "none" ? "Not counted" : brief.trust.inventory}
+            tone={brief.trust.inventory === "none" ? "var(--amber)" : "var(--green)"} />
+          <Fig label="Books" value={brief.trust.staleData ? "Behind" : "Current"}
+            sub={brief.trust.staleData ?? undefined}
+            tone={brief.trust.staleData ? "var(--amber)" : "var(--green)"} />
+        </div>
+      ),
+    },
+    ...(brief.today.primaryAction ? [{
+      eyebrow: "Do this now",
+      dot: "var(--mag)",
+      body: (
+        <div className="bd-act">
+          <Link to={brief.today.primaryAction.screenLink} onClick={(e) => e.stopPropagation()}>{brief.today.primaryAction.title}</Link>
+          {" — "}{brief.today.primaryAction.action}
+        </div>
+      ),
+    }] : []),
+  ];
+  const n = cards.length;
+  const at = Math.min(idx, n - 1);
+  const go = (next: number, d: "r" | "l") => { setDir(d); setIdx(((next % n) + n) % n); };
+  const card = cards[at];
+
   return (
     <DeckTile>
       <div className="th">
         <span className="tname">Daily brief</span>
         <span style={{ marginLeft: "auto" }}><Chip text={hm.label} color={hm.color} /></span>
       </div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: "rgb(var(--text))", margin: "8px 0 12px" }}>{brief.headline}</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
-        <Col title={`Yesterday${brief.yesterday.date ? ` · ${fmtDate(brief.yesterday.date)}` : ""}`} lines={brief.yesterday.lines} />
-        <Col title="Today" lines={brief.today.lines} />
-        <Col title="Trust" lines={brief.trust.lines} />
+      <div className="bd-stage">
+        {n > 2 && <div className="bd-ghost g2" />}
+        {n > 1 && <div className="bd-ghost" />}
+        <button type="button" key={at} className={`bd-card in-${dir}`}
+          aria-label={`Brief card ${at + 1} of ${n}: ${card.eyebrow}. Activate for the next card.`}
+          onClick={() => { if (swiped.current) { swiped.current = false; return; } go(at + 1, "r"); }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight") { e.preventDefault(); go(at + 1, "r"); }
+            if (e.key === "ArrowLeft") { e.preventDefault(); go(at - 1, "l"); }
+          }}
+          onPointerDown={(e) => { if (e.pointerType === "touch") touchX.current = e.clientX; }}
+          onPointerUp={(e) => {
+            if (touchX.current == null) return;
+            const dx = e.clientX - touchX.current; touchX.current = null;
+            if (dx < -40) { swiped.current = true; go(at + 1, "r"); }
+            else if (dx > 40) { swiped.current = true; go(at - 1, "l"); }
+          }}>
+          <span className="bd-eyebrow">
+            {card.dot && <i style={{ background: card.dot }} />}
+            {card.eyebrow}
+          </span>
+          <div className="bd-body">{card.body}</div>
+          <span className="bd-hint">{at + 1}/{n}</span>
+        </button>
       </div>
-      {brief.today.primaryAction && (
-        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--stroke2)", fontSize: 12.5 }}>
-          <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}>Most important: </span>
-          <Link to={brief.today.primaryAction.screenLink} style={{ color: "var(--mag)", fontWeight: 700 }}>{brief.today.primaryAction.title}</Link>
-          <span style={{ color: "rgb(var(--muted))" }}> — {brief.today.primaryAction.action}</span>
+      <div className="bd-nav">
+        <button type="button" className="bd-arrow" aria-label="Previous card" onClick={() => go(at - 1, "l")}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <div className="bd-dots">
+          {cards.map((c, i) => (
+            <button type="button" key={i} className="bd-dot" aria-current={i === at}
+              aria-label={`Card ${i + 1}: ${c.eyebrow}`} onClick={() => go(i, i > at ? "r" : "l")}>
+              <i />
+            </button>
+          ))}
         </div>
-      )}
+        <button type="button" className="bd-arrow" aria-label="Next card" onClick={() => go(at + 1, "r")}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 6l6 6-6 6" /></svg>
+        </button>
+      </div>
     </DeckTile>
   );
 }
@@ -661,11 +737,9 @@ function SetupRow({ p, onSave }: { p: ProductContextRow; onSave: (id: string, pa
 
 /* ═══ RETAIL ADVISOR — "What I would do" (Cycle 10) ═══════════════════ */
 
-const TRUTH_META: Record<RetailRecommendation["truthLevel"], { label: string; color: string }> = {
-  measured_conclusion: { label: "Measured", color: "var(--green)" },
-  strong_inference: { label: "Inference", color: "var(--amber)" },
-  experiment_hypothesis: { label: "Test", color: "rgb(var(--cyan))" },
-};
+/** Strips the currency prefix for the hero figure, which carries its own. */
+const bareEgp = (n: number) => egp(n).replace("EGP ", "");
+
 const FILTER_BUCKET: Record<string, string> = {
   merchandising: "Merchandising", shelf: "Merchandising", packaging: "Packaging",
   pricing: "Pricing", margin: "Pricing", purchase: "Purchasing", supplier: "Purchasing",
@@ -675,62 +749,89 @@ const FILTER_BUCKET: Record<string, string> = {
 };
 
 function RetailAdvisor({ result, loading, onExperiment }: {
-  result: { recommendations: RetailRecommendation[]; facts: { basisNote: string } } | null;
+  result: RetailResult | null;
   loading: boolean;
   onExperiment: (r: RetailRecommendation) => Promise<void>;
 }) {
   const [filter, setFilter] = useState<string>("All");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [why, setWhy] = useState(false);
   if (loading && !result) return <DeckTile><div style={{ fontSize: 13, color: "rgb(var(--dim))" }}>Reasoning over your books…</div></DeckTile>;
   if (!result) return null;
   const recs = result.recommendations;
   const buckets = ["All", ...Array.from(new Set(recs.map((r) => FILTER_BUCKET[r.domain] ?? "Operations")))];
   const shown = (filter === "All" ? recs : recs.filter((r) => (FILTER_BUCKET[r.domain] ?? "Operations") === filter));
 
+  const o = result.objective;
   return (
     <DeckTile>
       <div className="th"><span className="tname">What I would do</span>
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "rgb(var(--faint))" }}>{recs.length} recommendation{recs.length === 1 ? "" : "s"}</span>
+        {recs.length > 0 && <span className="sp-badge" style={{ marginLeft: "auto" }}>{recs.length}</span>}
       </div>
+
       {recs.length === 0 ? (
         <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>
-          Nothing clears the evidence bar yet{result.facts.basisNote ? ` (${result.facts.basisNote})` : ""}.
+          Nothing to change today — the stand and the numbers both look right.
         </div>
       ) : (
         <>
-          <div className="chiprow" style={{ margin: "10px 0" }}>
+          {/* THE PRIZE — the size of the whole list, before reading any of it */}
+          {o.totalEgp > 0 && (
+            <div className="wid-prize">
+              <div className="wid-prize-v tnum"><small>EGP</small>{bareEgp(o.totalEgp)}</div>
+              <div className="wid-prize-l">a month if you do all of it</div>
+              <div className="wid-prize-split">
+                {o.revenueUpsideEgp > 0 && <span><i style={{ background: "var(--green)" }} />{egp(o.revenueUpsideEgp)} more sales</span>}
+                {o.costSavingEgp > 0 && <span><i style={{ background: "rgb(var(--cyan))" }} />{egp(o.costSavingEgp)} less cost</span>}
+              </div>
+            </div>
+          )}
+
+          <div className="chiprow" style={{ margin: "12px 0 10px" }}>
             {buckets.map((b) => (
               <button key={b} className={filter === b ? "mbtn on" : "mbtn"} onClick={() => setFilter(b)}>{b}</button>
             ))}
           </div>
+
           <div className="space-y-2">
             {shown.map((r) => {
-              const t = TRUTH_META[r.truthLevel];
               const open = openId === r.id;
-              const prose = renderRecommendation(r);
               return (
-                <div key={r.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px" }}>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", cursor: "pointer" }} onClick={() => setOpenId(open ? null : r.id)}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{r.title}</span>
-                    <Chip text={t.label} color={t.color} />
-                    <Chip text={`${r.confidence} conf`} color="rgb(var(--dim))" />
-                    <Chip text={r.source === "bosta_experiment" ? "from your test" : r.source === "model_reasoning" ? "model idea" : "knowledge"} color={r.source === "bosta_experiment" ? "var(--green)" : r.source === "model_reasoning" ? "rgb(var(--cyan))" : "rgb(var(--faint))"} />
-                    <span style={{ marginLeft: "auto", fontSize: 11, color: "rgb(var(--faint))" }}>{FILTER_BUCKET[r.domain] ?? "Operations"}</span>
-                  </div>
-                  {!open && <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 4 }}>{prose.paragraphs[0]}</div>}
+                <div key={r.id} className={cn("wid-row", open && "open")}>
+                  <button type="button" className="wid-head" onClick={() => setOpenId(open ? null : r.id)}>
+                    <span className="wid-worth tnum">
+                      {r.expectedMonthlyEgp >= 13
+                        ? <><b>{egp(r.expectedMonthlyEgp)}</b><small>/month</small></>
+                        : <em>worth doing</em>}
+                    </span>
+                    <span className="wid-title">{r.title}</span>
+                    <svg className="wid-ch" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                      strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none" }} aria-hidden>
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+
+                  {!open && <div className="wid-do">{r.proposedAction}</div>}
+
                   {open && (
                     <div style={{ marginTop: 8, fontSize: 12.5, color: "rgb(var(--muted))" }}>
+                      <div className="wid-do" style={{ marginTop: 0 }}>{r.proposedAction}</div>
+                      {r.impact && (
+                        <div className="wid-basis">
+                          <b>{egp(r.impact.monthlyEgp)}/month</b> — {r.impact.basis}.
+                          {r.expectedMonthlyEgp < r.impact.monthlyEgp && (
+                            <> Ranked at {egp(r.expectedMonthlyEgp)} after allowing for how sure this is.</>
+                          )}
+                        </div>
+                      )}
                       <AdviceBlock label="Why" lines={[...r.observedFacts, ...r.reasoning]} />
-                      <AdviceBlock label="How to execute" lines={r.implementationSteps.length ? r.implementationSteps : [r.proposedAction]} />
-                      {r.testDesign && <AdviceBlock label="How to test" lines={[r.testDesign, ...r.successCriteria.map((c) => `Success: ${c}`)]} />}
-                      <AdviceBlock label="What could make it wrong" lines={[...r.missingInformation.map((m) => `Missing: ${m}`), ...r.risks, ...r.contraindications]} />
-                      <div style={{ marginTop: 6, fontSize: 12 }}>
-                        <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}>Classification: </span><span style={{ color: t.color }}>{prose.classification}</span>
-                        <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}> · Confidence: </span>{prose.confidence}
-                      </div>
-                      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                      <AdviceBlock label="How" lines={r.implementationSteps.length ? r.implementationSteps : [r.proposedAction]} />
+                      {r.testDesign && <AdviceBlock label="How you'll know" lines={[r.testDesign, ...r.successCriteria.map((c) => `Works if: ${c}`)]} />}
+                      <AdviceBlock label="Watch out for" lines={[...r.risks, ...r.contraindications]} />
+                      {r.sharpenWith && <div className="wid-sharpen">Sharper with: {r.sharpenWith}</div>}
+                      <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <Link to={r.screenLink} className="mbtn">Open screen</Link>
-                        {r.truthLevel === "experiment_hypothesis" && <button className="mbtn" onClick={() => void onExperiment(r)}>Add as experiment</button>}
+                        {r.truthLevel === "experiment_hypothesis" && <button className="mbtn" onClick={() => void onExperiment(r)}>Track as a test</button>}
                       </div>
                     </div>
                   )}
@@ -738,6 +839,14 @@ function RetailAdvisor({ result, loading, onExperiment }: {
               );
             })}
           </div>
+
+          {/* certainty is disclosed here, once — never used to withhold advice */}
+          {result.facts.basisNote && result.facts.basisNote !== "full coverage" && (
+            <div className="wid-foot">
+              <button type="button" className="aq-more" onClick={() => setWhy((v) => !v)}>{why ? "Hide" : "How sure is this?"}</button>
+              {why && <div style={{ marginTop: 6, lineHeight: 1.5 }}>Advice above is ranked on what it earns. Sharper once: {result.facts.basisNote}.</div>}
+            </div>
+          )}
         </>
       )}
     </DeckTile>
@@ -1046,7 +1155,24 @@ function ActionQueue({ actions, onUpdate }: { actions: ActionRow[]; onUpdate: (i
 
 /* ═══ ASK THE STRATEGIST ══════════════════════════════════════════════ */
 
-function AskStrategist({ s, report, actions, insights, brief, exceptions }: {
+type DecisionKind = "withdrawal" | "stock" | "employee";
+
+const DECISION_META: Record<DecisionKind, { chip: string; ask: string }> = {
+  withdrawal: { chip: "Take money out", ask: "How much? e.g. 20000" },
+  stock: { chip: "Buy stock", ask: "Purchase amount, e.g. 15000" },
+  employee: { chip: "Hire someone", ask: "Monthly salary, e.g. 6000" },
+};
+
+const VERDICT_META: Record<string, [string, string]> = {
+  safe: ["Affordable", "var(--green)"], safe_reduces_flexibility: ["Affordable · thins the buffer", "var(--green)"],
+  conditional: ["Conditional on expected money", "var(--amber)"], tight: ["Possible but tight", "var(--amber)"],
+  unsafe: ["Not safely affordable", "var(--red)"], unknowable: ["Can't be verified yet", "rgb(var(--violet))"],
+};
+
+/** ONE surface for talking to the strategist: free questions AND decisions.
+ *  A decision chip morphs the same composer into an amount field whose verdict
+ *  computes live from the engine; "Judgment" adds the AI's view on top. */
+function AskDecide({ s, report, actions, insights, brief, exceptions }: {
   s: StrategistSnapshot; report: StrategyReport; actions: ActionRow[]; insights: InsightRow[];
   brief: DailyBrief | null; exceptions: ReconciledException[];
 }) {
@@ -1056,6 +1182,11 @@ function AskStrategist({ s, report, actions, insights, brief, exceptions }: {
   const [input, setInput] = useState("");
   const [convId, setConvId] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [decision, setDecision] = useState<DecisionKind | null>(null);
+  const [amount, setAmount] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const [aiAnswer, setAiAnswer] = useState<{ r: StrategistResponse; note?: string } | null>(null);
+  const [aiState, setAiState] = useState<"idle" | "loading">("idle");
 
   /** Deterministic operational answer — the engine answers, NO model call.
    *  Returns a StrategistResponse or null when the question isn't operational. */
@@ -1139,10 +1270,44 @@ function AskStrategist({ s, report, actions, insights, brief, exceptions }: {
 
   const messages = msgsQ.data ?? [];
 
+  // ── decision calculators — pure engine, live as you type ─────────────
+  const amt = Number(amount) || 0;
+  const wa = useMemo(() => (decision === "withdrawal" && amt > 0 ? assessWithdrawalV2(s, report.cash, amt) : null), [s, report, decision, amt]);
+  const aff = useMemo(() => {
+    if (decision === "stock" && amt > 0) return assessAffordability(s, report.cash, { kind: "purchase", upfront: amt, mandatory: false, label: "stock purchase" });
+    if (decision === "employee" && amt > 0) return assessAffordability(s, report.cash, { kind: "employee", upfront: 0, recurringMonthly: amt, mandatory: false, label: "new employee" });
+    return null;
+  }, [s, report, decision, amt]);
+
+  const pickDecision = (k: DecisionKind) => {
+    setDecision((cur) => (cur === k ? null : k));
+    setAiAnswer(null); setShowAll(false); setAmount("");
+  };
+
+  const askJudgment = async () => {
+    if (!decision || amt <= 0) return;
+    const text = decision === "withdrawal" ? `Withdraw ${egp(amt)} this month.`
+      : decision === "stock" ? `Buy ${egp(amt)} of stock now.`
+      : `Hire an employee at ${egp(amt)} per month.`;
+    setAiState("loading");
+    try {
+      const result = await generateLanguage(
+        { mode: "decision_support", snapshot: s, report, findings, calendar: computeCalendar(todayCairo()), decision: text, decisionContext: report.decisionContext },
+        { enhanced: true },
+      );
+      if (result.fallback) timings.fallbacks += 1;
+      setAiAnswer({ r: result.response, note: result.fallbackReason ? `Language service unavailable — BostaOS templates answered. (${result.fallbackReason})` : undefined });
+    } catch (e) {
+      reportError("Decision support", e);
+    } finally {
+      setAiState("idle");
+    }
+  };
+
   return (
     <DeckTile>
       <div className="th"><span className="tname">Ask the strategist</span>
-        {convsQ.data && convsQ.data.length > 0 && (
+        {convsQ.data && convsQ.data.length > 0 && !decision && (
           <select style={{ marginLeft: "auto", fontSize: 12, background: "var(--surface2)", color: "rgb(var(--muted))", border: "1px solid var(--stroke2)", borderRadius: 8, padding: "4px 8px" }}
             value={convId ?? ""} onChange={(e) => setConvId(e.target.value || null)}>
             <option value="">New conversation</option>
@@ -1151,30 +1316,121 @@ function AskStrategist({ s, report, actions, insights, brief, exceptions }: {
         )}
       </div>
 
-      {/* suggested questions — from live data, never canned */}
-      <div className="chiprow" style={{ gap: 8, marginTop: 10 }}>
-        {suggestions.map((q) => (
+      {/* decision chips, then suggested questions — all one row */}
+      <div className="aq-chips">
+        {(Object.keys(DECISION_META) as DecisionKind[]).map((k) => (
+          <button key={k} type="button" className={cn("aq-dchip", decision === k && "on")} onClick={() => pickDecision(k)}>
+            {DECISION_META[k].chip}
+          </button>
+        ))}
+        {!decision && suggestions.map((q) => (
           <button key={q.text} className="mbtn" disabled={!!pending} onClick={() => void ask(q.text, q.mode)}>{q.text}</button>
         ))}
       </div>
 
-      <div className="space-y-3" style={{ marginTop: 12 }}>
-        {messages.map((m) => m.role === "user" ? (
-          <div key={m.id} style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>
-            {(m.content as { text?: string }).text}
-            {m.snapshotMeta?.lastDataDate && <span style={{ fontSize: 10.5, color: "rgb(var(--faint))", fontWeight: 500 }}> · asked on books to {m.snapshotMeta.lastDataDate}</span>}
-          </div>
-        ) : (
-          <AnswerCard key={m.id} r={m.content as StrategistResponse} messageId={m.id} snapshotMeta={m.snapshotMeta} />
-        ))}
-        {pending && <div style={{ fontSize: 12.5, color: "rgb(var(--dim))" }}>Working on “{pending}”…</div>}
-      </div>
+      {/* thread — hidden while a decision is being worked */}
+      {!decision && (
+        <div className="space-y-3" style={{ marginTop: 12 }}>
+          {messages.map((m) => m.role === "user" ? (
+            <div key={m.id} style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>
+              {(m.content as { text?: string }).text}
+            </div>
+          ) : (
+            <AnswerCard key={m.id} r={m.content as StrategistResponse} messageId={m.id} snapshotMeta={m.snapshotMeta} />
+          ))}
+          {pending && <div style={{ fontSize: 12.5, color: "rgb(var(--dim))" }}>Working on “{pending}”…</div>}
+        </div>
+      )}
 
+      {/* live verdict for the active decision */}
+      {decision === "withdrawal" && wa && (
+        <div className="aq-verdict" style={{ "--aqv": VERDICT_META[wa.verdict][1] } as React.CSSProperties}>
+          <div className="aq-vhead">
+            <Chip text={VERDICT_META[wa.verdict][0]} color={VERDICT_META[wa.verdict][1]} />
+            <Chip text={CONF_LABEL[wa.confidence]} color="rgb(var(--dim))" />
+            {wa.recommendedMax != null && (
+              <span className="aq-vmax"><b className="tnum">{egp(wa.recommendedMax)}</b><span>max safe draw</span></span>
+            )}
+          </div>
+          <div className="aq-facts">
+            <KV k="Verified cash" v={wa.verifiedCash} />
+            <KV k="After this draw" v={wa.resultingReserve} />
+            <KV k="Reserve" v={wa.reserve} />
+            {showAll && (<>
+              <KV k="Expected (not available)" v={wa.expectedMoney} />
+              <KV k="Committed" v={wa.committed} />
+              <KV k="Verified headroom" v={wa.verifiedHeadroom} />
+              <KV k="Profit context" v={wa.profitContext} />
+              <KV k="Already withdrawn" v={wa.withdrawalsAlready} />
+              <KV k="Data freshness" v={wa.dataFreshness} />
+            </>)}
+          </div>
+          {wa.reasonsToWait.length > 0 && (
+            <div className="aq-reasons">{wa.reasonsToWait.map((r, i) => <div key={i}>· {r}</div>)}</div>
+          )}
+          <div className="aq-foot">
+            <button type="button" className="aq-more" onClick={() => setShowAll((v) => !v)}>{showAll ? "Fewer numbers" : "All numbers"}</button>
+            <span className="note" style={{ marginLeft: "auto" }}>Profit ≠ cash in the drawer · Next: {wa.nextStep}</span>
+          </div>
+        </div>
+      )}
+      {(decision === "stock" || decision === "employee") && aff && (
+        <div className="aq-verdict" style={{ "--aqv": VERDICT_META[aff.verdict]?.[1] ?? "rgb(var(--dim))" } as React.CSSProperties}>
+          <div className="aq-vhead">
+            <Chip text={VERDICT_META[aff.verdict]?.[0] ?? aff.verdict} color={VERDICT_META[aff.verdict]?.[1] ?? "rgb(var(--dim))"} />
+            <Chip text={`${aff.answerLevel} answer`} color="rgb(var(--dim))" />
+            {aff.recommendedMax != null && (
+              <span className="aq-vmax"><b className="tnum">{egp(aff.recommendedMax)}</b><span>headroom</span></span>
+            )}
+          </div>
+          <div className="aq-facts">
+            <KV k="Verified cash" v={aff.verifiedCash != null ? egp(aff.verifiedCash) : "unknown — no fresh count"} />
+            <KV k="Committed (30d)" v={egp(aff.committed30)} />
+            <KV k="Reserve" v={egp(aff.requiredReserve)} />
+            {aff.recurring && <KV k="Monthly burden" v={`${egp(aff.recurring.monthly)}/month${aff.recurring.revenueToCover != null ? ` · needs ~${egp(aff.recurring.revenueToCover)}/month extra sales` : ""}`} />}
+            {showAll && (<>
+              <KV k="Expected (not available)" v={aff.expectedUnavailable != null ? `~${egp(aff.expectedUnavailable)}` : "—"} />
+              {aff.recurring && <KV k="Margin basis" v={aff.recurring.marginBasis} />}
+              {aff.recurring?.monthsCoverableFromHeadroom != null && <KV k="Headroom covers" v={`~${aff.recurring.monthsCoverableFromHeadroom} months of this cost with zero benefit`} />}
+            </>)}
+          </div>
+          {aff.reasons.length > 0 && <div className="aq-reasons">{aff.reasons.map((r, i) => <div key={i}>· {r}</div>)}</div>}
+          {aff.assumptions.length > 0 && <div className="aq-reasons" style={{ color: "var(--amber)" }}>{aff.assumptions.join(" · ")}</div>}
+          <div className="aq-foot">
+            <button type="button" className="aq-more" onClick={() => setShowAll((v) => !v)}>{showAll ? "Fewer numbers" : "All numbers"}</button>
+            <span className="note" style={{ marginLeft: "auto" }}>Next: {aff.nextStep}</span>
+          </div>
+        </div>
+      )}
+      {decision && aiAnswer && (
+        <div style={{ marginTop: 12 }}>
+          {aiAnswer.note && <div style={{ fontSize: 12, color: "var(--amber)", fontWeight: 600, marginBottom: 8 }}>{aiAnswer.note}</div>}
+          <AnswerCard r={aiAnswer.r} messageId={crypto.randomUUID()} snapshotMeta={{ period: s.meta.period.label, lastDataDate: s.meta.lastDataDate }} />
+        </div>
+      )}
+
+      {/* ONE composer — free question, or the active decision's amount */}
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <Input placeholder="Ask about your numbers, products, cash, cheques…" value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") void ask(input); }} />
-        <Button onClick={() => void ask(input)} disabled={!!pending}>{pending ? "…" : "Ask"}</Button>
+        {decision ? (
+          <>
+            <div className="aq-amt">
+              <span>EGP</span>
+              <Input type="number" inputMode="decimal" autoFocus placeholder={DECISION_META[decision].ask}
+                value={amount} onChange={(e) => setAmount(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void askJudgment(); }} />
+            </div>
+            <Button onClick={() => void askJudgment()} disabled={aiState === "loading" || amt <= 0}>
+              {aiState === "loading" ? "Assessing…" : "Judgment"}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Input placeholder="Ask about your numbers, products, cash, cheques…" value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void ask(input); }} />
+            <Button onClick={() => void ask(input)} disabled={!!pending}>{pending ? "…" : "Ask"}</Button>
+          </>
+        )}
       </div>
     </DeckTile>
   );
@@ -1191,14 +1447,14 @@ function AnswerCard({ r, messageId, snapshotMeta }: { r: StrategistResponse; mes
     try {
       await recordFeedback("message", messageId, verdict, why ?? null, snapshotMeta ?? null);
       setFb(verdict); setAskReason(false);
-      reportSuccess("Feedback", "Recorded — it never silently rewrites the rules");
+      reportSuccess("Feedback", "Recorded");
     } catch (e) { reportError("Feedback", e); }
   };
 
   return (
     <div style={{ border: "1px solid var(--stroke)", borderRadius: 12, padding: "12px 14px", background: "var(--surface2)" }}>
       {snapshotMeta?.fallbackReason && (
-        <div style={{ fontSize: 11.5, color: "var(--amber)", fontWeight: 600, marginBottom: 6 }}>Answered by BostaOS templates — language service unavailable.</div>
+        <div style={{ fontSize: 11.5, color: "var(--amber)", fontWeight: 600, marginBottom: 6 }}>Template answer — AI offline.</div>
       )}
       <div className="disp" style={{ fontSize: 14.5, fontWeight: 700 }}>{r.headline}</div>
       <p style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 6, lineHeight: 1.55 }}>{r.conclusion}</p>
@@ -1213,7 +1469,7 @@ function AnswerCard({ r, messageId, snapshotMeta }: { r: StrategistResponse; mes
       )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10, alignItems: "center" }}>
         {fb ? (
-          <span style={{ fontSize: 11.5, color: "rgb(var(--faint))" }}>Feedback: {fb.replace("_", " ")} ✓</span>
+          <span style={{ fontSize: 11.5, color: "rgb(var(--faint))" }}>✓ Noted</span>
         ) : (
           <>
             <button className="mbtn" onClick={() => void give("useful")}>Useful</button>
@@ -1223,7 +1479,6 @@ function AnswerCard({ r, messageId, snapshotMeta }: { r: StrategistResponse; mes
             <button className="mbtn" onClick={() => void give("acted_on")}>Acted on it</button>
           </>
         )}
-        {r.usage?.cache_read_input_tokens ? <span style={{ fontSize: 10.5, color: "rgb(var(--faint))", marginLeft: "auto" }}>cached context reused</span> : null}
       </div>
       {askReason && (
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -1258,155 +1513,6 @@ function PriorityBlock({ p }: { p: ResponsePriority }) {
         </div>
       )}
     </div>
-  );
-}
-
-/* ═══ DECISION MODE ═══════════════════════════════════════════════════ */
-
-type DecisionKind = "withdrawal" | "price" | "stock" | "employee" | "other";
-
-function DecisionMode({ s, report }: { s: StrategistSnapshot; report: StrategyReport }) {
-  const { reportError } = useUI();
-  const findings = report.findings;
-  const [kind, setKind] = useState<DecisionKind>("withdrawal");
-  const [amount, setAmount] = useState("20000");
-  const [freeText, setFreeText] = useState("");
-  const [aiAnswer, setAiAnswer] = useState<{ r: StrategistResponse; note?: string } | null>(null);
-  const [aiState, setAiState] = useState<"idle" | "loading">("idle");
-
-  const ctx = report.decisionContext;
-  const amt = Number(amount) || 0;
-  const wa = useMemo(() => (kind === "withdrawal" && amt > 0 ? assessWithdrawalV2(s, report.cash, amt) : null), [s, report, kind, amt]);
-  const [recurring, setRecurring] = useState("6000");
-  const aff = useMemo(() => {
-    if (kind === "stock" && amt > 0) return assessAffordability(s, report.cash, { kind: "purchase", upfront: amt, mandatory: false, label: "stock purchase" });
-    if (kind === "employee") return assessAffordability(s, report.cash, { kind: "employee", upfront: 0, recurringMonthly: Number(recurring) || 0, mandatory: false, label: "new employee" });
-    return null;
-  }, [s, report, kind, amt, recurring]);
-
-  const askAI = async () => {
-    const decision = kind === "withdrawal" ? `Withdraw ${egp(amt)} this month.` : freeText;
-    if (!decision.trim()) return;
-    setAiState("loading");
-    try {
-      const result = await generateLanguage(
-        { mode: "decision_support", snapshot: s, report, findings, calendar: computeCalendar(todayCairo()), decision, decisionContext: ctx },
-        { enhanced: true },
-      );
-      if (result.fallback) timings.fallbacks += 1;
-      setAiAnswer({ r: result.response, note: result.fallbackReason ? `Language service unavailable — BostaOS templates answered. (${result.fallbackReason})` : undefined });
-      setAiState("idle");
-    } catch (e) {
-      setAiState("idle"); reportError("Decision support", e);
-    }
-  };
-
-  const VERDICT_META: Record<string, [string, string]> = {
-    safe: ["Affordable", "var(--green)"], safe_reduces_flexibility: ["Affordable · thins the buffer", "var(--green)"],
-    conditional: ["Conditional on expected money", "var(--amber)"], tight: ["Possible but tight", "var(--amber)"],
-    unsafe: ["Not safely affordable", "var(--red)"], unknowable: ["Can't be verified yet", "rgb(var(--violet))"],
-  };
-
-  return (
-    <DeckTile>
-      <div className="th"><span className="tname">Decision mode</span>
-        <span className="eyebrow" style={{ marginLeft: "auto" }}>Numbers first · AI judgment second</span>
-      </div>
-      <div className="chiprow" style={{ gap: 8, marginTop: 10 }}>
-        {([["withdrawal", "Owner withdrawal"], ["stock", "Buy stock"], ["employee", "Hire employee"], ["price", "Price change"], ["other", "Something else"]] as [DecisionKind, string][]).map(([k, label]) => (
-          <button key={k} className={kind === k ? "mbtn accent" : "mbtn"} onClick={() => { setKind(k); setAiAnswer(null); }}>{label}</button>
-        ))}
-      </div>
-
-      {kind === "withdrawal" ? (
-        <div style={{ marginTop: 12 }}>
-          <Field label="How much do you want to take out? (EGP)">
-            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ maxWidth: 200 }} />
-          </Field>
-          {wa && (
-            <div style={{ marginTop: 12, border: "1px solid var(--stroke2)", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <Chip text={VERDICT_META[wa.verdict][0]} color={VERDICT_META[wa.verdict][1]} />
-                <Chip text={CONF_LABEL[wa.confidence]} color="rgb(var(--dim))" />
-                {wa.recommendedMax != null && <span style={{ fontSize: 13, fontWeight: 700 }}>Recommended max: {egp(wa.recommendedMax)}</span>}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10, marginTop: 12 }}>
-                <KV k="Verified cash" v={wa.verifiedCash} />
-                <KV k="Expected (not available)" v={wa.expectedMoney} />
-                <KV k="Committed" v={wa.committed} />
-                <KV k="Reserve" v={wa.reserve} />
-                <KV k="Verified headroom" v={wa.verifiedHeadroom} />
-                <KV k="After this draw" v={wa.resultingReserve} />
-                <KV k="Profit context" v={wa.profitContext} />
-                <KV k="Already withdrawn" v={wa.withdrawalsAlready} />
-                <KV k="Data freshness" v={wa.dataFreshness} />
-              </div>
-              {wa.reasonsToWait.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, color: "rgb(var(--faint))" }}>Reasons to wait</div>
-                  {wa.reasonsToWait.map((r, i) => <div key={i} style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 3 }}>· {r}</div>)}
-                </div>
-              )}
-              <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", marginTop: 10 }}>
-                A profitable month doesn't mean the cash is in the drawer — profit and cash are checked separately. Next step: {wa.nextStep}
-              </div>
-            </div>
-          )}
-        </div>
-      ) : kind === "stock" || kind === "employee" ? (
-        <div style={{ marginTop: 12 }}>
-          {kind === "stock"
-            ? <Field label="Purchase amount (EGP)"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ maxWidth: 200 }} /></Field>
-            : <Field label="Monthly salary (EGP)"><Input type="number" value={recurring} onChange={(e) => setRecurring(e.target.value)} style={{ maxWidth: 200 }} /></Field>}
-          {aff && (
-            <div style={{ marginTop: 12, border: "1px solid var(--stroke2)", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <Chip text={VERDICT_META[aff.verdict]?.[0] ?? aff.verdict} color={VERDICT_META[aff.verdict]?.[1] ?? "rgb(var(--dim))"} />
-                <Chip text={`${aff.answerLevel} answer`} color="rgb(var(--dim))" />
-                {aff.recommendedMax != null && <span style={{ fontSize: 13, fontWeight: 700 }}>Headroom: {egp(aff.recommendedMax)}</span>}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10, marginTop: 12 }}>
-                <KV k="Verified cash" v={aff.verifiedCash != null ? egp(aff.verifiedCash) : "unknown — no fresh count"} />
-                <KV k="Expected (not available)" v={aff.expectedUnavailable != null ? `~${egp(aff.expectedUnavailable)}` : "—"} />
-                <KV k="Committed (30d)" v={egp(aff.committed30)} />
-                <KV k="Reserve" v={egp(aff.requiredReserve)} />
-                {aff.recurring && <KV k="Recurring burden" v={`${egp(aff.recurring.monthly)}/month · ${aff.recurring.revenueToCover != null ? `needs ~${egp(aff.recurring.revenueToCover)}/month extra sales ${aff.recurring.marginBasis}` : aff.recurring.marginBasis}`} />}
-                {aff.recurring?.monthsCoverableFromHeadroom != null && <KV k="Headroom covers" v={`~${aff.recurring.monthsCoverableFromHeadroom} months of this cost with zero benefit`} />}
-              </div>
-              {aff.reasons.length > 0 && <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 8 }}>{aff.reasons.map((r, i) => <div key={i}>· {r}</div>)}</div>}
-              {aff.assumptions.length > 0 && <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 6 }}>{aff.assumptions.join(" · ")}</div>}
-              <div style={{ fontSize: 12, color: "rgb(var(--text))", fontWeight: 600, marginTop: 8 }}>→ {aff.nextStep}</div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ marginTop: 12 }}>
-          <Field label="Describe the decision you're considering">
-            <Input placeholder={kind === "price" ? "e.g. raise كاجو price by 10%" : "I'm considering…"}
-              value={freeText} onChange={(e) => setFreeText(e.target.value)} />
-          </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 10, marginTop: 12 }}>
-            <KV k="Cash headroom" v={ctx.cashHeadroomAboveFloor != null ? egp(ctx.cashHeadroomAboveFloor) : `unknown — ${ctx.cashHeadroomNote}`} />
-            <KV k="One margin point is worth" v={ctx.marginPointValue != null ? `${egp(ctx.marginPointValue)} / period` : "unknown"} />
-            <KV k="Money due from the mall" v={ctx.openTabEstimatedNet != null ? `~${egp(ctx.openTabEstimatedNet)}` : "unknown"} />
-            {ctx.belowMarginFloor.length > 0 && <KV k="Below your margin floor" v={ctx.belowMarginFloor.map((p) => `${p.name} (${p.marginPct}%)`).join(", ")} />}
-          </div>
-          {ctx.caveats.length > 0 && <div style={{ fontSize: 11.5, color: "var(--amber)", marginTop: 8 }}>{ctx.caveats.join(" · ")}</div>}
-        </div>
-      )}
-
-      <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <Button onClick={() => void askAI()} disabled={aiState === "loading"}>
-          {aiState === "loading" ? "Assessing…" : "Get the strategist's judgment"}
-        </Button>
-      </div>
-      {aiAnswer && (
-        <div style={{ marginTop: 12 }}>
-          {aiAnswer.note && <div style={{ fontSize: 12, color: "var(--amber)", fontWeight: 600, marginBottom: 8 }}>{aiAnswer.note}</div>}
-          <AnswerCard r={aiAnswer.r} messageId={crypto.randomUUID()} snapshotMeta={{ period: s.meta.period.label, lastDataDate: s.meta.lastDataDate }} />
-        </div>
-      )}
-    </DeckTile>
   );
 }
 
@@ -1664,7 +1770,7 @@ function WeeklyPriorityCard({ weekly, onQueue }: { weekly: ReturnType<typeof sel
   if (!p) return null;
   return (
     <DeckTile>
-      <div className="th"><span className="tname">This week's priority</span>
+      <div className="th" style={{ flexWrap: "wrap" }}><span className="tname">This week's priority</span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <Chip text={`${p.effort} effort`} color="rgb(var(--dim))" />
           <Chip text={CONF_LABEL[p.confidence] ?? p.confidence} color="rgb(var(--dim))" />
@@ -1676,7 +1782,7 @@ function WeeklyPriorityCard({ weekly, onQueue }: { weekly: ReturnType<typeof sel
         {p.evidence.map((e, i) => <span key={i}>{e.label}: <b style={{ color: "rgb(var(--muted))" }}>{e.value}</b></span>)}
       </div>
       <div style={{ fontSize: 11.5, color: "rgb(var(--dim))", marginTop: 8 }}>
-        Success: {p.successCriteria} · {p.reviewTiming} · expected: {p.expectedOutcome}
+        Success: {p.successCriteria} · {p.reviewTiming}
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
         <Link to={p.screenLink} style={{ fontSize: 12, color: "var(--mag)", fontWeight: 700 }}>Open screen</Link>

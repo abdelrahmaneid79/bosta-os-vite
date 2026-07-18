@@ -11,8 +11,11 @@ import type { StrategyReport } from "../analysis/report";
 import type { ProductFact, RetailBusinessFacts } from "./contract";
 import { loadRetailContext, listPackagingFormats } from "../persistence/retail-context";
 import { EMPTY_CONTEXT } from "./interview";
+import { getLocationBrain } from "@/core/read/location";
+import { seasonOn, nextSeason } from "./season";
 
 export interface MerchFields {
+  id: string | null;
   category: string | null;
   packagingFormat: string | null;
   packSizeG: number | null;
@@ -57,6 +60,10 @@ export interface ComposeFactsInput {
   customerOccasions: string[];
   operationalConstraints: string[];
   commonlyBoughtTogether: [string, string][];
+  nextSeason: RetailBusinessFacts["nextSeason"];
+  zones: RetailBusinessFacts["zones"];
+  observations: RetailBusinessFacts["observations"];
+  locationProfile: RetailBusinessFacts["locationProfile"];
   isStale: boolean;
   staleDays: number | null;
 }
@@ -83,7 +90,7 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
     const growthPct = prior && prior.revenue > 0 ? r1(((d.revenue - prior.revenue) / prior.revenue) * 100) : null;
     const marginDeltaPts = d.marginPct != null && prior?.marginPct != null ? r1(d.marginPct - prior.marginPct) : null;
     return {
-      id: null,
+      id: merch?.id ?? null,
       name: d.name,
       category: merch?.category ?? null,
       revenue: Math.round(d.revenue),
@@ -122,11 +129,13 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
     };
   });
 
+  // What would sharpen the numbers — DISCLOSURE, never a reason to stay quiet.
+  // The strategist always advises; this line says how sure it can be.
   const basis: string[] = [];
-  if (!i.inventoryTracked) basis.push("inventory not counted (cover/value limited)");
-  if ((i.coveragePct ?? 0) < 60) basis.push(`product-line coverage ${Math.round(i.coveragePct ?? 0)}%`);
-  if (i.merch.size === 0) basis.push("no merchandising/packaging fields recorded yet");
-  if (i.isStale) basis.push(`books ${i.staleDays ?? "?"} days stale`);
+  if (!i.inventoryTracked) basis.push("stock not counted, so cover and waste are estimated");
+  if ((i.coveragePct ?? 0) < 60) basis.push(`${Math.round(i.coveragePct ?? 0)}% of sales are split by product`);
+  if (i.merch.size === 0) basis.push("no pack sizes or shelf positions recorded");
+  if (i.isStale) basis.push(`books are ${i.staleDays ?? "?"} days behind`);
 
   return {
     period: i.period, comparePeriod: i.comparePeriod, products,
@@ -134,7 +143,8 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
     coveragePct: i.coveragePct, inventoryTracked: i.inventoryTracked, stockCountAgeDays: i.stockCountAgeDays,
     cashCountFresh: i.cashCountFresh, marginFloorPct: i.marginFloorPct, maxCoverDays: i.maxCoverDays,
     deadStockDays: i.deadStockDays, strategicProducts: i.strategicProducts, cashForPurchases: i.cashForPurchases,
-    nextChequeEta: i.nextChequeEta, season: i.season,
+    nextChequeEta: i.nextChequeEta, season: i.season, nextSeason: i.nextSeason,
+    zones: i.zones, observations: i.observations, locationProfile: i.locationProfile,
     offeredPackaging: i.offeredPackaging, allowedPromotions: i.allowedPromotions, allowedDisplayChanges: i.allowedDisplayChanges,
     customerOccasions: i.customerOccasions, operationalConstraints: i.operationalConstraints, commonlyBoughtTogether: i.commonlyBoughtTogether,
     isStale: i.isStale, staleDays: i.staleDays,
@@ -145,12 +155,13 @@ export function composeRetailFacts(i: ComposeFactsInput): RetailBusinessFacts {
 /** Read the optional structured merchandising fields keyed by product name. */
 async function loadMerch(): Promise<Map<string, MerchFields>> {
   const { data, error } = await requireEngine().from("products")
-    .select("id,name_en,packaging_format,pack_size_g,packaging_cost,display_zone,shelf_level,facings,tier,impulse_type,min_order_qty,supplier_lead_days,quantity_breaks,do_not_discontinue,is_traffic_driver");
+    .select("id,name_en,category_id,product_categories(name),packaging_format,pack_size_g,packaging_cost,display_zone,shelf_level,facings,tier,impulse_type,min_order_qty,supplier_lead_days,quantity_breaks,do_not_discontinue,is_traffic_driver");
   if (error) return new Map();
   const m = new Map<string, MerchFields>();
   for (const p of data ?? []) {
     m.set(p.name_en, {
-      category: null,
+      id: p.id,
+      category: (p.product_categories as unknown as { name?: string } | null)?.name ?? null,
       packagingFormat: p.packaging_format, packSizeG: p.pack_size_g, packagingCost: p.packaging_cost,
       displayZone: p.display_zone, shelfLevel: p.shelf_level, facings: p.facings,
       tier: (p.tier as MerchFields["tier"]) ?? null, impulseType: (p.impulse_type as MerchFields["impulseType"]) ?? null,
@@ -165,13 +176,21 @@ async function loadMerch(): Promise<Map<string, MerchFields>> {
 /** Assemble the facts from the audited snapshot + report + merchandising fields
  *  + the owner-interview context (packaging offered, allowed promotions, etc.). */
 export async function assembleRetailFacts(s: StrategistSnapshot, report: StrategyReport): Promise<RetailBusinessFacts> {
-  const [merch, ctx, packaging] = await Promise.all([loadMerch(), loadRetailContext().catch(() => EMPTY_CONTEXT), listPackagingFormats().catch(() => [])]);
+  const [merch, ctx, packaging, branch] = await Promise.all([
+    loadMerch(),
+    loadRetailContext().catch(() => EMPTY_CONTEXT),
+    listPackagingFormats().catch(() => []),
+    // the branch brain is advisory — never fail the strategist over it
+    getLocationBrain().catch(() => ({ locationId: null, profile: null, zones: [], observations: [] })),
+  ]);
   const offeredPackaging = packaging.map((f) => {
     const total = [f.packageCost, f.prepCost, f.labelSealCost].reduce<number | null>((s2, c) => (c == null ? s2 : (s2 ?? 0) + c), null);
     return { type: f.packagingType ?? "custom", name: f.name, hasCost: total != null, totalUnitCost: total, giftingSuitable: f.giftingSuitable, impulseSuitable: f.impulseSuitable, premiumScore: f.premiumScore };
   });
   const lastCount = s.inventory.lastPhysicalCount.value;
   const stockAge = lastCount ? Math.round((Date.parse(s.meta.today) - Date.parse(lastCount)) / 86_400_000) : null;
+  const live = seasonOn(s.meta.today);
+  const upcoming = nextSeason(s.meta.today);
   return composeRetailFacts({
     period: s.meta.period.label,
     comparePeriod: s.meta.comparePeriod.label,
@@ -191,9 +210,17 @@ export async function assembleRetailFacts(s: StrategistSnapshot, report: Strateg
     maxCoverDays: s.context.maxStockCoverDays.value,
     deadStockDays: s.context.deadStockDays.value,
     strategicProducts: s.context.strategicProducts.value ?? [],
-    cashForPurchases: null,                              // unknown until the drawer is counted (honest pre-live)
+    // verified headroom above the owner's cash floor; stays null when the
+    // drawer has never been counted, which is honest rather than optimistic
+    cashForPurchases: report.decisionContext.cashHeadroomAboveFloor,
     nextChequeEta: s.cheques.nextChequeEta.value,
-    season: null,
+    season: live?.season ?? null,
+    nextSeason: upcoming
+      ? { season: upcoming.window.season, name: upcoming.window.name, startsOn: upcoming.window.from, weeksAway: upcoming.weeksAway }
+      : null,
+    zones: branch.zones,
+    observations: branch.observations,
+    locationProfile: branch.profile,
     offeredPackaging,
     allowedPromotions: ctx.allowedPromotions,
     allowedDisplayChanges: ctx.allowedDisplayChanges,

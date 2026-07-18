@@ -25,7 +25,7 @@ const facts = (): RetailBusinessFacts => ({
   period: "Jun 2026", comparePeriod: "May 2026", products: [], totalRevenue: 87_000,
   totalGrossProfit: 35_000, coveragePct: 100, inventoryTracked: false, stockCountAgeDays: null,
   cashCountFresh: false, marginFloorPct: 30, maxCoverDays: null, deadStockDays: null,
-  strategicProducts: [], cashForPurchases: null, nextChequeEta: null, season: null,
+  strategicProducts: [], cashForPurchases: null, nextChequeEta: null, season: null, nextSeason: null, zones: [], observations: [], locationProfile: null,
   offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [],
   operationalConstraints: [], commonlyBoughtTogether: [], isStale: false, staleDays: null,
   basisNote: "test",

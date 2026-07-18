@@ -15,7 +15,7 @@ const F = (products: ProductFact[], o: Partial<RetailBusinessFacts> = {}): Retai
   period: "2026-05", comparePeriod: "2026-04", products, totalRevenue: 20000, totalGrossProfit: 8000,
   coveragePct: 92, inventoryTracked: true, stockCountAgeDays: 3, cashCountFresh: true, marginFloorPct: 30,
   maxCoverDays: 45, deadStockDays: 60, strategicProducts: [], cashForPurchases: 5000, nextChequeEta: "2026-05-25",
-  season: null, offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [],
+  season: null, nextSeason: null, zones: [], observations: [], locationProfile: null, offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [],
   operationalConstraints: [], commonlyBoughtTogether: [], isStale: false, staleDays: 0, basisNote: "", ...o,
 });
 const OPTS = { today: "2026-05-15", maxRecommendations: 40, maxPerProduct: 4 };
@@ -129,7 +129,19 @@ describe("executive knowledge expansion", () => {
   });
 
   it("weekend occasion + low profit driver → pre-weekend top-up", () => {
-    const r = pick(run(F([P({ name: "Cashews", profitSharePct: 15, daysCover: 2 })], { customerOccasions: ["weekend"] })), "weekend-readiness");
+    // profit share 11% clears weekend-readiness (>=10) but not the stockout
+    // playbook (>=12), so this isolates the weekend reason
+    const r = pick(run(F([P({ name: "Cashews", profitSharePct: 11, daysCover: 2 })], { customerOccasions: ["weekend"] })), "weekend-readiness");
     expect(r?.type).toBe("buy_now");
+  });
+
+  it("when two playbooks propose the same buy, the more urgent reason wins the slot", () => {
+    // Both weekend-readiness and stockout-risk want "buy Cashews now". That is
+    // ONE action, so it is shown once — and running out of an earner outranks
+    // the weekend approaching, because it is measured rather than anticipated.
+    const recs = run(F([P({ name: "Cashews", profitSharePct: 15, daysCover: 2 })], { customerOccasions: ["weekend"] }));
+    const buys = recs.filter((r) => r.type === "buy_now" && r.affectedProducts[0] === "Cashews");
+    expect(buys).toHaveLength(1);
+    expect(buys[0].playbookId).toBe("stockout-risk-profit-driver");
   });
 });

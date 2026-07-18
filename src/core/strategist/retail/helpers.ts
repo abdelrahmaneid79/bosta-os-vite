@@ -1,6 +1,6 @@
 /** Shared builders for retail playbooks — keeps each playbook terse and its
  *  recommendation shape consistent. PURE. */
-import type { Evidence, ProductFact, RecommendationDraft } from "./contract";
+import type { BrandEffect, Evidence, ImpactEstimate, ProductFact, RecommendationDraft } from "./contract";
 
 export const egp = (n: number) => `EGP ${Math.round(n).toLocaleString()}`;
 export const pct = (n: number | null) => (n == null ? "unknown" : `${Math.round(n * 10) / 10}%`);
@@ -8,6 +8,15 @@ export const pct = (n: number | null) => (n == null ? "unknown" : `${Math.round(
 export function ev(label: string, value: string, source: string, period: string, screenLink = "/health"): Evidence {
   return { label, value, source, period, screenLink };
 }
+
+/** Money a move ADDS per month. `basis` must spell out the arithmetic on the
+ *  owner's own numbers — the gate rejects an impact whose basis doesn't. */
+export const gain = (monthlyEgp: number, basis: string, kind: ImpactEstimate["kind"] = "arithmetic"): ImpactEstimate =>
+  ({ monthlyEgp: Math.round(monthlyEgp), basis, kind, lever: "revenue" });
+
+/** Money a move SAVES per month. Same evidence discipline as `gain`. */
+export const save = (monthlyEgp: number, basis: string, kind: ImpactEstimate["kind"] = "arithmetic"): ImpactEstimate =>
+  ({ monthlyEgp: Math.round(monthlyEgp), basis, kind, lever: "cost" });
 
 type DraftInput = {
   title: string;
@@ -30,10 +39,13 @@ type DraftInput = {
   mechanism: string;
   expectedBenefitType: string;
   financialImpactEgp?: number | null;
+  impact?: ImpactEstimate | null;
+  brandEffect?: BrandEffect;
   risks?: string[];
   contraindications?: string[];
   assumptions?: string[];
   missingInformation?: string[];
+  sharpenWith?: string | null;
   confidence: RecommendationDraft["confidence"];
   evidence?: Evidence[];
   screenLink?: string;
@@ -65,11 +77,14 @@ export function draft(d: DraftInput): RecommendationDraft {
     effort: d.effort ?? "low",
     mechanism: d.mechanism,
     expectedBenefitType: d.expectedBenefitType,
-    financialImpactEgp: d.financialImpactEgp ?? null,
+    financialImpactEgp: d.financialImpactEgp ?? d.impact?.monthlyEgp ?? null,
+    impact: d.impact ?? null,
+    brandEffect: d.brandEffect ?? "neutral",
     risks: d.risks ?? [],
     contraindications: d.contraindications ?? [],
     assumptions: d.assumptions ?? [],
     missingInformation: d.missingInformation ?? [],
+    sharpenWith: d.sharpenWith ?? null,
     confidence: d.confidence,
     evidence: d.evidence ?? [],
     screenLink: d.screenLink ?? "/health",

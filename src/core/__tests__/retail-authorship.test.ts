@@ -20,7 +20,7 @@ const F = (products: ProductFact[], o: Partial<RetailBusinessFacts> = {}): Retai
   period: "2026-05", comparePeriod: "2026-04", products, totalRevenue: 20000, totalGrossProfit: 8000,
   coveragePct: 92, inventoryTracked: true, stockCountAgeDays: 3, cashCountFresh: true, marginFloorPct: 30,
   maxCoverDays: 45, deadStockDays: 60, strategicProducts: [], cashForPurchases: 5000, nextChequeEta: "2026-05-25",
-  season: null, offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [], operationalConstraints: [], commonlyBoughtTogether: [], isStale: false, staleDays: 0, basisNote: "", ...o,
+  season: null, nextSeason: null, zones: [], observations: [], locationProfile: null, offeredPackaging: [], allowedPromotions: [], allowedDisplayChanges: [], customerOccasions: [], operationalConstraints: [], commonlyBoughtTogether: [], isStale: false, staleDays: 0, basisNote: "", ...o,
 });
 const OPTS = { today: "2026-05-15", maxRecommendations: 30 };
 

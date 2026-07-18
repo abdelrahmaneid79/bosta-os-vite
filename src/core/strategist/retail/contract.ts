@@ -16,6 +16,9 @@ export type { Evidence, FindingConfidence, RetailDomain } from "../intelligence/
 
 export type TruthLevel = "measured_conclusion" | "strong_inference" | "experiment_hypothesis";
 
+/** The trading seasons that actually move a nut & snack stand in Egypt. */
+export type RetailSeason = "ramadan" | "eid" | "gifting" | "back_to_school" | "winter_nuts" | "summer_slow";
+
 /** Where a recommendation came from — always shown to the owner. A model may
  *  author a candidate, but it enters through the SAME deterministic validation
  *  gate and can never be labelled a measured conclusion. */
@@ -90,6 +93,71 @@ export interface ProductFact {
   ownerTrafficDriver: boolean;
 }
 
+/* ── the objective ──────────────────────────────────────────────────────────
+ *  BostaOS has ONE goal: grow revenue and cut cost without cheapening the
+ *  brand. Every recommendation is ranked by what it is WORTH, never by how
+ *  complete the books are. Thin data lowers certainty and is disclosed — it
+ *  never silences the advice.                                                */
+
+/** What a move is worth per month, and WHY that number exists.
+ *
+ *  `basis` is mandatory and must state the actual arithmetic in the owner's
+ *  own terms ("40 dead facings × your 71 EGP/facing/month main-table
+ *  average"). A number without traceable arithmetic is a fabrication and is
+ *  rejected by the gate — the owner's standing rule is no invented data. */
+export interface ImpactEstimate {
+  /** monthly EGP the move is expected to add (revenue) or save (cost) */
+  monthlyEgp: number;
+  /** the arithmetic, in plain words — always shown next to the number */
+  basis: string;
+  /** measured  = computed purely from recorded BostaOS numbers
+   *  arithmetic= his own numbers extrapolated to an unused asset/format
+   *  directional = a real effect with no local number yet; magnitude unproven */
+  kind: "measured" | "arithmetic" | "directional";
+  /** revenue growth vs cost reduction — the two halves of the objective */
+  lever: "revenue" | "cost";
+}
+
+/** Effect on how the brand reads on the shelf. Premium permission is an asset:
+ *  a move that earns money by cheapening presentation is penalised, and one
+ *  that would visibly damage the brand is blocked outright. */
+export type BrandEffect = "builds" | "neutral" | "risks";
+
+/* ── the physical branch (Gardenia) ─────────────────────────────────────── */
+
+/** One selling zone of the actual stand — the fixtures, not the books. */
+export interface ZoneFact {
+  key: string;
+  name: string;
+  /** premium_impulse | impulse | value_volume | opportunity | adjacent | removed */
+  tier: string;
+  /** high | aisle_end | passing | destination */
+  traffic: string;
+  facings: number;
+  lit: boolean;
+  branded: boolean;
+  signage: string | null;
+  notes: string | null;
+  active: boolean;
+}
+
+/** A standing observation about the branch, from the owner's own photo audit. */
+export interface LocationObservationFact {
+  category: string;
+  severity: string;              // critical | major | minor | strength
+  finding: string;
+  recommendation: string | null;
+}
+
+/** The branch's operating reality — what the owner may and may not change. */
+export interface LocationProfileFact {
+  operatingModel: string | null;
+  pricingControl: string | null;
+  brandAssets: string | null;
+  equipment: string | null;
+  constraints: string | null;
+}
+
 /** A packaging format the owner has confirmed they offer + its economics. */
 export interface OfferedPackaging {
   type: string;                 // 'mini_bag' | 'pouch' | 'gift' | 'grab_and_go' | ...
@@ -121,7 +189,16 @@ export interface RetailBusinessFacts {
   // cash / timing
   cashForPurchases: number | null;   // verified affordable spend; null = unknown
   nextChequeEta: string | null;
-  season: "ramadan" | "eid" | "gifting" | null;
+  /** the retail season LIVE today (null = ordinary trading) */
+  season: RetailSeason | null;
+  /** the next season worth preparing for, and how long there is to prepare —
+   *  buying and packing decisions need lead time, so the strategist plans
+   *  forward instead of only reacting when the peak has already arrived */
+  nextSeason: { season: RetailSeason; name: string; startsOn: string; weeksAway: number } | null;
+  // the physical branch
+  zones: ZoneFact[];
+  observations: LocationObservationFact[];
+  locationProfile: LocationProfileFact | null;
   // owner interview context
   offeredPackaging: OfferedPackaging[];
   allowedPromotions: string[];
@@ -202,10 +279,18 @@ export interface RetailRecommendation {
   mechanism: string;
   expectedBenefitType: string;
   financialImpactEgp: number | null;    // only when deterministically calculable
+  /** what this move is worth per month + the arithmetic behind it. This — not
+   *  data completeness — is what ranks the owner's list. */
+  impact: ImpactEstimate | null;
+  /** does the move build, preserve, or cheapen the brand on the shelf */
+  brandEffect: BrandEffect;
   risks: string[];
   contraindications: string[];
   assumptions: string[];
   missingInformation: string[];
+  /** ONE thing the owner could record to make this number sharper. Advisory
+   *  only — it is never a reason to withhold the recommendation. */
+  sharpenWith: string | null;
   confidence: FindingConfidence;
   confidenceCeiling: FindingConfidence;
   evidence: Evidence[];

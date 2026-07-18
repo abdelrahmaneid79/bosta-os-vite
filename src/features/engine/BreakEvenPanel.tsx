@@ -4,12 +4,15 @@
  *  been earned), then the bar that gives it context, then the three levers
  *  (days left, daily rate required, value of extra sales). Status is carried by
  *  a labelled chip AND an icon, never by colour alone. */
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DeckTile } from "./deck";
 import { SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp } from "@/core/utils/format";
+import { fmtDate } from "@/core/utils/date";
+import { cn } from "@/core/utils/cn";
 import { isEngineConfigured } from "@/core/db/engine";
-import { getBreakEven, type BreakEvenSnapshot } from "@/core/read/break-even";
+import { getBreakEven, type BreakEvenSnapshot, type BreakEvenDay } from "@/core/read/break-even";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"];
@@ -35,6 +38,7 @@ function Metric({ value, label, hint }: { value: string; label: string; hint?: s
 
 export function BreakEvenPanel() {
   const q = useQuery({ queryKey: ["break-even"], queryFn: getBreakEven, enabled: isEngineConfigured });
+  const [sel, setSel] = useState<BreakEvenDay | null>(null);
   if (!isEngineConfigured) return null;
   if (q.isLoading) return <DeckTile><SkeletonRows rows={3} /></DeckTile>;
   if (q.isError) return <DeckTile><ErrorState message={String((q.error as Error)?.message ?? "Could not load break-even")} /></DeckTile>;
@@ -43,9 +47,16 @@ export function BreakEvenPanel() {
   const monthName = MONTHS[Number(b.month.slice(5, 7)) - 1];
   const pastBreakEven = b.profit > 0;
   const barPct = Math.min(100, Math.max(0, b.progressPct));
+  // scale the day columns against the best day, so the shape of the month reads
+  const peak = b.days.reduce((m, d) => Math.max(m, d.revenue), 0);
+  // Where the month SHOULD be by today if break-even were earned evenly —
+  // the tick the fill has to keep up with. Clamped so the label stays on-card.
+  const pacePct = b.daysInMonth > 0
+    ? Math.min(96, Math.max(4, (b.daysElapsed / b.daysInMonth) * 100)) : null;
 
   return (
     <DeckTile>
+      <div className="be" style={{ "--be-c": s.colour } as React.CSSProperties}>
       <div className="be-head">
         <span className="tname">Break-even · {monthName}</span>
         <span className="be-chip" style={{ color: s.colour, borderColor: s.colour }}>
@@ -58,7 +69,9 @@ export function BreakEvenPanel() {
 
       {/* HERO — the one number worth reading first */}
       <div className="be-hero">
-        <div className="be-hero-v tnum" style={{ color: pastBreakEven ? "var(--green)" : "rgb(var(--text))" }}>
+        <div className="be-hero-v tnum" style={pastBreakEven
+          ? { color: "var(--green)", textShadow: "0 0 28px rgba(66,226,154,.35)" }
+          : { color: "rgb(var(--text))" }}>
           <small>EGP</small>{bare(pastBreakEven ? b.profit : b.revenueStillNeeded)}
         </div>
         <div className="be-hero-l">
@@ -66,12 +79,62 @@ export function BreakEvenPanel() {
         </div>
       </div>
 
-      {/* progress toward the fixed base */}
-      <div className="be-bar" role="img"
-        aria-label={`${bare(b.revenue)} of ${bare(b.breakEvenRevenue)} break-even reached, ${barPct} percent`}>
-        <i style={{ width: `${barPct}%`, background: s.colour }} />
+      {/* THE MONTH, DAY BY DAY — one column per day, height = that day's take.
+          Hover or tap any day to see where the month stood after it. */}
+      <div className="be-run">
+        <div className="be-days" role="img"
+          aria-label={`${bare(b.revenue)} of ${bare(b.breakEvenRevenue)} break-even reached, ${barPct} percent, day ${b.daysElapsed} of ${b.daysInMonth}`}>
+          {b.days.map((d) => {
+            const h = peak > 0 ? Math.max(6, Math.round((d.revenue / peak) * 100)) : 6;
+            const isToday = d.day === b.daysElapsed;
+            return (
+              <button type="button" key={d.date}
+                className={cn("be-day", d.isFuture && "future", isToday && "today", sel?.day === d.day && "sel")}
+                style={{ "--h": `${d.isFuture ? 6 : h}%` } as React.CSSProperties}
+                onMouseEnter={() => setSel(d)} onFocus={() => setSel(d)}
+                onMouseLeave={() => setSel(null)} onBlur={() => setSel(null)}
+                onClick={() => setSel((c) => (c?.day === d.day ? null : d))}
+                aria-label={`${d.day} ${monthName}: ${d.isFuture ? "not yet" : `${bare(d.revenue)} sold, ${bare(d.cumulative)} for the month`}`}>
+                <i />
+              </button>
+            );
+          })}
+        </div>
+
+        {/* the progress line itself — its own layer under the days */}
+        <div className="be-bar">
+          <i style={{ width: `${barPct}%` }} />
+          {pacePct != null && !pastBreakEven && (
+            <span className="be-tick" style={{ left: `${pacePct}%` }} aria-hidden="true" />
+          )}
+        </div>
       </div>
-      <div className="be-scale tnum">
+
+      {/* one readout that swaps between the month and the picked day */}
+      <div className="be-read tnum">
+        {sel ? (
+          <>
+            <b>{fmtDate(sel.date)}</b>
+            {sel.isFuture ? <span>still to come</span> : (
+              <>
+                <span>{bare(sel.revenue)} sold</span>
+                <span>{bare(sel.cumulative)} by then</span>
+                <span className={sel.cumulative >= sel.pace ? "ok" : "behind"}>
+                  {sel.cumulative >= sel.pace ? "on pace" : `${bare(sel.pace - sel.cumulative)} behind pace`}
+                </span>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <b>Day {b.daysElapsed} of {b.daysInMonth}</b>
+            <span>{bare(b.revenue)} sold</span>
+            <span>{bare(b.breakEvenRevenue)} needed</span>
+          </>
+        )}
+      </div>
+
+      <div className="be-scale tnum" hidden>
         <span>{bare(b.revenue)} sold</span>
         <span>{bare(b.breakEvenRevenue)} needed</span>
       </div>
@@ -95,7 +158,11 @@ export function BreakEvenPanel() {
         ) : (
           <>No sales recorded yet this month.</>
         )}
-        <span className="be-note">Rent, salary and the mall&rsquo;s {Math.round(0.03 * 100)}% are already taken out.</span>
+        <span className="be-note">
+          Covers {egp(b.fixedCosts.rent)} rent + {egp(b.fixedCosts.ownCosts)} {b.fixedCosts.ownCostsBasis}, plus the mall&rsquo;s 3%.
+          Both leave at month end, but the month owes them from day one.
+        </span>
+      </div>
       </div>
     </DeckTile>
   );

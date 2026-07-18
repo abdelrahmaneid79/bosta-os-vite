@@ -47,6 +47,15 @@ export interface DailyBrief {
     complete: boolean;
     lines: string[];
     exceptions: number;
+    /** the raw figures, so the UI can lay them out as data instead of prose */
+    stats: {
+      revenue: number | null;
+      expenses: number | null;
+      grossProfit: number | null;
+      grossProfitCovered: boolean;
+      topProduct: string | null;
+      closeStatus: string;
+    };
   };
   today: {
     lines: string[];
@@ -121,7 +130,17 @@ export function composeDailyBrief(i: BriefInput): DailyBrief {
     date: i.today,
     health,
     headline,
-    yesterday: { date: i.lastDay?.date ?? i.lastDataDate, complete, lines: yLines, exceptions: i.exceptions.total },
+    yesterday: {
+      date: i.lastDay?.date ?? i.lastDataDate, complete, lines: yLines, exceptions: i.exceptions.total,
+      stats: {
+        revenue: i.lastDay?.revenue ?? null,
+        expenses: i.lastDay?.expenses ?? null,
+        grossProfit: i.lastDay?.grossProfit ?? null,
+        grossProfitCovered: i.lastDay?.grossProfitCovered ?? false,
+        topProduct: i.lastDay?.topProduct ?? null,
+        closeStatus: i.lastDayClose,
+      },
+    },
     today: { lines: tLines, primaryAction: i.primaryAction, secondaryActions: i.secondaryActions },
     trust: {
       cash: i.cashConfidence, inventory: i.inventoryConfidence, financial: i.financialConfidence,
