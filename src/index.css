@@ -3,6 +3,19 @@
 @tailwind utilities;
 
 /* ===================================================================
+   IDENTITY FONTS — self-hosted in /public/fonts so the brand faces can
+   never silently fall back: no CDN, cached same-origin by the service
+   worker, works offline in the installed PWA. Clash Display carries all
+   headings and hero numbers; Satoshi is the body face.
+   =================================================================== */
+@font-face{font-family:'Clash Display';src:url('/fonts/clash-display-600.woff2') format('woff2');font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:'Clash Display';src:url('/fonts/clash-display-700.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Satoshi';src:url('/fonts/satoshi-400.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'Satoshi';src:url('/fonts/satoshi-500.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:'Satoshi';src:url('/fonts/satoshi-700.woff2') format('woff2');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'Satoshi';src:url('/fonts/satoshi-900.woff2') format('woff2');font-weight:900;font-style:normal;font-display:swap}
+
+/* ===================================================================
    THEME TOKENS — all colours are space-separated RGB channels so that
    Tailwind's  rgb(var(--x) / <alpha-value>)  opacity modifiers work
    (e.g. bg-pink/15, border-line/60). Light is the default; .dark on
