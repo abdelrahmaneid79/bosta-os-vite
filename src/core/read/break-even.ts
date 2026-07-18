@@ -56,7 +56,14 @@ export async function getBreakEven(): Promise<BreakEvenSnapshot> {
   // target divides to Infinity, which is worse than useless.
   const trailingFrom = new Date(Date.parse(`${today}T00:00:00Z`) - 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const [lines, trailing, opexRows] = await Promise.all([
+  const [dayTotals, lines, trailing, opexRows] = await Promise.all([
+    // Authoritative revenue: the day total on the sale itself. Some days are
+    // recorded as a total only (no product breakdown), so summing sale_items
+    // would silently under-report them.
+    sb.from("sales").select("total_amount")
+      .is("voided_at", null)
+      .gte("sale_date", `${month}-01`)
+      .lte("sale_date", today),
     sb.from("sale_items")
       .select("quantity,line_total,products!inner(selling_price,avg_cost,pack_size_g,packaging_cost),sales!inner(sale_date)")
       .is("voided_at", null)
@@ -73,6 +80,7 @@ export async function getBreakEven(): Promise<BreakEvenSnapshot> {
       .gte("expense_date", `${month}-01`)
       .lte("expense_date", today),
   ]);
+  if (dayTotals.error) throw dayTotals.error;
   if (lines.error) throw lines.error;
   if (trailing.error) throw trailing.error;
   if (opexRows.error) throw opexRows.error;
@@ -97,8 +105,15 @@ export async function getBreakEven(): Promise<BreakEvenSnapshot> {
 
   const mtd = tally(lines.data as Row[] | null);
   const hist = tally(trailing.data as Row[] | null);
-  const revenue = mtd.revenue;
-  const contribution = mtd.contribution;
+
+  // Revenue always comes from the day totals. Contribution comes from product
+  // lines where they exist; for revenue recorded as a day total only, it is
+  // estimated at the trailing margin rather than dropped (which would make a
+  // good month look like a loss).
+  const revenue = (dayTotals.data ?? []).reduce((s, r) => s + (Number(r.total_amount) || 0), 0);
+  const trailingCmRaw = hist.revenue > 0 ? hist.contribution / hist.revenue : 0;
+  const uncoveredRevenue = Math.max(0, revenue - mtd.revenue);
+  const contribution = mtd.contribution + uncoveredRevenue * trailingCmRaw;
 
   // Own operating costs, excluding stock buys (that's COGS) and packaging
   // (already charged per pack above) so nothing is counted twice.
@@ -114,9 +129,8 @@ export async function getBreakEven(): Promise<BreakEvenSnapshot> {
   // The TARGET uses the trailing margin (stable, and always available) so the
   // panel gives a real number on day 1 of the month. Actual profit still uses
   // this month's own contribution.
-  const trailingCm = hist.revenue > 0 ? hist.contribution / hist.revenue : 0;
   const mtdCm = revenue > 0 ? contribution / revenue : 0;
-  const cmFraction = trailingCm > 0 ? trailingCm : mtdCm;
+  const cmFraction = trailingCmRaw > 0 ? trailingCmRaw : mtdCm;
 
   const breakEvenRevenue = cmFraction > 0 ? Math.round(fixedMonthly / cmFraction) : 0;
   const base = breakEven(revenue, contribution, fixedMonthly);
