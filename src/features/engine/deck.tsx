@@ -2,6 +2,30 @@
  *  / .stat tile / .mbars / .tbl / .subtabs), as reusable React so every screen is
  *  identical to the design. Pure presentation; screens wire them to live data. */
 import { useState, type ReactNode } from "react";
+import { cn } from "@/core/utils/cn";
+
+/** A launcher into a focused subpage — chevron row with an optional count.
+ *  Shared so the strategist and performance pages open subpages identically. */
+export function SubpageCard({ title, sub, badge, urgent, onClick }: {
+  title: string; sub: string; badge?: number; urgent?: boolean; onClick: () => void;
+}) {
+  return (
+    <button type="button" className="sp-card" onClick={onClick}
+      aria-label={badge ? `${title} — ${badge} need${badge === 1 ? "s" : ""} attention` : title}>
+      <div className="sp-card-body">
+        <div className="sp-card-t">
+          {title}
+          {badge != null && badge > 0 && <span className={cn("sp-badge", urgent && "urgent")}>{badge}</span>}
+        </div>
+        <div className="sp-card-s">{sub}</div>
+      </div>
+      <svg className="sp-card-c" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M9 18l6-6-6-6" />
+      </svg>
+    </button>
+  );
+}
 
 export function PageHdr({ title, sub, right }: { title: string; sub: string; right?: ReactNode }) {
   return (

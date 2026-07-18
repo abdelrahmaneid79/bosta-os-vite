@@ -666,6 +666,20 @@
 .cdk .wid-basis b{color:var(--mag);font-weight:700;font-variant-numeric:tabular-nums}
 .cdk .wid-sharpen{margin-top:8px;font-size:11.5px;color:var(--cd-faint);font-style:italic}
 .cdk .wid-foot{margin-top:12px;padding-top:10px;border-top:1px solid var(--stroke2);font-size:12px;color:var(--cd-dim)}
+
+/* ── "Worth fixing" rows (Strategist › Run the day) — folded-in Gaps ─────────── */
+.cdk .fix-row{display:flex;gap:11px;align-items:flex-start;border:1px solid var(--stroke2);border-radius:13px;
+  padding:11px 13px;text-decoration:none;color:inherit;
+  background:linear-gradient(180deg,var(--surface2),var(--surface));transition:border-color .16s,transform .16s,box-shadow .16s}
+.cdk .fix-row:hover{border-color:rgba(255,77,187,.35);transform:translateY(-1px);box-shadow:0 12px 26px -18px rgba(0,0,0,.85)}
+.cdk .fix-row:active{transform:scale(.99)}
+.cdk .fix-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.cdk .fix-t{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--cd-text);line-height:1.3}
+.cdk .fix-m{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--cd-dim);font-variant-numeric:tabular-nums;
+  background:rgba(255,255,255,.06);border-radius:999px;padding:1px 8px}
+.cdk .fix-d{font-size:12px;color:var(--cd-muted);margin-top:3px;line-height:1.45}
+.cdk .fix-a{font-size:12px;font-weight:700;color:var(--mag);margin-top:4px}
+@media (prefers-reduced-motion:reduce){ .cdk .fix-row:hover,.cdk .fix-row:active{transform:none} }
 @media (max-width:767px){
   .cdk .wid-prize-v{font-size:29px}
   .cdk .wid-head{flex-wrap:wrap;gap:4px 10px}

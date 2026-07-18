@@ -24,15 +24,9 @@ export const NAV_SECTIONS: NavSection[] = [
     { to: "/expenses", label: "Expenses" },
     { to: "/cheques", label: "Cheques" },
   ] },
-  { id: "reports", label: "Reports", icon: "M6 2h9l5 5v15H4V2zM9 13h6M9 17h6", accent: "#9B6CFF", tabs: [
-    { to: "/reports", label: "Overview" },
-    { to: "/reconcile", label: "Profit" },
-    { to: "/reports/tables", label: "Tables & export" },
-  ] },
   { id: "insights", label: "Insights", icon: "M22 12h-4l-3 8L9 4l-3 8H2", accent: "#54D69A", tabs: [
     { to: "/health", label: "Strategist" },
-    { to: "/missing", label: "Gaps" },
-    { to: "/activity", label: "Activity" },
+    { to: "/performance", label: "Performance" },
   ] },
 ];
 

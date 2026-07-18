@@ -7,23 +7,19 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, Eyebrow, Badge, Select } from "@/components/ui";
+import { Card, Eyebrow, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { Confirm } from "@/components/ui/Confirm";
-import { EmptyState, SkeletonRows, ErrorState, PartialNote } from "@/components/feedback";
+import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
-import { useBooksStartDate } from "@/store/books";
-import { egp, num, pct } from "@/core/utils/format";
+import { egp, num } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
-import { rangeLabel } from "@/core/range";
-import { useFilters } from "@/store/filters";
 import { getStockSummary } from "@/core/read/stock";
 import { getProducts } from "@/core/read/common";
 import { getRecentSales, getSaleItems, daySignal, DAY_SIGNAL_LABEL, type DaySignal, type SaleRow as SaleRowVM, type SaleLine } from "@/core/read/sales";
 import { getPurchases, getInventoryPurchases } from "@/core/read/purchases";
-import { getProfitReadout } from "@/core/read/profit";
 import { ProductForm, PurchaseForm, SaleForm, SaleItemForm } from "./forms";
 import { ProductDetailScreen } from "./product";
 import { PageHdr, Stat, DeckTile, TileHead } from "./deck";
@@ -424,72 +420,3 @@ export function PurchasesScreen() {
   );
 }
 
-// ── Reconcile / P&L (read-derived) ────────────────────────────────────────────
-export function ReconcileScreen() {
-  const range = useActiveRange();
-  const key = useFilters((s) => s.rangeKey);
-  const accStart = useBooksStartDate();
-  const q = useQuery({ queryKey: ["profit", range, accStart], queryFn: () => getProfitReadout(range, accStart), enabled: isEngineConfigured });
-  const p = q.data;
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Eyebrow>Profit · {rangeLabel(key, range)}</Eyebrow>
-        <DateRangePicker />
-      </div>
-      {p?.partialBefore && <PartialNote since={p.partialBefore} />}
-      {!isEngineConfigured ? <ConnectPanel /> : q.isError ? <ErrorState message={String((q.error as Error)?.message)} /> : (
-        <>
-          <Card glow>
-            <Eyebrow>Net profit · after costs &amp; expenses</Eyebrow>
-            <div className="mt-1 flex flex-wrap items-end gap-3">
-              <div className="tnum font-display text-5xl font-extrabold leading-none text-text">
-                {p ? (p.netProfit == null ? "—" : egp(p.netProfit)) : "—"}
-              </div>
-              {p && p.netMargin != null && <Badge tone={p.netMargin >= 0 ? "good" : "bad"}>{pct(p.netMargin)} net margin</Badge>}
-            </div>
-            <div className="mt-6 space-y-3">
-              <Bar label="Revenue" amount={p ? egp(p.revenue) : "—"} pctWidth={100} tone="bg-good" />
-              <Bar label="− Cost of goods" amount={p ? egp(p.cogs) : "—"} pctWidth={p && p.revenue > 0 ? (p.cogs / p.revenue) * 100 : 0} tone="bg-bad/70" />
-              <Bar label="= Gross profit" amount={p ? (p.grossProfit == null ? "—" : egp(p.grossProfit)) : "—"}
-                pctWidth={p && p.revenue > 0 && p.grossProfit != null ? Math.max(0, (p.grossProfit / p.revenue) * 100) : 0} tone="bg-pink/60" />
-              <Bar label="− Operating expenses" amount={p ? egp(p.operatingExpenses) : "—"} pctWidth={p && p.revenue > 0 ? (p.operatingExpenses / p.revenue) * 100 : 0} tone="bg-warn/70" />
-              <Bar label="= Net profit" amount={p ? (p.netProfit == null ? "—" : egp(p.netProfit)) : "—"}
-                pctWidth={p && p.revenue > 0 && p.netProfit != null ? Math.max(0, (p.netProfit / p.revenue) * 100) : 0} tone="bg-pink" strong />
-            </div>
-            {p && p.grossProfit != null && (
-              <div className="mt-4 text-[11px] text-dim">
-                Gross margin {p.margin != null ? pct(p.margin) : "—"} · money you take out isn&rsquo;t counted as a cost here.
-              </div>
-            )}
-          </Card>
-          {p && !p.complete && (
-            <Card>
-              <div className="space-y-1 text-sm text-warn">
-                <div>Profit isn&rsquo;t final yet — some days sold but their cost isn&rsquo;t recorded.</div>
-                {p.uncoveredRevenue >= 1 && (
-                  <div className="text-dim">{egp(p.uncoveredRevenue)} of sales still need their product cost added.</div>
-                )}
-                {p.margin != null && <div className="text-dim">On the part with costs, margin is {pct(p.margin)}.</div>}
-              </div>
-            </Card>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function Bar({ label, amount, pctWidth, tone, strong }: { label: string; amount: string; pctWidth: number; tone: string; strong?: boolean }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between">
-        <span className={`text-xs ${strong ? "font-display font-semibold text-text" : "text-muted"}`}>{label}</span>
-        <span className={`font-display text-sm font-semibold ${strong ? "text-pink" : "text-text"}`}>{amount}</span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-panel2">
-        <div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.min(100, Math.max(0, pctWidth))}%`, transition: "width .5s ease" }} />
-      </div>
-    </div>
-  );
-}

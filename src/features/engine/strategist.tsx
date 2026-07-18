@@ -9,7 +9,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { DeckTile, PageHdr } from "./deck";
+import { DeckTile, PageHdr, SubpageCard } from "./deck";
 import { Button, Field, Input } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/core/utils/cn";
@@ -20,6 +20,8 @@ import { fmtDate } from "@/core/utils/date";
 import { useUI } from "@/store/ui";
 import { todayCairo, isoDaysAgo } from "@/core/time";
 import { assembleSalesGaps } from "@/core/read/sales-gaps";
+import { getRiskInsights } from "@/core/read/insights";
+import { getMissingData } from "@/core/read/missing";
 import type { SalesGap } from "@/core/strategist/analysis/operations";
 import { assembleSnapshotV2 } from "@/core/strategist/snapshot-v2";
 import type { Finding } from "@/core/strategist/analysis/types";
@@ -97,28 +99,6 @@ function Chip({ text, color }: { text: string; color: string }) {
 
 /** Entry point to a subpage. Heavy detail opens in its own focused view rather
  *  than stacking on this page — one thing to look at, not everything at once. */
-function SubpageCard({ title, sub, badge, urgent, onClick }: {
-  title: string; sub: string; badge?: number; urgent?: boolean; onClick: () => void;
-}) {
-  return (
-    <button type="button" className="sp-card" onClick={onClick}
-      aria-label={badge ? `${title} — ${badge} need${badge === 1 ? "s" : ""} attention` : title}>
-      <div className="sp-card-body">
-        <div className="sp-card-t">
-          {title}
-          {badge != null && badge > 0 && (
-            <span className={cn("sp-badge", urgent && "urgent")}>{badge}</span>
-          )}
-        </div>
-        <div className="sp-card-s">{sub}</div>
-      </div>
-      <svg className="sp-card-c" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M9 18l6-6-6-6" />
-      </svg>
-    </button>
-  );
-}
 
 export function StrategistScreen() {
   const qc = useQueryClient();
@@ -265,6 +245,7 @@ export function StrategistScreen() {
       </div>
 
       <Modal open={!!opsOpen} onClose={() => setOpsOpen(false)} title="Run the day" wide>
+        <FixThesePanel />
         <OperationalExceptionsPanel exceptions={exceptions} loading={opsQ.isLoading}
           onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
           onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
@@ -478,6 +459,48 @@ function DailyBriefCard({ brief, loading }: { brief: DailyBrief | null; loading:
 /* ═══ OPERATIONAL EXCEPTIONS (Cycle 9 — canonical model) ══════════════ */
 
 const EXC_COLOR: Record<string, string> = { critical: "var(--red)", high: "var(--amber)", medium: "rgb(var(--violet))", low: "rgb(var(--dim))", info: "rgb(var(--dim))" };
+
+/** Risks & data gaps — folded in from the old "Gaps" tab, so everything that
+ *  needs fixing lives with the advice instead of on a separate screen. */
+function FixThesePanel() {
+  const risksQ = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
+  const gapsQ = useQuery({ queryKey: ["missing-data"], queryFn: getMissingData, enabled: en });
+  const risks = risksQ.data ?? [];
+  const gaps = gapsQ.data ?? [];
+  if (risksQ.isLoading || gapsQ.isLoading) return <DeckTile><SkeletonRows rows={2} /></DeckTile>;
+  if (risks.length === 0 && gaps.length === 0) return null;
+
+  const sevColor = (s: string) => s === "critical" || s === "high" ? "var(--red)" : s === "warning" || s === "medium" ? "var(--amber)" : "rgb(var(--dim))";
+  return (
+    <DeckTile>
+      <div className="th"><span className="tname">Worth fixing</span>
+        <span className="sp-badge" style={{ marginLeft: "auto" }}>{risks.length + gaps.length}</span>
+      </div>
+      <div className="space-y-2" style={{ marginTop: 8 }}>
+        {risks.map((r) => (
+          <Link key={r.key} to={r.route} className="fix-row">
+            <span className="fix-dot" style={{ background: sevColor(r.severity) }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="fix-t">{r.title}{r.metric && <span className="fix-m tnum">{r.metric}</span>}</div>
+              <div className="fix-d">{r.detail}</div>
+              <div className="fix-a">→ {r.action}</div>
+            </div>
+          </Link>
+        ))}
+        {gaps.map((g) => (
+          <Link key={g.key} to={g.route} className="fix-row">
+            <span className="fix-dot" style={{ background: sevColor(g.severity) }} />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="fix-t">{g.title}<span className="fix-m tnum">{g.count}</span></div>
+              <div className="fix-d">{g.detail}</div>
+              <div className="fix-a">→ {g.action}</div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </DeckTile>
+  );
+}
 
 function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
   exceptions: ReconciledException[]; loading: boolean;

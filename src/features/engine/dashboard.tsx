@@ -1,23 +1,17 @@
 import { useMemo, useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Card, Eyebrow, Pill, Badge, Button } from "@/components/ui";
-import { DeckTile } from "./deck";
 import { BarChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
-import { egp, egpShort, egpShortBare } from "@/core/utils/format";
+import { egpShort, egpShortBare } from "@/core/utils/format";
 import { ALL_TIME_FROM } from "@/core/range";
 import { getPurchaseTotal } from "@/core/read/purchases";
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
-import { getMissingData } from "@/core/read/missing";
-import { getRiskInsights } from "@/core/read/insights";
-import { getActivityFeed, type ActivityEvent } from "@/core/read/activity";
 import { getDailyRevenue } from "@/core/read/sales";
 import { getExpenses } from "@/core/read/expenses";
 import { getChequeCycle } from "@/core/read/settlements";
 import { todayCairo, monthBoundsCairo, isoDaysAgo, isoRange } from "@/core/time";
-import type { Insight, Severity } from "@/core/insights/risk";
 
 const en = isEngineConfigured;
 
@@ -379,114 +373,7 @@ export function DashboardScreen() {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   The remaining screens (Health, Gaps, Activity) keep the existing kit — they
-   are separate routes, ported in a later pass.
-   ═════════════════════════════════════════════════════════════════════════ */
-
-const dot = (s: string) => (s === "high" ? "bg-bad" : s === "medium" ? "bg-warn" : "bg-dim");
-const sevDot = (s: Severity) => (s === "critical" ? "bg-bad" : s === "warning" ? "bg-warn" : "bg-dim");
-const confLabel: Record<Insight["confidence"], string> = { high: "", estimate: "estimate", "low-data": "needs data" };
-const kindGlyph: Record<ActivityEvent["kind"], string> = { sale: "🟢", purchase: "📦", expense: "🧾", cash: "💵", withdrawal: "🏷️", cheque: "🏦", count: "🔢", close: "✅", exception: "⚠️" };
-
-/** Compact insight row — title, why, action, honest confidence chip. */
-export function InsightRow({ i }: { i: Insight }) {
-  return (
-    <Link to={i.route} className="row-hover block rounded-2xl border border-line p-3.5">
-      <div className="flex items-start gap-2.5">
-        <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${sevDot(i.severity)}`} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-display text-sm font-bold text-text">{i.title}</span>
-            {confLabel[i.confidence] && <Badge tone={i.confidence === "low-data" ? "neutral" : "warn"}>{confLabel[i.confidence]}</Badge>}
-            {i.metric && <span className="ml-auto tnum text-[11px] text-dim">{i.metric}</span>}
-          </div>
-          <div className="mt-1 text-[12.5px] leading-relaxed text-muted">{i.detail}</div>
-          <div className="mt-1.5 text-[12px] font-semibold text-pink">→ {i.action}</div>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 function Note({ children }: { children: React.ReactNode }) {
   return <div className="py-1 text-sm" style={{ color: "rgb(var(--dim))" }}>{children}</div>;
 }
 
-/* ─ Gaps: risks & signals + data gaps ──────────────────────────────────── */
-export function MissingScreen() {
-  const q = useQuery({ queryKey: ["missing"], queryFn: getMissingData, enabled: en });
-  const ins = useQuery({ queryKey: ["risk-insights"], queryFn: getRiskInsights, enabled: en });
-  if (!en) return <EmptyState title="Sign in to scan for gaps" />;
-  if (q.isLoading || ins.isLoading) return <SkeletonRows rows={5} />;
-  if (q.isError) return <ErrorState message={String((q.error as Error)?.message)} />;
-  if (ins.isError) return <ErrorState message={String((ins.error as Error)?.message)} />;
-  const issues = q.data ?? [];
-  const risks = ins.data ?? [];
-  if (issues.length === 0 && risks.length === 0) return <EmptyState title="All clear" hint="Nothing flagged, data looks complete." />;
-  return (
-    <div className="space-y-5">
-      {risks.length > 0 && (
-        <div className="space-y-2">
-          <Eyebrow>Risks &amp; signals · {risks.length}</Eyebrow>
-          {risks.map((i) => <InsightRow key={i.key} i={i} />)}
-        </div>
-      )}
-      {issues.length > 0 && (
-        <div className="space-y-3">
-          <Eyebrow>Data gaps · {issues.length}</Eyebrow>
-          {issues.map((i) => (
-            <Card key={i.key}>
-              <div className="flex items-start gap-3">
-                <span className={`mt-1 h-2.5 w-2.5 rounded-full ${dot(i.severity)}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display font-bold">{i.title}</span>
-                    <Pill tone={i.severity === "high" ? "bad" : i.severity === "medium" ? "warn" : "neutral"}>{i.count}</Pill>
-                  </div>
-                  <div className="mt-1 text-sm text-muted">{i.detail}</div>
-                  <div className="mt-1.5 text-[12px] font-semibold text-pink">→ {i.action}</div>
-                </div>
-                <Link to={i.route} className="lift flex-shrink-0 rounded-2xl border border-line bg-panel px-3.5 py-2 text-xs font-semibold text-text hover:bg-panel2">Fix</Link>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─ Activity — full business event feed ────────────────────────────────── */
-export function ActivityScreen() {
-  const navigate = useNavigate();
-  const feed = useQuery({ queryKey: ["activity-full"], queryFn: () => getActivityFeed(60, 200), enabled: en });
-  if (!en) return <EmptyState title="Sign in to see activity" />;
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Eyebrow>Recent activity</Eyebrow>
-        <Button variant="outline" size="sm" disabled={feed.isFetching} onClick={() => feed.refetch()}>{feed.isFetching ? "Refreshing…" : "Refresh"}</Button>
-      </div>
-      {feed.isLoading ? <SkeletonRows rows={8} />
-        : feed.isError ? <ErrorState message={String((feed.error as Error)?.message)} onRetry={() => feed.refetch()} />
-        : (feed.data?.length ?? 0) === 0 ? <EmptyState title="No events yet" hint="Your activity shows up here" />
-        : (
-        <DeckTile style={{ padding: 0 }}><div className="scroll" style={{ maxHeight: "70vh" }}>
-          <table className="tbl">
-            <thead><tr><th>Date</th><th>Event</th><th className="r">Amount</th></tr></thead>
-            <tbody>
-              {feed.data!.map((e) => (
-                <tr key={`${e.kind}-${e.id}`} className="prodcell" onClick={() => navigate(e.route)}>
-                  <td style={{ whiteSpace: "nowrap", color: "rgb(var(--dim))" }}>{fmtDate(e.date, "d MMM yyyy")}</td>
-                  <td><span style={{ marginRight: 8 }}>{kindGlyph[e.kind]}</span>{e.label}</td>
-                  <td className="r" style={{ color: e.amount > 0 ? "var(--green)" : "rgb(var(--muted))" }}>{e.amount !== 0 ? `${e.amount > 0 ? "+" : "−"}${egp(Math.abs(e.amount))}` : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div></DeckTile>
-      )}
-    </div>
-  );
-}

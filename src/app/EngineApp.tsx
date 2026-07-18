@@ -35,7 +35,7 @@ const receipts = () => import("@/features/engine/receipts");
 const productImport = () => import("@/features/engine/product-import");
 const daySalesImport = () => import("@/features/engine/day-sales-import");
 const opening = () => import("@/features/engine/opening");
-const analytics = () => import("@/features/engine/analytics");
+const performance = () => import("@/features/engine/performance");
 const qa = () => import("@/features/qa/QAScreen");
 const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
   lazy(() => load().then((m) => ({ default: m[key] as unknown as React.ComponentType })));
@@ -43,20 +43,16 @@ const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
 const StockScreen = L(screens, "StockScreen");
 const SalesScreen = L(screens, "SalesScreen");
 const PurchasesScreen = L(screens, "PurchasesScreen");
-const ReconcileScreen = L(screens, "ReconcileScreen");
 const DashboardScreen = L(dash, "DashboardScreen");
 const StrategistScreen = L(strategist, "StrategistScreen");
-const MissingScreen = L(dash, "MissingScreen");
-const ActivityScreen = L(dash, "ActivityScreen");
 const MoneyScreen = L(money, "MoneyScreen");
 const ChequesScreen = L(money, "ChequesScreen");
 const ExpensesScreen = L(money, "ExpensesScreen");
-const ReportsScreen = L(more, "ReportsScreen");
 const SystemCheckScreen = L(more, "SystemCheckScreen");
 const SettingsScreen = L(more, "SettingsScreen");
 const ReceiptsScreen = lazy(() => receipts().then((m) => ({ default: m.ReceiptsScreen })));
 const HistoryImportScreen = lazy(() => import("@/features/engine/history-import").then((m) => ({ default: m.HistoryImportScreen })));
-const AnalyticsScreen = L(analytics, "AnalyticsScreen");
+const PerformanceScreen = L(performance, "PerformanceScreen");
 const QAScreen = L(qa, "QAScreen");
 const PreferencesScreen = L(more, "PreferencesScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
@@ -93,8 +89,8 @@ const EL: Record<string, React.ReactNode> = {
   "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <DaySalesPhotoImport />, "/sales/product-lines/file": <ProductLineImportScreen />,
   "/stock": <StockScreen />, "/purchases": <PurchasesScreen />, "/costs": <ProductCostImportScreen />,
   "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/settlements": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
-  "/reports": <AnalyticsScreen />, "/reconcile": <ReconcileScreen />, "/reports/tables": <ReportsScreen />,
-  "/health": <StrategistScreen />, "/missing": <MissingScreen />, "/activity": <ActivityScreen />,
+  "/performance": <PerformanceScreen />,
+  "/health": <StrategistScreen />,
   "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/settings/opening": <OpeningBalancesScreen />, "/settings/history": <HistoryImportScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
 };
 const build = (s: { id: string; label: string; icon: string; accent: string; tabs: { to: string; label: string }[] }): Group =>
@@ -262,7 +258,7 @@ function AlertBell() {
           <div className="absolute right-0 z-[61] mt-2 w-[340px] max-w-[92vw] animate-rise overflow-hidden rounded-3xl border border-line bg-panel shadow-pop">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div className="font-display text-sm font-bold">Alerts {openAlerts.length > 0 && <span className="text-dim">· {openAlerts.length}</span>}</div>
-              <NavLink to="/missing" onClick={() => setOpen(false)} className="text-[12px] font-semibold text-pink">Open center →</NavLink>
+              <NavLink to="/health" onClick={() => setOpen(false)} className="text-[12px] font-semibold text-pink">Open strategist →</NavLink>
             </div>
             <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
               {q.isLoading ? <div className="px-4 py-6 text-center text-sm text-dim">Checking…</div>
@@ -385,6 +381,13 @@ function Shell() {
                 <Route key={t.to} path={t.to} element={<Page group={g}>{t.el}</Page>} />
               )))}
               <Route path="/imports" element={<Navigate to="/sales/import" replace />} />
+              {/* Reports + Gaps + Activity folded into Performance and the Strategist —
+                  redirect the old routes so bookmarks and deep links still land. */}
+              <Route path="/reports" element={<Navigate to="/performance" replace />} />
+              <Route path="/reports/tables" element={<Navigate to="/performance" replace />} />
+              <Route path="/reconcile" element={<Navigate to="/performance" replace />} />
+              <Route path="/missing" element={<Navigate to="/health" replace />} />
+              <Route path="/activity" element={<Navigate to="/performance" replace />} />
               <Route path="/expenses/import" element={<Page group={ALL_GROUPS.find((g) => g.id === "money")!}>{EL["/expenses/import"]}</Page>} />
               <Route path="/sales/product-lines/file" element={<Page group={ALL_GROUPS.find((g) => g.id === "sales")!}>{EL["/sales/product-lines/file"]}</Page>} />
               <Route path="/product/:id" element={<ProductDetailScreen />} />
