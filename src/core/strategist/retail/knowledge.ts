@@ -853,10 +853,12 @@ const chequeCyclePurchasing: KnowledgePlaybook = {
 };
 
 import { EXECUTIVE_KNOWLEDGE } from "./knowledge-executive";
+import { UNIT_ECONOMICS_KNOWLEDGE } from "./knowledge-unit-economics";
 
 /** THE LIBRARY. */
 export const KNOWLEDGE_LIBRARY: KnowledgePlaybook[] = [
   ...EXECUTIVE_KNOWLEDGE,
+  ...UNIT_ECONOMICS_KNOWLEDGE,
   profitBesideTraffic, premiumEntrySize, supplierQuantityBreak, chequeCyclePurchasing,
   highValueSlowMover, deadStock, overstockVsCover, stockoutRiskProfitDriver,
   profitDriverLowSpace, weakExcessFacings, premiumWeakPresentation, candyImpulsePlacement,
