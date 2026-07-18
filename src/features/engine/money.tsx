@@ -327,7 +327,7 @@ export function ChequesScreen() {
               <div className="chq-detail">
                 <div className="amt"><small>EGP</small>{bareEgp(detail.net)}</div>
                 <div style={{ flex: 1, minWidth: 200 }}>
-                  <div className="win"><span className="dot" style={{ background: chqEra(detail.cycleStart as string) }} />Received <b>{detail.receivedDate ? fmtDate(detail.receivedDate, "d MMM yyyy") : "—"}</b> · covers <b>{fmtDate(detail.cycleStart as string, "d MMM")} – {fmtDate(detail.cycleEnd as string, "d MMM")}</b> · {detail.cycleDays} days</div>
+                  <div className="win"><span className="dot" style={{ background: chqEra(detail.cycleStart as string) }} />Received <b>{detail.receivedDate ? fmtDate(detail.receivedDate, "d MMM yyyy") : "—"}</b> · covers <b>{fmtDate(detail.cycleStart as string, "d MMM yyyy")} – {fmtDate(detail.cycleEnd as string, "d MMM yyyy")}</b> · {detail.cycleDays} days</div>
                   {detail.gross != null && (
                     <div className="sub">{detail.deductions ? `Sales EGP ${bareEgp(detail.gross)} · mall kept EGP ${bareEgp(detail.deductions)}` : "Matches your sales"}</div>
                   )}
@@ -346,7 +346,7 @@ export function ChequesScreen() {
             <div className="chq-answer">
               {!trace ? "Pick a day above."
                 : traced ? (
-                  <>Paid by your <span className="hl">{egp(traced.net)}</span> cheque, received <b>{traced.receivedDate ? fmtDate(traced.receivedDate, "d MMM yyyy") : "—"}</b> · covers <b>{fmtDate(traced.cycleStart as string, "d MMM")} – {fmtDate(traced.cycleEnd as string, "d MMM")}</b>.</>
+                  <>Paid by your <span className="hl">{egp(traced.net)}</span> cheque, received <b>{traced.receivedDate ? fmtDate(traced.receivedDate, "d MMM yyyy") : "—"}</b> · covers <b>{fmtDate(traced.cycleStart as string, "d MMM yyyy")} – {fmtDate(traced.cycleEnd as string, "d MMM yyyy")}</b>.</>
                 ) : "Not settled yet — still on the open tab."}
             </div>
           </DeckTile>

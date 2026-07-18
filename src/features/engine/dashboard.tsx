@@ -211,7 +211,7 @@ export function DashboardScreen() {
   // this week — daily bars ending at the latest recorded day
   const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const weekDays = isoRange(isoDaysAgo(d.latest, 6), d.latest);
-  const weekBars = weekDays.map((x) => ({ label: WD[new Date(x + "T00:00:00Z").getUTCDay()], full: fmtDate(x, "EEE d MMM"), value: byDay.get(x) ?? 0 }));
+  const weekBars = weekDays.map((x) => ({ label: WD[new Date(x + "T00:00:00Z").getUTCDay()], full: fmtDate(x, "EEE d MMM yyyy"), value: byDay.get(x) ?? 0 }));
   const weekTotal = weekBars.reduce((s, b) => s + b.value, 0);
   const priorTotal = isoRange(isoDaysAgo(d.latest, 13), isoDaysAgo(d.latest, 7)).reduce((s, x) => s + (byDay.get(x) ?? 0), 0);
   const weekDelta = pctDelta(weekTotal, priorTotal);
@@ -325,7 +325,7 @@ export function DashboardScreen() {
             <span className="disp" style={{ fontWeight: 700, fontSize: 27, letterSpacing: "-.02em" }}>EGP {money2(weekTotal)}</span>
             {weekDelta != null && <span className={`delta ${weekDelta >= 0 ? "up" : "down"}`}>{weekDelta >= 0 ? "+" : ""}{weekDelta.toFixed(1)}%</span>}
           </div>
-          <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM")} · vs EGP {money2(priorTotal)} prior 7 days</div>
+          <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM yyyy")}–{fmtDate(d.latest, "d MMM yyyy")} · vs EGP {money2(priorTotal)} prior 7 days</div>
           <div style={{ marginTop: 14 }}><BarChart data={weekBars} height={150} /></div>
         </div>
 

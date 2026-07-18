@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import { DeckTile, PageHdr, Section } from "./deck";
 import { Button, Field, Input } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
+import { cn } from "@/core/utils/cn";
 import { SkeletonRows, ErrorState, EmptyState } from "@/components/feedback";
 import { isEngineConfigured } from "@/core/db/engine";
 import { egp } from "@/core/utils/format";
@@ -94,6 +95,31 @@ function Chip({ text, color }: { text: string; color: string }) {
 }
 
 /* ═══ MAIN SCREEN ═════════════════════════════════════════════════════ */
+
+/** Entry point to a subpage. Heavy detail opens in its own focused view rather
+ *  than stacking on this page — one thing to look at, not everything at once. */
+function SubpageCard({ title, sub, badge, urgent, onClick }: {
+  title: string; sub: string; badge?: number; urgent?: boolean; onClick: () => void;
+}) {
+  return (
+    <button type="button" className="sp-card" onClick={onClick}
+      aria-label={badge ? `${title} — ${badge} need${badge === 1 ? "s" : ""} attention` : title}>
+      <div className="sp-card-body">
+        <div className="sp-card-t">
+          {title}
+          {badge != null && badge > 0 && (
+            <span className={cn("sp-badge", urgent && "urgent")}>{badge}</span>
+          )}
+        </div>
+        <div className="sp-card-s">{sub}</div>
+      </div>
+      <svg className="sp-card-c" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M9 18l6-6-6-6" />
+      </svg>
+    </button>
+  );
+}
 
 export function StrategistScreen() {
   const qc = useQueryClient();
@@ -189,7 +215,6 @@ export function StrategistScreen() {
   const interviewPending = (interviewQ.data?.questions.length ?? 0) > 0;
   const openActions = actions.filter((a) => ["suggested", "accepted", "in_progress"].includes(a.status)).length;
   const gaps = gapsQ.data ?? [];
-  const opsSignal = exceptions.length > 0 || activating || interviewPending || gaps.length > 0;
   const opsCritical = exceptions.some((e) => e.severity === "critical" || e.severity === "high");
   const opsBadgeCount = exceptions.length + (interviewPending ? 1 : 0) + openActions + gaps.length;
 
@@ -231,10 +256,16 @@ export function StrategistScreen() {
         qc.invalidateQueries({ queryKey: ["strategist-actions"] });
       }} />
 
-      {/* ═══ RUN THE DAY — operational surface; opens itself when something needs you ═══ */}
-      <Section title="Run the day" sub={activating ? "activation in progress" : "exceptions · close · setup · queue"}
-        badge={opsBadgeCount || undefined} badgeColor={opsCritical ? "var(--red)" : undefined}
-        open={opsOpen ?? opsSignal} onToggle={setOpsOpen} keepMounted>
+      {/* ═══ SUBPAGES — each opens as its own focused view, so this page stays calm ═══ */}
+      <div className="sp-grid">
+        <SubpageCard title="Run the day"
+          sub={activating ? "Activation in progress" : "Exceptions, close, setup & queue"}
+          badge={opsBadgeCount || undefined} urgent={opsCritical} onClick={() => setOpsOpen(true)} />
+        <SubpageCard title="Intelligence" sub="Findings, products & cash"
+          badge={findings.length || undefined} onClick={() => setIntelOpen(true)} />
+      </div>
+
+      <Modal open={!!opsOpen} onClose={() => setOpsOpen(false)} title="Run the day" wide>
         <OperationalExceptionsPanel exceptions={exceptions} loading={opsQ.isLoading}
           onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
           onDismiss={async (id, reason) => { await dismissException(id, reason); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Dismissed"); }} />
@@ -256,11 +287,10 @@ export function StrategistScreen() {
         <ActionQueue actions={actionsQ.data ?? []} onUpdate={async (id, status, note) => {
           await updateActionStatus(id, status, note); qc.invalidateQueries({ queryKey: ["strategist-actions"] });
         }} />
-      </Section>
+      </Modal>
 
       {/* ═══ INTELLIGENCE — the full analysis, folded until wanted ═══ */}
-      <Section title="Intelligence" sub="findings · products · cash" badge={findings.length || undefined}
-        open={intelOpen ?? false} onToggle={setIntelOpen} keepMounted>
+      <Modal open={!!intelOpen} onClose={() => setIntelOpen(false)} title="Intelligence" wide>
         <ExecutiveBriefing s={s} report={report} weekly={weekly} />
         <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
           onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
@@ -277,7 +307,7 @@ export function StrategistScreen() {
           }} />
         <ProductStrategy report={report} />
         <CashIntelligence report={report} />
-      </Section>
+      </Modal>
 
       {/* ═══ ASK & DECIDE — conversation and structured decisions ═══ */}
       <Section title="Ask & decide" sub="questions · withdrawal & affordability" defaultOpen keepMounted>
