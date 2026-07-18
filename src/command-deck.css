@@ -212,8 +212,23 @@
 .cdk .crange button{background:linear-gradient(135deg,var(--mag),var(--cd-violet));color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit}
 .cdk .addbtn{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--stroke);border-radius:11px;padding:9px 14px;font-weight:600;font-size:13px;color:var(--cd-text);cursor:pointer;transition:.15s;font-family:inherit}
 .cdk .addbtn:hover{border-color:rgba(255,77,187,.45);color:var(--mag)}
-.cdk .btn{background:linear-gradient(135deg,var(--mag),var(--cd-violet));color:#fff;border:none;border-radius:11px;padding:11px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit}
+.cdk .btn{background:linear-gradient(135deg,var(--mag),var(--cd-violet));color:#fff;border:none;border-radius:11px;padding:11px 16px;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;transition:transform .15s ease,box-shadow .15s ease,filter .15s ease}
+.cdk .btn:hover{box-shadow:0 10px 24px -10px rgba(255,77,187,.6);filter:brightness(1.06)}
 .cdk .btn.ghost{background:rgba(255,255,255,.05);border:1px solid var(--stroke);color:var(--cd-text)}
+.cdk .btn.ghost:hover{border-color:rgba(255,77,187,.4);box-shadow:none;filter:none}
+
+/* ── SYSTEMIC INTERACTIVITY FLOOR ─────────────────────────────────────────────
+   The strategist-page press/hover standard, applied to every shared control so
+   the whole app feels responsive to touch, not just one screen. Guarded for
+   reduced-motion at the foot of the file. */
+.cdk .addbtn{transition:transform .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease}
+.cdk .addbtn:hover{transform:translateY(-1px);box-shadow:0 8px 18px -10px rgba(255,77,187,.4)}
+.cdk .seg span{transition:color .15s ease,background .15s ease,transform .12s ease}
+.cdk .seg span.on{box-shadow:0 6px 16px -8px rgba(255,77,187,.55),inset 0 1px 0 rgba(255,255,255,.22)}
+.cdk .chip{transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.cdk .chip:hover{transform:translateY(-2px)}
+.cdk .btn:active,.cdk .addbtn:active,.cdk .go:active,.cdk .seg span:active,
+.cdk .chip:active,.cdk .mbtn:active{transform:scale(.96)}
 .cdk .daycell,.cdk .prodcell{cursor:pointer}
 .cdk .daycell:hover td,.cdk .prodcell:hover td{background:rgba(255,77,187,.09)!important}
 .cdk .daycell td:last-child::after{content:'›';color:var(--mag);margin-left:10px;font-weight:700;opacity:0;transition:opacity .15s}
@@ -354,6 +369,10 @@
 /* reduced motion: kill decorative animation app-wide, keep instant state */
 @media (prefers-reduced-motion:reduce){
   .cdk *, .cdk *::before, .cdk *::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+  /* the systemic press/hover lifts are motion too — neutralise the transforms */
+  .cdk .btn:hover,.cdk .addbtn:hover,.cdk .chip:hover,
+  .cdk .btn:active,.cdk .addbtn:active,.cdk .go:active,.cdk .seg span:active,
+  .cdk .chip:active,.cdk .mbtn:active{transform:none}
 }
 
 /* horizontally scrollable chip/filter rows on phones — never poor wrapping */

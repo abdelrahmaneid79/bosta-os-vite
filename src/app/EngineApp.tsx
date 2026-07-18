@@ -113,7 +113,7 @@ function SectionTabs({ group }: { group: Group }) {
     <div className="mb-5 inline-flex flex-wrap gap-1 rounded-2xl border border-white/[0.09] bg-white/[0.04] p-1.5">
       {group.tabs.map((t) => (
         <NavLink key={t.to} to={t.to} end
-          className={({ isActive }) => cn("rounded-xl px-4 py-2 text-[13px] font-semibold transition",
+          className={({ isActive }) => cn("rounded-xl px-4 py-2 text-[13px] font-semibold transition active:scale-95 motion-reduce:active:scale-100",
             isActive ? "bg-gradient-to-br from-pink to-violet text-white shadow-pink" : "text-muted hover:text-text")}>
           {t.label}
         </NavLink>

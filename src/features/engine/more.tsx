@@ -64,7 +64,7 @@ export function ReportsScreen() {
     <div className="space-y-4">
       {failed > 0 && (
         <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-2 text-[12.5px] font-semibold text-warn">
-          {failed} report read(s) failed — dashes below may hide real numbers. Reload to retry.
+          Some figures didn&rsquo;t load — dashes below may hide real numbers. Reload to retry.
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -74,13 +74,13 @@ export function ReportsScreen() {
       {p?.partialBefore && <PartialNote since={p.partialBefore} />}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Revenue" value={p ? egp(p.revenue) : "—"} />
-        <Stat label="COGS" value={p ? egp(p.cogs) : "—"} />
-        <Stat label="Gross profit" value={p ? (p.grossProfit == null ? "unknown" : egp(p.grossProfit)) : "—"} accent="text-good" />
-        <Stat label="Gross margin" value={p ? (p.margin == null ? "unknown" : pct(p.margin)) : "—"} />
+        <Stat label="Cost of goods" value={p ? egp(p.cogs) : "—"} />
+        <Stat label="Gross profit" value={p ? (p.grossProfit == null ? "—" : egp(p.grossProfit)) : "—"} accent="text-good" />
+        <Stat label="Gross margin" value={p ? (p.margin == null ? "—" : pct(p.margin)) : "—"} />
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Operating expenses" value={p ? egp(p.operatingExpenses) : "—"} accent="text-warn" />
-        <Stat label="Net profit" value={p ? (p.netProfit == null ? "unknown" : egp(p.netProfit)) : "—"} accent="text-good" />
+        <Stat label="Net profit" value={p ? (p.netProfit == null ? "—" : egp(p.netProfit)) : "—"} accent="text-good" />
         <Stat label="Sales days" value={sales.data ? sales.data.days : "—"} />
         <Stat label="Purchases" value={purch.data != null ? egpShort(purch.data) : "—"} />
       </div>
@@ -108,7 +108,7 @@ export function ReportsScreen() {
             <Eyebrow>Top products · revenue (lifetime)</Eyebrow>
             <Badge tone="neutral">since launch</Badge>
           </div>
-          <p className="px-4 pt-1 text-[11px] text-dim">Lifetime sales × supplier-bill cost. <span className="text-faint">* margin estimated on raw nut/seed cost — excludes roasting + packaging. No confident cost shows “cost n/a”.</span></p>
+          <p className="px-4 pt-1 text-[11px] text-dim">Best sellers since you opened. <span className="text-faint">* margin from raw cost only.</span></p>
           <div className="mt-2 divide-y divide-line">
             {lifeProds.slice(0, 12).map((x, i) => {
               const top = lifeProds[0]?.revenue ?? 0;
@@ -299,8 +299,8 @@ function CostingCard() {
   });
   return (
     <Card>
-      <Eyebrow>Costing — roasting + packaging uplift</Eyebrow>
-      <p className="mt-1 text-[12px] text-dim">Uplifts raw nut/seed cost to finished-good COGS for roasting loss + packaging. Resale goods (jelly, pretzels…) unaffected.</p>
+      <Eyebrow>Cost uplift for roasting + packaging</Eyebrow>
+      <p className="mt-1 text-[12px] text-dim">Adds a % onto raw nut/seed cost to cover roasting loss and packaging. Ready-made goods (jelly, pretzels…) aren&rsquo;t touched.</p>
       <div className="mt-2 flex items-end gap-2">
         <Field label="Uplift % on raw costs"><Input type="number" step="any" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="15" /></Field>
         <Button variant="outline" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
@@ -358,7 +358,7 @@ export function SettingsScreen() {
       <Card>
         <Eyebrow>Account</Eyebrow>
         <Row label="Signed in" value={email ?? "—"} />
-        <Row label="Backend" value="Verified Supabase engine" last />
+        <Row label="Data" value="Live · your account only" last />
         <div className="mt-3"><SignOutButton /></div>
       </Card>
 

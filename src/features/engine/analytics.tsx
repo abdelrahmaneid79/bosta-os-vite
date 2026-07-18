@@ -23,7 +23,7 @@ import { Link } from "react-router-dom";
 
 const CURRENCY = new Set(["periodRevenue", "dailyAvg", "avg30", "monthProfit", "owed", "allTime", "totalExp"]);
 function fmtKpi(k: Kpi): string {
-  if (k.value == null) return "unknown";
+  if (k.value == null) return "—";
   if (k.key === "growth") return `${k.value >= 0 ? "▲ +" : "▼ "}${Math.abs(Math.round(k.value))}%`;
   if (CURRENCY.has(k.key)) return egpShort(k.value);
   return String(Math.round(k.value));
@@ -35,11 +35,11 @@ const BUDGET_TONE: Record<string, { bar: string; text: string; label: string }> 
   "on-track": { bar: "bg-good", text: "text-good", label: "on track" },
   behind: { bar: "bg-warn", text: "text-warn", label: "behind" },
   over: { bar: "bg-bad", text: "text-bad", label: "over budget" },
-  unknown: { bar: "bg-dim", text: "text-dim", label: "needs data" },
+  unknown: { bar: "bg-dim", text: "text-dim", label: "no target" },
 };
 
 const CONF_TONE: Record<string, "good" | "warn" | "neutral"> = { high: "good", estimate: "warn", "low-data": "neutral" };
-const CONF_LABEL: Record<string, string> = { high: "high confidence", estimate: "estimate", "low-data": "needs more data" };
+const CONF_LABEL: Record<string, string> = { high: "solid", estimate: "rough", "low-data": "early guess" };
 const DOW_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
 /** Revenue forecast — day-of-week seasonality × recent level, honest confidence. */

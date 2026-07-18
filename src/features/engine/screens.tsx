@@ -215,7 +215,7 @@ export function SalesScreen() {
 
   return (
     <div>
-      <PageHdr title="Sales" sub={`Revenue = sum of daily totals${d.span ? ` · ${d.span}` : ""}`}
+      <PageHdr title="Sales" sub={d.span ? d.span : "Your daily takings"}
         right={<>
           <button className="addbtn" onClick={() => navigate("/sales/import")}>Import receipt</button>
           <button className="qadd" style={{ height: 38 }} onClick={() => setAddOpen(true)}><span>+ New sale</span></button>
@@ -444,34 +444,33 @@ export function ReconcileScreen() {
             <Eyebrow>Net profit · after costs &amp; expenses</Eyebrow>
             <div className="mt-1 flex flex-wrap items-end gap-3">
               <div className="tnum font-display text-5xl font-extrabold leading-none text-text">
-                {p ? (p.netProfit == null ? "unknown" : egp(p.netProfit)) : "—"}
+                {p ? (p.netProfit == null ? "—" : egp(p.netProfit)) : "—"}
               </div>
               {p && p.netMargin != null && <Badge tone={p.netMargin >= 0 ? "good" : "bad"}>{pct(p.netMargin)} net margin</Badge>}
             </div>
             <div className="mt-6 space-y-3">
               <Bar label="Revenue" amount={p ? egp(p.revenue) : "—"} pctWidth={100} tone="bg-good" />
               <Bar label="− Cost of goods" amount={p ? egp(p.cogs) : "—"} pctWidth={p && p.revenue > 0 ? (p.cogs / p.revenue) * 100 : 0} tone="bg-bad/70" />
-              <Bar label="= Gross profit" amount={p ? (p.grossProfit == null ? "unknown" : egp(p.grossProfit)) : "—"}
+              <Bar label="= Gross profit" amount={p ? (p.grossProfit == null ? "—" : egp(p.grossProfit)) : "—"}
                 pctWidth={p && p.revenue > 0 && p.grossProfit != null ? Math.max(0, (p.grossProfit / p.revenue) * 100) : 0} tone="bg-pink/60" />
               <Bar label="− Operating expenses" amount={p ? egp(p.operatingExpenses) : "—"} pctWidth={p && p.revenue > 0 ? (p.operatingExpenses / p.revenue) * 100 : 0} tone="bg-warn/70" />
-              <Bar label="= Net profit" amount={p ? (p.netProfit == null ? "unknown" : egp(p.netProfit)) : "—"}
+              <Bar label="= Net profit" amount={p ? (p.netProfit == null ? "—" : egp(p.netProfit)) : "—"}
                 pctWidth={p && p.revenue > 0 && p.netProfit != null ? Math.max(0, (p.netProfit / p.revenue) * 100) : 0} tone="bg-pink" strong />
             </div>
             {p && p.grossProfit != null && (
               <div className="mt-4 text-[11px] text-dim">
-                Gross margin {p.margin != null ? pct(p.margin) : "—"} · personal withdrawals are tracked as cash, never counted as expenses here.
+                Gross margin {p.margin != null ? pct(p.margin) : "—"} · money you take out isn&rsquo;t counted as a cost here.
               </div>
             )}
           </Card>
           {p && !p.complete && (
             <Card>
               <div className="space-y-1 text-sm text-warn">
-                <div>⚠ Whole-period profit withheld — revenue is exact, but COGS is incomplete, so we show “unknown” rather than a wrong number.</div>
-                {p.missingCostLines > 0 && <div>· {p.missingCostLines} of {p.soldLines} sold lines have no recorded cost.</div>}
+                <div>Profit isn&rsquo;t final yet — some days sold but their cost isn&rsquo;t recorded.</div>
                 {p.uncoveredRevenue >= 1 && (
-                  <div>· {egp(p.uncoveredRevenue)} of revenue ({p.coveredPct != null ? pct(100 - p.coveredPct) : "—"}) sits on days with no product-line detail — its cost is unknowable until those days are imported.</div>
+                  <div className="text-dim">{egp(p.uncoveredRevenue)} of sales still need their product cost added.</div>
                 )}
-                {p.margin != null && <div className="text-dim">Measured gross margin on the {p.coveredPct != null ? pct(p.coveredPct) : "—"} of revenue with detail: {pct(p.margin)}.</div>}
+                {p.margin != null && <div className="text-dim">On the part with costs, margin is {pct(p.margin)}.</div>}
               </div>
             </Card>
           )}

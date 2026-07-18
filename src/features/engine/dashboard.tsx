@@ -168,7 +168,7 @@ export function DashboardScreen() {
   }, [rows, month.from, today]);
 
   if (daily.isError) return <ErrorState message={String((daily.error as Error)?.message)} />;
-  if (!en) return <EmptyState title="Sign in to load your deck" hint="Live data only — never faked." />;
+  if (!en) return <EmptyState title="Sign in to load your deck" />;
 
   const monthNum = +d.monthKey.slice(5, 7), yearNum = +d.monthKey.slice(0, 4);
   const monthLabel = `${MON[monthNum - 1]} ${yearNum}`, monthShort = MON[monthNum - 1];
@@ -256,7 +256,7 @@ export function DashboardScreen() {
           <div className="orb" />
           <div className="heronut"><img src="/assets/bosta-mascot.svg" alt="" /></div>
           <div className="th"><span className="eyebrow">Revenue · {monthLabel}</span></div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 2 }}>Latest reporting month · {tradingDays} trading days</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 2 }}>{tradingDays} trading days</div>
           <div className="hv tnum" style={{ marginTop: "auto" }}><span className="hcur">EGP</span>{money2(d.monthRev)}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
             {revDelta != null && (
@@ -275,14 +275,14 @@ export function DashboardScreen() {
           <div className="th"><span className="tname">Spend · {monthShort}</span></div>
           <div className="bn tnum"><small>EGP</small>{money2(monthSpend)}</div>
           <div className="bar" style={{ marginTop: 18 }}><i style={{ width: `${spendRatio}%`, background: "linear-gradient(90deg,rgb(var(--violet)),var(--mag))" }} /></div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of {monthShort} revenue · {stockShare}% stock</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of revenue · {stockShare}% on stock</div>
         </div>
 
         {/* net cash */}
         <div className="tile netcash">
           <div className="th"><span className="tname">Net cash · {monthShort}</span></div>
           <div className="bn tnum" style={{ color: netCash >= 0 ? "var(--green)" : "var(--red)" }}><small>EGP</small>{money2(netCash)}</div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 18 }}>{marginPct}% cash margin · revenue − expenses − stock buys</div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 18 }}>{marginPct}% kept from every pound</div>
         </div>
 
         {/* performance gauge */}
@@ -325,7 +325,7 @@ export function DashboardScreen() {
             <span className="disp" style={{ fontWeight: 700, fontSize: 27, letterSpacing: "-.02em" }}>EGP {money2(weekTotal)}</span>
             {weekDelta != null && <span className={`delta ${weekDelta >= 0 ? "up" : "down"}`}>{weekDelta >= 0 ? "+" : ""}{weekDelta.toFixed(1)}%</span>}
           </div>
-          <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM yyyy")}–{fmtDate(d.latest, "d MMM yyyy")} · vs EGP {money2(priorTotal)} prior 7 days</div>
+          <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM yyyy")} · was EGP {money2(priorTotal)}</div>
           <div style={{ marginTop: 14 }}><BarChart data={weekBars} height={150} /></div>
         </div>
 
@@ -371,7 +371,7 @@ export function DashboardScreen() {
             {d.best.k && <span className="delta up">peak</span>}
           </div>
           <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 10, fontWeight: 500, lineHeight: 1.5 }}>
-            {topVen ? `Top supplier is ${topVen[0]} at EGP ${money2(topVen[1])} across all purchases — ${venPct}% of stock spend.` : "Add supplier notes on purchases to see your top supplier."}
+            {topVen ? `${topVen[0]} is your biggest supplier — EGP ${money2(topVen[1])}, ${venPct}% of stock spend.` : "Add supplier notes on purchases to see your top supplier."}
           </div>
         </div>
       </div>

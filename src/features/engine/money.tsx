@@ -7,7 +7,7 @@ import { Confirm } from "@/components/ui/Confirm";
 import { DonutChart, GroupedBarChart, BarChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
-import { egp, egpShort } from "@/core/utils/format";
+import { egp } from "@/core/utils/format";
 import { fmtDate } from "@/core/utils/date";
 import { cn } from "@/core/utils/cn";
 import { isEngineConfigured } from "@/core/db/engine";
@@ -22,7 +22,7 @@ import { useUI } from "@/store/ui";
 const en = isEngineConfigured;
 const monthKey = (d: string) => d.slice(0, 7);
 const KIND_LABEL: Record<string, string> = {
-  cheque: "cheque in", withdrawal: "withdrawal · not an expense", expense: "expense",
+  cheque: "cheque in", withdrawal: "you took out", expense: "expense",
   purchase: "stock purchase", cash_in: "cash in", cash_out: "cash out",
 };
 
@@ -64,7 +64,6 @@ export function MoneyScreen() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
-        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 600 }}>Cheques in − expenses, stock &amp; withdrawals out</div>
         <div style={{ flex: 1 }} />
         <DateRangePicker />
         <button className="addbtn" onClick={() => setSheet("withdraw")}>Withdraw</button>
@@ -72,7 +71,7 @@ export function MoneyScreen() {
       </div>
 
       <div className="statgrid">
-        <Stat label="Cash on hand" color="rgb(var(--cyan))" value={c ? (c.balance == null ? "—" : egp(c.balance)) : "—"} sub={<div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{c?.since ? `opening ${egpShort(c.opening)} · since ${fmtDate(c.since)}` : "count to set →"}</div>} />
+        <Stat label="Cash on hand" color="rgb(var(--cyan))" value={c ? (c.balance == null ? "—" : egp(c.balance)) : "—"} sub={<div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{c?.since ? `counted ${fmtDate(c.since)}` : "count to set →"}</div>} />
         <Stat label="Money in" color="var(--green)" value={c ? egp(c.inflow) : "—"} />
         <Stat label="Money out" color="var(--red)" value={c ? egp(Math.abs(c.outflow)) : "—"} />
         <Stat label="Withdrawals" color="var(--amber)" value={c ? egp(c.withdrawals) : "—"} />
@@ -94,7 +93,7 @@ export function MoneyScreen() {
                   {movements.map((m) => (
                     <tr key={m.id}>
                       <td>{fmtDate(m.date, "EEE d MMM yyyy")}</td>
-                      <td style={{ textTransform: "capitalize" }}>{m.label} <span style={{ color: "rgb(var(--dim))", fontSize: 12 }}>· {KIND_LABEL[m.kind] ?? m.kind}</span></td>
+                      <td style={{ textTransform: "capitalize" }}>{m.label} <span style={{ color: "rgb(var(--dim))", fontSize: 12 }}>· {KIND_LABEL[m.kind] ?? m.kind.replace(/_/g, " ")}</span></td>
                       <td className="r" style={{ color: m.amount >= 0 ? "var(--green)" : "var(--red)" }}>{m.amount >= 0 ? "+" : "−"}{egp(Math.abs(m.amount))}</td>
                       <td>{m.id.startsWith("mv-") ? <button onClick={() => setVoidMv(m.id.slice(3))} title="Void" style={{ color: "rgb(var(--faint))", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>✕</button> : null}</td>
                     </tr>
