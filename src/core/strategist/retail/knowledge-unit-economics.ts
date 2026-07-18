@@ -16,11 +16,19 @@
  *  inventing a fill weight. */
 import type { KnowledgePlaybook, RetailBusinessFacts, ProductFact, RecommendationDraft } from "./contract";
 import { draft, ev, egp, pct } from "./helpers";
-import { trueEconomics, repackSaving, packWeightForPrice, type StoreCostModel } from "./unit-economics";
+import { trueEconomics, repackSaving, type StoreCostModel } from "./unit-economics";
 
 /** Current Gardenia terms (Era 3: 3% of revenue + flat rent). Rent is fixed and
  *  belongs in break-even, not in per-product margin, so it is not applied here. */
 const COMMISSION_PCT = 0.03;
+
+/** Shopper price bands, from the pack prices actually observed on this stand
+ *  (roughly 23–146 EGP). A pack is a purchase occasion before it is a cost
+ *  calculation: below IMPULSE it is a grab-and-go, above TAKE_HOME it stops
+ *  being an everyday snack. These bounds stop the engine proposing a pack that
+ *  is cheaper per kg but that nobody would actually carry to the till. */
+const IMPULSE_TICKET_MAX = 60;
+const TAKE_HOME_TICKET_MAX = 120;
 
 const modelFor = (p: ProductFact): StoreCostModel => ({
   commissionPct: COMMISSION_PCT,
@@ -56,34 +64,47 @@ const packagingTaxRepack: KnowledgePlaybook = {
   match: (p) => {
     if (!hasPackFacts(p)) return false;
     const e = econ(p);
-    return (e.packagingPctOfTicket ?? 0) >= 6;
+    if ((e.packagingPctOfTicket ?? 0) < 6) return false;
+    // A pack is filled to the BOX's volume, so "pack bigger" only ever means
+    // stepping up a box size (~2x capacity). Only propose that where the
+    // current pack is a cheap one AND the doubled pack still lands at a price
+    // a shopper would plausibly pay for a take-home size.
+    const ticket = e.ticket ?? 0;
+    return ticket > 0 && ticket <= IMPULSE_TICKET_MAX && ticket * 2 <= TAKE_HOME_TICKET_MAX;
   },
   build: (p, f) => {
     const e = econ(p);
-    const target = Math.round((p.packSizeG ?? 0) * 1.6 / 5) * 5; // ~60% bigger, rounded to 5g
+    // The physical step: the next box up holds roughly twice the volume and
+    // costs only ~0.07 more. We never invent an arbitrary gram target — the
+    // fill is whatever that box holds for THIS product's density.
+    const target = Math.round(((p.packSizeG ?? 0) * 2) / 5) * 5;
     const saving = repackSaving(p.units || 0, p.packSizeG ?? 0, target, p.packagingCost ?? 0);
-    const roundPrice = packWeightForPrice(p.sellingPrice ?? 0, 75);
+    const bigTicket = Math.round((e.ticket ?? 0) * 2);
     return draft({
-      title: `Pack ${p.name} bigger — packaging is taking ${pct(e.packagingPctOfTicket)} of its price`,
+      title: `Add a larger ${p.name} pack — packaging takes ${pct(e.packagingPctOfTicket)} of the small one`,
       domain: "packaging", type: "larger_value_size", product: p,
       observedFacts: [
-        `${p.name} sells at about ${egp(e.ticket ?? 0)} a pack (${Math.round(p.packSizeG ?? 0)}g).`,
+        `${p.name} sells at about ${egp(e.ticket ?? 0)} a pack (${Math.round(p.packSizeG ?? 0)}g — a full small box).`,
         `The box + sticker costs ${egp(p.packagingCost ?? 0)} — ${pct(e.packagingPctOfTicket)} of that price.`,
         e.trueMarginPct != null ? `Margin falls from ${pct(e.grossMarginPct)} to ${pct(e.trueMarginPct)} once the mall's cut and packaging come off.` : "",
       ].filter(Boolean),
-      principles: ["A flat per-pack cost is a bigger tax the cheaper the pack."],
+      principles: [
+        "A flat per-pack cost is a bigger tax the cheaper the pack.",
+        "Pack size is set by box volume and by the shopper's occasion — never by the maths alone.",
+      ],
       reasoning: [
         "The same box is used regardless of what goes in it, so a small pack pays the same as a large one.",
-        "Selling the identical volume in fewer, larger packs cuts the cost with no price rise and no lost sales.",
+        "The next box up holds about twice the volume for roughly the same cost, halving packaging per kg.",
+        "The larger pack serves a take-home shopper, so it should sit ALONGSIDE the small one rather than replace it — the small pack is what the impulse buyer wants.",
       ],
-      truthLevel: "measured_conclusion",
-      proposedAction: `Move ${p.name} from ~${Math.round(p.packSizeG ?? 0)}g to about ${target}g per pack.` +
-        (saving ? ` On recent volume that is ~${saving.packsSaved} fewer packs and saves about ${egp(saving.saving)}.` : "") +
-        (roundPrice ? ` A ${roundPrice}g fill would land on a round ${egp(75)} price.` : ""),
+      truthLevel: "strong_inference",
+      proposedAction: `Add a second, larger ${p.name} pack in the next box up — about ${target}g at roughly ${egp(bigTicket)} — and keep the current ${Math.round(p.packSizeG ?? 0)}g pack for impulse buyers.` +
+        (saving ? ` Every shopper who trades up saves you the cost of a whole extra pack.` : ""),
       implementationSteps: [
-        `Set the standard fill for ${p.name} to ~${target}g.`,
-        "Keep the price per kg unchanged — only the pack size changes.",
-        "Hold for two cheque cycles, then compare packs used and units sold.",
+        `Fill the next box size up with ${p.name} — it will hold roughly ${target}g at this product's density.`,
+        "Keep the price per kg unchanged; only the pack size differs.",
+        "Face both sizes side by side and hold for two cheque cycles.",
+        "Compare total units and packs used — success is the same volume in fewer packs.",
       ],
       contraindications: ["If this line is a deliberate low-price impulse buy, test on half the facings first."],
       timing: "this week", durationDays: 21, effort: "low",
