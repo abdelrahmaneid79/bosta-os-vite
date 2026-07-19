@@ -251,9 +251,6 @@ export function DashboardScreen() {
             <span style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500 }}>
               {d.lastRev > 0 ? `vs ${prevMonthShort}` : "first month"} · EGP {money2(avgPerDay)}/day
             </span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: netCash >= 0 ? "var(--green)" : "var(--red)", marginLeft: "auto" }}>
-              {netCash >= 0 ? "+" : "−"}EGP {money2(Math.abs(netCash))} kept after everything
-            </span>
           </div>
           <div style={{ marginTop: 14 }}>{daily.isLoading ? null : <AreaChart data={heroData} id="hero" height={110} strong />}</div>
         </div>
@@ -265,6 +262,7 @@ export function DashboardScreen() {
             <div className="hstat"><div className="l">Lifetime</div><div className="v tnum">{egpShortBare(d.lifetimeRev)}</div></div>
             <div className="hstat"><div className="l">Best month</div><div className="v tnum">{d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(2, 4)}` : "—"}</div></div>
             <div className="hstat"><div className="l">Cheques in</div><div className="v tnum">{egpShortBare(cycle.data?.totalReceived ?? 0)}</div></div>
+            <div className="hstat"><div className="l">Kept · {monthShort}</div><div className="v tnum" style={{ color: netCash >= 0 ? "var(--green)" : "var(--red)" }}>{egpShortBare(Math.abs(netCash))}</div></div>
           </div>
           <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, lineHeight: 1.5 }}>
             {topVen ? `${topVen[0]} is your biggest supplier, ${venPct}% of stock spend.` : d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(0, 4)} is the record: EGP ${money2(d.best.v)}.` : "Log a few days to unlock insights."}

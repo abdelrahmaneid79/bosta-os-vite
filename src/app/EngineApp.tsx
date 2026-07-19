@@ -306,59 +306,6 @@ function AlertBell() {
 }
 
 
-function MobileNav() {
-  const { pathname } = useLocation();
-  const active = groupForPath(pathname);
-  const [open, setOpen] = useState(false);
-  const close = useCallback(() => setOpen(false), []);
-  const panelRef = useFocusTrap<HTMLDivElement>(open, close);
-  useScrollLock(open);
-  const MOBILE_IDS = ["today", "sales", "inventory", "money", "insights"];
-  const vis = useVisibleGroups();
-  const primary = MOBILE_IDS.map((id) => vis.find((g) => g.id === id)).filter((g): g is Group => !!g);
-  return (
-    <>
-      {/* Phones only. From 768px up the top pill handles navigation (icon-only
-          768–1000px, icon+label above) — the two never show together. */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line bg-rail px-1 pt-2 md:hidden"
-        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
-        {primary.map((g) => (
-          <NavLink key={g.id} to={g.tabs[0].to} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active?.id === g.id ? "text-pink" : "text-faint")}>
-            <Icon d={g.icon} className="h-5 w-5" /><span className="text-[9px] font-semibold">{g.label}</span>
-          </NavLink>
-        ))}
-        <button onClick={() => setOpen(true)} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active && !primary.includes(active) ? "text-pink" : "text-faint")}>
-          <Icon d={I.insights} className="h-5 w-5" /><span className="text-[9px] font-semibold">More</span>
-        </button>
-      </nav>
-      {open && (
-        <div onClick={close} className="fixed inset-0 z-[60] flex items-end bg-black/70 md:hidden">
-          <div ref={panelRef} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="All sections" tabIndex={-1}
-            className="max-h-[80vh] w-full animate-sheetUp overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel2 p-5 pb-8 shadow-sheet focus:outline-none">
-            <div className="mb-3 flex items-center justify-between"><div className="font-display text-lg font-semibold">All sections</div>
-              <button onClick={close} className="flex h-8 w-8 items-center justify-center rounded-lg bg-panel2 text-muted">✕</button></div>
-            <div className="space-y-3">
-              {[...GROUPS, SETTINGS].map((g) => (
-                <div key={g.id}>
-                  <div className="mb-1 flex items-center gap-2 text-faint"><Icon d={g.icon} className="h-4 w-4" /><span className="text-[10px] font-bold uppercase tracking-wider">{g.label}</span></div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {g.tabs.map((t) => (
-                      <NavLink key={t.to} to={t.to} end onClick={() => setOpen(false)}
-                        className={({ isActive }) => cn("rounded-lg border px-3 py-1.5 text-[13px]", isActive ? "border-pink bg-pink/15 text-pink" : "border-line bg-panel text-muted")}>
-                        {t.label}
-                      </NavLink>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
 function Shell() {
   const [add, setAdd] = useState(false);
   useApplyTheme();
@@ -397,7 +344,6 @@ function Shell() {
           </Suspense>
         </main>
       </div>
-      <MobileNav />
       <QuickSheet open={add} onClose={() => setAdd(false)} />
       <CommandPalette />
       <Toaster />

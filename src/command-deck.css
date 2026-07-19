@@ -44,22 +44,22 @@
 .cdk .nd{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 3px;border-radius:50%;background:var(--mag);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid #0a0c10}
 .cdk .avt{width:44px;height:44px;border:none;border-radius:13px;background:linear-gradient(135deg,var(--cd-violet),var(--cd-cyan));display:flex;align-items:center;justify-content:center;font-family:'Clash Display';font-weight:700;font-size:14px;color:#fff;cursor:pointer;transition:transform .18s;flex-shrink:0}
 .cdk .avt:hover{transform:scale(1.05)}
-.cdk .qadd{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--mag),var(--cd-violet));color:#fff;border:none;border-radius:13px;height:44px;padding:0 16px;font-family:'Satoshi',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 10px 24px -8px rgba(255,77,187,.7);transition:transform .15s,filter .15s}
+.cdk .qadd{display:flex;align-items:center;gap:7px;white-space:nowrap;flex-shrink:0;background:linear-gradient(135deg,var(--mag),var(--cd-violet));color:#fff;border:none;border-radius:13px;height:44px;padding:0 16px;font-family:'Satoshi',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 10px 24px -8px rgba(255,77,187,.7);transition:transform .15s,filter .15s}
 .cdk .qadd:hover{filter:brightness(1.08)} .cdk .qadd:active{transform:scale(.97)} .cdk .qadd svg{width:16px;height:16px}
-/* Responsive nav: three graceful states, never gone.
-   ≥1000px  icon + label pills
-   ≤1000px  icon-only squares (labels return automatically when wider)
-   ≤560px   tighter squares + brand text shrinks; the pill row itself scrolls
-            sideways as a last resort instead of wrapping or hiding. */
-@media (max-width:1000px){
-  .cdk .np span{display:none}
-  .cdk .np{padding:11px 13px}
+/* Responsive nav — owner spec: icons + text at big AND medium, icons-only at
+   small. The toolbar itself exists at every width; nothing ever vanishes. */
+@media (max-width:1080px){
+  .cdk .np{padding:9px 12px;font-size:12.5px;gap:6px}
+  .cdk .np svg{width:15px;height:15px}
   .cdk .wmtxt small{display:none}
 }
 @media (max-width:767px){
-  /* phones: the bottom tab bar owns navigation; the top bar stays brand + actions */
-  .cdk .navpill{display:none}
+  .cdk .np span{display:none}
+  .cdk .np{padding:10px 12px}
+  .cdk .navpill{overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;max-width:100%;flex-shrink:1}
+  .cdk .navpill::-webkit-scrollbar{display:none}
   .cdk .topbar{gap:10px}
+  .cdk .wmtxt{display:none}
   .cdk .qadd .ql{display:none}
   .cdk .qadd{padding:0 13px}
 }
@@ -106,9 +106,9 @@
 .cdk .up{color:var(--green);background:rgba(66,226,154,.13)} .cdk .down{color:var(--red);background:rgba(255,92,114,.13)} .cdk .flat{color:var(--cd-muted);background:rgba(255,255,255,.06)}
 .cdk .hero{background:linear-gradient(150deg,rgba(255,77,187,.16),rgba(157,107,255,.10) 55%,rgba(39,229,204,.07));border:1px solid rgba(255,77,187,.28);display:flex;flex-direction:column;min-height:340px}
 .cdk .hero .orb{position:absolute;right:-40px;top:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(255,77,187,.5),transparent 65%);filter:blur(14px);animation:cdk-float 9s ease-in-out infinite}
-.cdk .heronut{position:absolute;right:34px;top:30px;width:104px;height:104px;border-radius:50%;background:conic-gradient(from 200deg,var(--mag),var(--cd-violet),var(--cd-cyan),var(--mag));display:flex;align-items:center;justify-content:center;box-shadow:0 20px 50px -12px rgba(255,77,187,.6);animation:cdk-float 7s ease-in-out infinite}
+.cdk .heronut{position:absolute;right:34px;top:26px;width:122px;height:122px;border-radius:50%;background:conic-gradient(from 200deg,var(--mag),var(--cd-violet),var(--cd-cyan),var(--mag));display:flex;align-items:center;justify-content:center;box-shadow:0 20px 50px -12px rgba(255,77,187,.6);animation:cdk-float 7s ease-in-out infinite}
 .cdk .heronut::after{content:'';position:absolute;inset:3px;border-radius:50%;background:radial-gradient(circle at 35% 28%,#21242c,#0c0e13)}
-.cdk .heronut img{width:58px;height:58px;object-fit:contain;filter:brightness(0) invert(1);position:relative;z-index:1;opacity:.95}
+.cdk .heronut img{height:64%;width:auto;object-fit:contain;filter:brightness(0) invert(1);position:relative;z-index:1;opacity:.95}
 .cdk .hv{font-family:'Clash Display';font-weight:700;font-size:56px;letter-spacing:-.03em;line-height:.95;margin-top:auto}
 .cdk .hcur{font-size:26px;color:var(--mag2);font-weight:600;margin-right:6px;letter-spacing:0}
 .cdk .bn{font-family:'Clash Display';font-weight:700;font-size:38px;letter-spacing:-.025em;line-height:1;margin-top:16px}
@@ -316,8 +316,7 @@
      the subtitle was clipped). Drop the decoration on phones and scale the value
      so it always sits clear on its own. */
   .cdk .hero .orb{ display:none; }
-  .cdk .hero .heronut{ width:62px; height:62px; right:18px; top:16px; }
-  .cdk .hero .heronut img{ width:34px; height:34px; }
+  .cdk .hero .heronut{ width:74px; height:74px; right:16px; top:14px; }
   .cdk .hv{ font-size:42px; }
   .cdk .hcur{ font-size:20px; margin-right:5px; }
 
@@ -325,6 +324,8 @@
      min-width:0 let the column shrink) squeezed it to a sliver that broke the
      big number mid-digit. Stack the gauge above a full-width body instead. */
   .cdk .perf{ flex-direction:column; align-items:center; text-align:center; gap:16px; }
+  .cdk .perf .hstats{ display:grid; grid-template-columns:1fr 1fr; gap:14px 10px; width:100%; }
+  .cdk .perf .hstat{ border:none; padding:0; }
   .cdk .hgauge{ width:auto; }
   .cdk .hbody{ min-width:0; width:100%; }
   .cdk .hhead{ max-width:none; }
