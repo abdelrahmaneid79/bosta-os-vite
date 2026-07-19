@@ -155,3 +155,76 @@ export function buildOverview(txns: BankTxn[], months: BankMonth[], reversals: B
     totalMonths: inRange.length,
   };
 }
+
+// ── What the business earned vs what the owner actually took out ────────────
+
+export interface BurnMonth {
+  month: string;
+  revenue: number; cogs: number; mallDeductions: number; runningCosts: number;
+  /** Revenue less the mall's cut, the cost of what was sold, and running costs. */
+  profit: number;
+  cashKeptFromCheques: number; cashFromAtm: number; cashAvailable: number;
+  cashTheBusinessNeeded: number;
+  /** Cash left after stock and running costs — what he took for himself.
+   *  A residual: it absorbs every upstream error, so read it over a year, not
+   *  a month. Single months swing negative purely on timing (stock bought in
+   *  one month is sold across the next two). */
+  drawingsResidual: number;
+  personalCardSpend: number;
+  /** Sales recorded but no cost of sales — the day's product breakdown is
+   *  missing, so this month's profit is meaningless and must be left out. */
+  cogsMissing: boolean;
+  unreadableBreaks: number;
+}
+
+export interface BurnSummary {
+  months: number;
+  revenue: number; cogs: number; mallDeductions: number; runningCosts: number;
+  profit: number; profitPerMonth: number;
+  cashAvailable: number; cashTheBusinessNeeded: number;
+  drawings: number; personalCardSpend: number;
+  tookOut: number; tookOutPerMonth: number;
+  /** What he took as a share of what the business made. Over 100 means he is
+   *  drawing more than the business earns. */
+  pctOfProfit: number | null;
+  excludedMonths: number;
+}
+
+export async function getBurnMonths(): Promise<BurnMonth[]> {
+  const { data, error } = await requireEngine().from("v_owner_burn").select("*").order("month");
+  if (error) throw error;
+  return (data ?? []).filter((r) => r.month).map((r) => ({
+    month: r.month as string,
+    revenue: Number(r.revenue ?? 0), cogs: Number(r.cogs ?? 0),
+    mallDeductions: Number(r.mall_deductions ?? 0), runningCosts: Number(r.running_costs ?? 0),
+    profit: Number(r.profit ?? 0),
+    cashKeptFromCheques: Number(r.cash_kept_from_cheques ?? 0),
+    cashFromAtm: Number(r.cash_from_atm ?? 0),
+    cashAvailable: Number(r.cash_available ?? 0),
+    cashTheBusinessNeeded: Number(r.cash_the_business_needed ?? 0),
+    drawingsResidual: Number(r.drawings_residual ?? 0),
+    personalCardSpend: Number(r.personal_card_spend ?? 0),
+    cogsMissing: !!r.cogs_missing, unreadableBreaks: Number(r.unreadable_breaks ?? 0),
+  }));
+}
+
+/** Months with sales but no cost of sales are dropped: their profit would be
+ *  the full revenue, which would flatter every average built on top of it. */
+export function summariseBurn(rows: BurnMonth[]): BurnSummary {
+  const usable = rows.filter((r) => !r.cogsMissing && (r.revenue > 0 || r.cashAvailable > 0));
+  const n = usable.length || 1;
+  const sum = (k: keyof BurnMonth) => usable.reduce((s, r) => s + (r[k] as number), 0);
+  const profit = sum("profit");
+  const tookOut = sum("drawingsResidual") + sum("personalCardSpend");
+  return {
+    months: usable.length,
+    revenue: sum("revenue"), cogs: sum("cogs"),
+    mallDeductions: sum("mallDeductions"), runningCosts: sum("runningCosts"),
+    profit, profitPerMonth: profit / n,
+    cashAvailable: sum("cashAvailable"), cashTheBusinessNeeded: sum("cashTheBusinessNeeded"),
+    drawings: sum("drawingsResidual"), personalCardSpend: sum("personalCardSpend"),
+    tookOut, tookOutPerMonth: tookOut / n,
+    pctOfProfit: profit > 0 ? (100 * tookOut) / profit : null,
+    excludedMonths: rows.length - usable.length,
+  };
+}

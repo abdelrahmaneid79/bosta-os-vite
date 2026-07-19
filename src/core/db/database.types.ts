@@ -181,6 +181,7 @@ export type Database = {
           updated_at: string
           void_reason: string | null
           voided_at: string | null
+          was_reversed: boolean
         }
         Insert: {
           amount?: number | null
@@ -207,6 +208,7 @@ export type Database = {
           updated_at?: string
           void_reason?: string | null
           voided_at?: string | null
+          was_reversed?: boolean
         }
         Update: {
           amount?: number | null
@@ -233,6 +235,7 @@ export type Database = {
           updated_at?: string
           void_reason?: string | null
           voided_at?: string | null
+          was_reversed?: boolean
         }
         Relationships: []
       }
@@ -2776,6 +2779,7 @@ export type Database = {
       v_bank_month: {
         Row: {
           banked: number | null
+          cash_attempts_reversed: number | null
           cash_out: number | null
           cheque_count: number | null
           cheques_net: number | null
@@ -2881,6 +2885,26 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_owner_burn: {
+        Row: {
+          cash_available: number | null
+          cash_from_atm: number | null
+          cash_kept_from_cheques: number | null
+          cash_the_business_needed: number | null
+          cogs: number | null
+          cogs_missing: boolean | null
+          drawings_residual: number | null
+          inventory_recorded: number | null
+          mall_deductions: number | null
+          month: string | null
+          personal_card_spend: number | null
+          profit: number | null
+          revenue: number | null
+          running_costs: number | null
+          unreadable_breaks: number | null
+        }
+        Relationships: []
       }
     }
     Functions: {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildOverview, catLabel, BANK_CATEGORIES, type BankTxn, type BankMonth, type BankReversal } from "@/core/read/bank";
+import { buildOverview, summariseBurn, catLabel, BANK_CATEGORIES,
+  type BankTxn, type BankMonth, type BankReversal, type BurnMonth } from "@/core/read/bank";
 
 const txn = (o: Partial<BankTxn>): BankTxn => ({
   id: o.id ?? Math.random().toString(36).slice(2), date: o.date ?? "2025-08-01",
@@ -80,5 +81,61 @@ describe("bank overview", () => {
     expect(BANK_CATEGORIES.find((c) => c.key === "cash_small")!.side).toBe("check");
     // A shop we can read but not classify is personal, never a guessed industry.
     expect(BANK_CATEGORIES.find((c) => c.key === "personal_other")!.side).toBe("personal");
+  });
+});
+
+const burn = (o: Partial<BurnMonth>): BurnMonth => ({
+  month: o.month ?? "2025-08", revenue: o.revenue ?? 0, cogs: o.cogs ?? 0,
+  mallDeductions: o.mallDeductions ?? 0, runningCosts: o.runningCosts ?? 0, profit: o.profit ?? 0,
+  cashKeptFromCheques: o.cashKeptFromCheques ?? 0, cashFromAtm: o.cashFromAtm ?? 0,
+  cashAvailable: o.cashAvailable ?? 0, cashTheBusinessNeeded: o.cashTheBusinessNeeded ?? 0,
+  drawingsResidual: o.drawingsResidual ?? 0, personalCardSpend: o.personalCardSpend ?? 0,
+  cogsMissing: o.cogsMissing ?? false, unreadableBreaks: o.unreadableBreaks ?? 0,
+});
+
+describe("owner burn", () => {
+  it("counts drawings and personal card spending together as what was taken out", () => {
+    const s = summariseBurn([
+      burn({ month: "2025-08", revenue: 100_000, profit: 20_000, drawingsResidual: 15_000, personalCardSpend: 3_000 }),
+      burn({ month: "2025-09", revenue: 100_000, profit: 20_000, drawingsResidual: 18_000, personalCardSpend: 4_000 }),
+    ]);
+    expect(s.tookOut).toBe(40_000);
+    expect(s.profit).toBe(40_000);
+    expect(s.pctOfProfit).toBe(100);
+    expect(s.tookOutPerMonth).toBe(20_000);
+  });
+
+  it("drops months that have sales but no cost of sales", () => {
+    // Such a month books its whole revenue as profit, which would flatter every
+    // average built on it — July 2026 is exactly this case in the real data.
+    const s = summariseBurn([
+      burn({ month: "2026-06", revenue: 90_000, cogs: 56_000, profit: 10_000 }),
+      burn({ month: "2026-07", revenue: 52_000, cogs: 0, profit: 52_000, cogsMissing: true }),
+    ]);
+    expect(s.months).toBe(1);
+    expect(s.profit).toBe(10_000);
+    expect(s.excludedMonths).toBe(1);
+  });
+
+  it("flags drawing more than the business earns", () => {
+    const s = summariseBurn([burn({ revenue: 100_000, profit: 10_000, drawingsResidual: 14_000 })]);
+    expect(s.pctOfProfit).toBe(140);
+  });
+
+  it("returns no ratio when the business made nothing, rather than dividing by zero", () => {
+    const s = summariseBurn([burn({ revenue: 100_000, profit: 0, drawingsResidual: 5_000 })]);
+    expect(s.pctOfProfit).toBeNull();
+    expect(s.tookOut).toBe(5_000);
+  });
+
+  it("keeps a loss-making month in the average instead of hiding it", () => {
+    const s = summariseBurn([
+      burn({ month: "2026-05", revenue: 100_000, profit: 30_000, drawingsResidual: 10_000 }),
+      burn({ month: "2026-06", revenue: 90_000, cogs: 56_000, profit: -9_000, drawingsResidual: 20_000 }),
+    ]);
+    expect(s.months).toBe(2);
+    expect(s.profit).toBe(21_000);
+    expect(s.tookOut).toBe(30_000);
+    expect(s.pctOfProfit).toBeCloseTo(142.86, 1);
   });
 });

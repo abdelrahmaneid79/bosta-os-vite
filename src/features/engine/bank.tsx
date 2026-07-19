@@ -24,6 +24,7 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { useUI } from "@/store/ui";
 import {
   getBankTxns, getBankMonths, getBankReversals, buildOverview,
+  getBurnMonths, summariseBurn,
   BANK_CATEGORIES, catLabel, type BankTxn, type BankSide,
 } from "@/core/read/bank";
 import { setBankCategory, setBankNote } from "@/core/db/mutations";
@@ -51,18 +52,21 @@ function Pill({ side }: { side: BankSide }) {
 export function BankScreen() {
   const qc = useQueryClient();
   const { reportSuccess, reportError } = useUI();
-  const [tab, setTab] = useState<"story" | "months" | "rows">("story");
+  const [tab, setTab] = useState<"story" | "burn" | "months" | "rows">("story");
   const [filter, setFilter] = useState<"all" | "business" | "personal" | "check">("all");
   const [edit, setEdit] = useState<BankTxn | null>(null);
 
   const txnsQ = useQuery({ queryKey: ["bank-txns"], queryFn: getBankTxns, enabled: en });
   const monthsQ = useQuery({ queryKey: ["bank-months"], queryFn: getBankMonths, enabled: en });
   const revQ = useQuery({ queryKey: ["bank-reversals"], queryFn: getBankReversals, enabled: en });
+  const burnQ = useQuery({ queryKey: ["owner-burn"], queryFn: getBurnMonths, enabled: en });
 
   const txns = txnsQ.data ?? [];
   const months = monthsQ.data ?? [];
   const reversals = revQ.data ?? [];
   const o = useMemo(() => buildOverview(txns, months, reversals), [txns, months, reversals]);
+  const burnRows = burnQ.data ?? [];
+  const burn = useMemo(() => summariseBurn(burnRows), [burnRows]);
 
   const save = useMutation({
     mutationFn: ({ id, category, side }: { id: string; category: string; side: BankSide }) => setBankCategory(id, category, side),
@@ -129,7 +133,7 @@ export function BankScreen() {
       </div>
 
       <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-white/[0.09] bg-white/[0.04] p-1.5">
-        {([["story", "The story"], ["months", "Month by month"], ["rows", `Every movement (${txns.length})`]] as const).map(([k, label]) => (
+        {([["story", "The story"], ["burn", "What you took out"], ["months", "Month by month"], ["rows", `Every movement (${txns.length})`]] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={cn("rounded-xl px-4 py-2 text-[13px] font-semibold transition active:scale-95 motion-reduce:active:scale-100",
               tab === k ? "bg-gradient-to-br from-pink to-violet text-white shadow-pink" : "text-muted hover:text-text")}>
@@ -216,6 +220,123 @@ export function BankScreen() {
               <p className="text-text">
                 A bank statement would settle it completely. This is as far as the text messages can go.
               </p>
+            </div>
+          </DeckTile>
+        </div>
+      )}
+
+      {tab === "burn" && (
+        <div className="space-y-5">
+          <DeckTile className="relative overflow-hidden">
+            <div className="pointer-events-none absolute -left-16 -top-20 h-56 w-56 rounded-full bg-warn/12 blur-3xl" />
+            <div className="relative">
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Over {burn.months} months</div>
+              <h3 className="mt-1 font-display text-2xl leading-tight text-text sm:text-[28px]">
+                The business made {egp(burn.profitPerMonth)} a month.
+                <br className="hidden sm:block" /> You took out{" "}
+                <span className={cn(burn.pctOfProfit != null && burn.pctOfProfit > 100 ? "text-bad" : "text-warn")}>
+                  {egp(burn.tookOutPerMonth)}
+                </span>.
+              </h3>
+              {burn.pctOfProfit != null && (
+                <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
+                  That is <span className="font-bold text-text">{Math.round(burn.pctOfProfit)}%</span> of everything the business earned.
+                  {burn.pctOfProfit > 98
+                    ? " Nothing is being left in to build a cushion — a bad month has to come out of your own pocket."
+                    : " The rest stays in the business."}
+                </p>
+              )}
+              <div className="mt-4 flex h-2.5 w-full overflow-hidden rounded-full bg-white/[0.07]">
+                <div className="h-full bg-gradient-to-r from-warn to-pink" style={{ width: `${Math.min(100, burn.pctOfProfit ?? 0)}%` }} />
+              </div>
+              <div className="mt-1.5 flex justify-between text-[11px] font-semibold">
+                <span className="text-muted">what you took</span>
+                <span className="text-muted">what the business made</span>
+              </div>
+            </div>
+          </DeckTile>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            <DeckTile>
+              <TileHead name="What the business earned" />
+              <div className="space-y-2 text-[13px]">
+                <Line label="Sales" value={burn.revenue} />
+                <Line label="Less the mall's rent and commission" value={-burn.mallDeductions} />
+                <Line label="Less what the stock cost you" value={-burn.cogs} />
+                <Line label="Less wages, packaging, the rest" value={-burn.runningCosts} />
+                <Line label="Profit" value={burn.profit} strong />
+              </div>
+            </DeckTile>
+            <DeckTile>
+              <TileHead name="What you actually took" />
+              <div className="space-y-2 text-[13px]">
+                <Line label="Cash you had (kept + drawn)" value={burn.cashAvailable} />
+                <Line label="Less what the business needed" value={-burn.cashTheBusinessNeeded} />
+                <Line label="Cash left over" value={burn.drawings} />
+                <Line label="Plus personal card spending" value={burn.personalCardSpend} />
+                <Line label="Taken out" value={burn.tookOut} strong />
+              </div>
+            </DeckTile>
+          </div>
+
+          <DeckTile>
+            <TileHead name="Month by month" />
+            <p className="mb-3 text-[12px] leading-relaxed text-muted">
+              Single months swing hard and some go negative — stock bought in one month gets sold across the next two,
+              so the cash and the cost never land together. Read the year, not the month.
+            </p>
+            <div className="-mx-1 overflow-x-auto">
+              <table className="w-full min-w-[560px] text-[13px]">
+                <thead>
+                  <tr className="border-b border-white/[0.09] text-left text-[11px] uppercase tracking-wider text-muted">
+                    <th className="px-3 py-2.5 font-bold">Month</th>
+                    <th className="px-3 py-2.5 text-right font-bold">Profit</th>
+                    <th className="px-3 py-2.5 text-right font-bold">You took</th>
+                    <th className="px-3 py-2.5 font-bold" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {burnRows.filter((r) => !r.cogsMissing && (r.revenue > 0 || r.cashAvailable > 0)).map((r) => {
+                    const took = r.drawingsResidual + r.personalCardSpend;
+                    return (
+                      <tr key={r.month} className="border-b border-white/[0.05] last:border-0">
+                        <td className="px-3 py-2.5 font-semibold text-text">{fmtDate(r.month + "-01", "MMM yyyy")}</td>
+                        <td className={cn("px-3 py-2.5 text-right tabular-nums", r.profit < 0 ? "text-bad" : "text-good")}>{egp(r.profit)}</td>
+                        <td className={cn("px-3 py-2.5 text-right tabular-nums", took > r.profit ? "font-semibold text-warn" : "text-muted")}>{egp(took)}</td>
+                        <td className="px-3 py-2.5 text-[11px] text-muted">
+                          {took > r.profit ? "took more than it made" : ""}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {burn.excludedMonths > 0 && (
+              <p className="mt-3 text-[12px] text-muted">
+                {burn.excludedMonths} month{burn.excludedMonths > 1 ? "s are" : " is"} left out — sales are recorded
+                but the product breakdown is not, so there is no cost of sales to subtract and the profit would be nonsense.
+              </p>
+            )}
+          </DeckTile>
+
+          <DeckTile>
+            <TileHead name="What could move this number" />
+            <div className="space-y-2.5 text-[13px] leading-relaxed text-muted">
+              <p>
+                "What you took" is what is left after the stock and the bills — it is not a figure anyone wrote down,
+                so it quietly absorbs every gap elsewhere. Two gaps would make it look bigger than it really is.
+              </p>
+              <p>
+                <span className="font-semibold text-text">Stock you bought but have not sold yet.</span> The cash went out;
+                the cost only appears when it sells. Nothing in BostaOS tracks stock movements yet, so this cannot be measured —
+                if you built up stock over the year, you took out less than this says.
+              </p>
+              <p>
+                <span className="font-semibold text-text">Wages.</span> Only {egp(45950)} of salary is on file for the whole
+                period. If the real figure is nearer 8,000 a month, about 50,000 of what looks like your drawings was actually wages.
+              </p>
+              <p className="text-text">Recording purchases and wages as you go is what turns this from an estimate into a fact.</p>
             </div>
           </DeckTile>
         </div>
