@@ -224,7 +224,7 @@ function TopNav({ onAdd }: { onAdd: () => void }) {
           </NavLink>
         ))}
       </nav>
-      <button onClick={onAdd} className="qadd"><Icon d={I.plus} w={2.6} className="h-4 w-4" /> Quick add</button>
+      <button onClick={onAdd} className="qadd"><Icon d={I.plus} w={2.6} className="h-4 w-4" /><span className="ql">Quick add</span></button>
       <AlertBell />
     </div>
   );
@@ -318,10 +318,9 @@ function MobileNav() {
   const primary = MOBILE_IDS.map((id) => vis.find((g) => g.id === id)).filter((g): g is Group => !!g);
   return (
     <>
-      {/* Visible until the top nav-pill takes over at 861px (the pill hides at
-          ≤860px in command-deck.css). Using md:hidden here left a 768–860px gap
-          with no navigation at all. */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line bg-rail px-1 pt-2 min-[861px]:hidden"
+      {/* Phones only. From 768px up the top pill handles navigation (icon-only
+          768–1000px, icon+label above) — the two never show together. */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 items-center border-t border-line bg-rail px-1 pt-2 md:hidden"
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
         {primary.map((g) => (
           <NavLink key={g.id} to={g.tabs[0].to} className={cn("flex flex-col items-center gap-1 rounded-xl px-1 py-1.5", active?.id === g.id ? "text-pink" : "text-faint")}>

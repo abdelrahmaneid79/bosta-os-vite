@@ -65,10 +65,13 @@ function AreaChart({ data, id, height = 200, strong = false, axis = false }: { d
   };
   // ONE pointer handler = smooth mouse hover AND touch-drag scrubbing.
   const onPoint = (e: React.PointerEvent) => setFromX(e.clientX);
+  // Touch has no pointerleave: lifting the finger must clear the crosshair,
+  // or the tooltip sticks until the next tap somewhere else.
+  const onLift = (e: React.PointerEvent) => { if (e.pointerType !== "mouse") setHover(null); };
   const hp = hover != null ? d[hover] : null;
   const xStep = Math.max(1, Math.ceil(vals.length / 6));
   const chart = (
-    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair", touchAction: "none" }} onPointerDown={onPoint} onPointerMove={onPoint} onPointerLeave={() => setHover(null)}>
+    <div ref={ref} className="chartbox" style={{ height: H, cursor: "crosshair", touchAction: "none" }} onPointerDown={onPoint} onPointerMove={onPoint} onPointerUp={onLift} onPointerCancel={onLift} onPointerLeave={() => setHover(null)}>
       <svg className="chsvg" viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
         <defs>
           <linearGradient id={`gf_${id}`} x1="0" y1="0" x2="0" y2="1">

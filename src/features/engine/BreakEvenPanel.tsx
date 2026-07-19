@@ -63,7 +63,10 @@ export function BreakEvenPanel() {
 
   return (
     <DeckTile>
-      <div className="be" style={{ "--be-c": s.colour } as React.CSSProperties}>
+      {/* Touch never fires blur reliably: a tap anywhere outside the day strip
+          clears the picked day, so nothing stays "selected" after the finger. */}
+      <div className="be" style={{ "--be-c": s.colour } as React.CSSProperties}
+        onPointerDown={(e) => { if (!(e.target as HTMLElement).closest(".be-day")) setSel(null); }}>
       <div className="be-head">
         <span className="tname">Break-even · {monthName}</span>
         <span className="be-chip" style={{ color: s.colour, borderColor: s.colour }}>

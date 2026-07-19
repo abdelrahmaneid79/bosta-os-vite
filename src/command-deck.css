@@ -46,7 +46,23 @@
 .cdk .avt:hover{transform:scale(1.05)}
 .cdk .qadd{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,var(--mag),var(--cd-violet));color:#fff;border:none;border-radius:13px;height:44px;padding:0 16px;font-family:'Satoshi',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer;box-shadow:0 10px 24px -8px rgba(255,77,187,.7);transition:transform .15s,filter .15s}
 .cdk .qadd:hover{filter:brightness(1.08)} .cdk .qadd:active{transform:scale(.97)} .cdk .qadd svg{width:16px;height:16px}
-@media (max-width:860px){ .cdk .navpill{display:none} .cdk .wmtxt small{display:none} }
+/* Responsive nav: three graceful states, never gone.
+   ≥1000px  icon + label pills
+   ≤1000px  icon-only squares (labels return automatically when wider)
+   ≤560px   tighter squares + brand text shrinks; the pill row itself scrolls
+            sideways as a last resort instead of wrapping or hiding. */
+@media (max-width:1000px){
+  .cdk .np span{display:none}
+  .cdk .np{padding:11px 13px}
+  .cdk .wmtxt small{display:none}
+}
+@media (max-width:767px){
+  /* phones: the bottom tab bar owns navigation; the top bar stays brand + actions */
+  .cdk .navpill{display:none}
+  .cdk .topbar{gap:10px}
+  .cdk .qadd .ql{display:none}
+  .cdk .qadd{padding:0 13px}
+}
 /* Below md (767px): the nav pills are gone, so push the topbar actions to the
    RIGHT edge — logo left, Quick-add + bell as a balanced cluster right. Scoped
    under 768px so desktop is untouched. */
@@ -299,7 +315,9 @@
      a narrow card the 56px value ran straight under the logo (numbers overlapped,
      the subtitle was clipped). Drop the decoration on phones and scale the value
      so it always sits clear on its own. */
-  .cdk .hero .heronut, .cdk .hero .orb{ display:none; }
+  .cdk .hero .orb{ display:none; }
+  .cdk .hero .heronut{ width:62px; height:62px; right:18px; top:16px; }
+  .cdk .hero .heronut img{ width:34px; height:34px; }
   .cdk .hv{ font-size:42px; }
   .cdk .hcur{ font-size:20px; margin-right:5px; }
 
@@ -767,4 +785,25 @@
 @media (prefers-reduced-motion:reduce){
   .cdk .sheet-backdrop,.cdk .sheet-panel,.cdk .chip{transition:none}
   .cdk button:not(:disabled):active,.cdk .chip:active,.cdk .lrow.tap:active{transform:none}
+}
+
+
+/* ═══ TOUCH CORRECTNESS — hover is for mice ═════════════════════════════════
+   On touch screens a :hover rule sticks after the tap and reads as a glitch.
+   Neutralise every hover lift/tint for hover-incapable devices; :active press
+   feedback (scale .985) remains — that is the touch feedback channel. */
+@media (hover:none){
+  .cdk .tile.clickable:hover{transform:none;border-color:var(--stroke);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 30px 60px -34px rgba(0,0,0,.9)}
+  .cdk .chip:hover{transform:none;border-color:var(--stroke)}
+  .cdk .lrow.tap:hover,.cdk .tbl tbody tr:hover{background:transparent}
+  .cdk .np:hover,.cdk .go:hover,.cdk .iconbtn:hover,.cdk .sheet-x:hover{color:var(--cd-muted);border-color:var(--stroke)}
+  .cdk .seg span:hover,.cdk .subtabs span:hover{color:var(--cd-dim)}
+  .cdk .sp-card:hover{transform:none}
+}
+
+/* Chip row on phones: one thumb-swipe lane with snap, not a cramped grid */
+@media (max-width:760px){
+  .cdk .chiprow{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-ms-overflow-style:none;scrollbar-width:none;padding-bottom:2px}
+  .cdk .chiprow::-webkit-scrollbar{display:none}
+  .cdk .chip{min-width:200px;scroll-snap-align:start;flex-shrink:0}
 }
