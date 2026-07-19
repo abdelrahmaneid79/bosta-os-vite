@@ -8,7 +8,7 @@
  *  reconcile before Approve unlocks. Nothing saves until you approve; writes go
  *  through the existing create_sale_item RPC (money math untouched). */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHead, Eyebrow, Button, Badge } from "@/components/ui";
 import { EmptyState, SkeletonRows } from "@/components/feedback";
@@ -69,6 +69,7 @@ async function fetchExistingDay(date: string, locationId: string): Promise<Exist
 interface LineMeta { conf: number; warnings: string[] }
 
 export function DaySalesPhotoImport() {
+  const nav = useNavigate();
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
@@ -325,6 +326,15 @@ export function DaySalesPhotoImport() {
         </Card>
       )}
 
+      {/* One import surface: today's photo report or bulk day totals. The two
+          old tabs ("Daily report" / "Bulk totals") merged here — same jobs,
+          one obvious place, a segmented switch between them. */}
+      <div className="mb-4 flex justify-center">
+        <div className="subtabs" style={{ margin: 0 }}>
+          <span className="on">Day report · photo</span>
+          <span onClick={() => nav("/sales/import")}>Bulk totals · file</span>
+        </div>
+      </div>
       {!lines ? (
         /* ───────── Upload ───────── */
         <Card>
@@ -332,10 +342,11 @@ export function DaySalesPhotoImport() {
             <CardHead title="Snap today's sales report" sub="Snap the report — you'll check it before saving" accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
               <label className={`lift flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-pink px-5 py-3 font-display text-sm font-bold text-ink shadow-pink ${busy ? "pointer-events-none opacity-60" : ""}`}>
-                📷 Take photo<input type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} disabled={busy} />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+                Take photo<input type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} disabled={busy} />
               </label>
               <label className={`lift flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-line bg-panel2 px-5 py-3 font-display text-sm font-bold text-text ${busy ? "pointer-events-none opacity-60" : ""}`}>
-                Choose a file<input type="file" accept="image/*,.png,.jpg,.jpeg,.webp" className="hidden" onChange={onFile} disabled={busy} />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M13 2v7h7" /></svg>Choose a file<input type="file" accept="image/*,.png,.jpg,.jpeg,.webp" className="hidden" onChange={onFile} disabled={busy} />
               </label>
             </div>
             {busy

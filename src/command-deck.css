@@ -742,11 +742,14 @@
 .cdk .sheet-x svg{width:16px;height:16px}
 .cdk .sheet-body{padding:4px 22px 26px;overflow-y:auto;overscroll-behavior:contain}
 @media(min-width:900px){
-  .cdk.sheet-root{align-items:stretch;justify-content:flex-start}
-  .cdk .sheet-panel{max-width:480px;max-height:none;height:100dvh;border-radius:0 26px 26px 0;border-bottom:1px solid var(--stroke);
-    transform:translateX(-32px)}
-  .cdk .sheet-panel.wide{max-width:640px}
-  .cdk .sheet-panel.on{transform:translateX(0)}
+  /* desktop: a levitating centered panel — big, wide, bordered, floating */
+  .cdk.sheet-root{align-items:center;justify-content:center;padding:32px}
+  .cdk .sheet-panel{max-width:640px;max-height:88dvh;height:auto;border-radius:26px;
+    border:1px solid rgba(255,255,255,.14);border-bottom:1px solid rgba(255,255,255,.14);
+    box-shadow:0 60px 140px -30px rgba(0,0,0,.95),0 20px 60px -20px rgba(255,77,187,.14),inset 0 1px 0 rgba(255,255,255,.09);
+    transform:translateY(18px) scale(.985)}
+  .cdk .sheet-panel.wide{max-width:820px}
+  .cdk .sheet-panel.on{transform:translateY(0) scale(1)}
   .cdk .sheet-grab{display:none}
   .cdk .sheet-head{padding-top:22px}
 }
