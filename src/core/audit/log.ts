@@ -16,7 +16,8 @@ export type AuditAction =
   | "close.complete" | "close.reopen" | "close.void"
   | "exception.acknowledge" | "exception.dismiss" | "exception.resolve"
   | "action.status_change" | "experiment.create" | "experiment.update"
-  | "context.save" | "product.delete";
+  | "context.save" | "product.delete"
+  | "bank.recategorise" | "bank.note";
 
 export interface AuditEntry {
   action: AuditAction;

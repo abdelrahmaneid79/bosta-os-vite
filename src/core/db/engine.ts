@@ -93,4 +93,7 @@ export const recordCashCountAtomic = (args: {
   p_account_id: args.accountId, p_count_date: args.countDate, p_counted: args.counted, p_expected: args.expected,
   p_notes: args.notes, p_is_opening_baseline: args.isOpeningBaseline, p_verification: args.verification,
   p_counted_source: args.countedSource, p_bank_balance: args.bankBalance, p_idempotency_key: args.idempotencyKey,
-}) as Promise<{ id: string; difference: number; replayed: boolean }>;
+  // The generated types mark every function argument non-null, but the SQL
+  // signature takes nullable text/numeric and branches on them explicitly
+  // (0039: `if p_idempotency_key is not null`). Nulls are the intended input.
+} as never) as Promise<{ id: string; difference: number; replayed: boolean }>;

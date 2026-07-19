@@ -119,6 +119,123 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_reversals: {
+        Row: {
+          amount: number
+          created_at: string
+          day_month: string | null
+          id: string
+          merchant: string | null
+          note: string | null
+          refund_confirmed: boolean
+          source: string
+          txn_date: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          day_month?: string | null
+          id?: string
+          merchant?: string | null
+          note?: string | null
+          refund_confirmed?: boolean
+          source?: string
+          txn_date?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          day_month?: string | null
+          id?: string
+          merchant?: string | null
+          note?: string | null
+          refund_confirmed?: boolean
+          source?: string
+          txn_date?: string | null
+        }
+        Relationships: []
+      }
+      bank_transactions: {
+        Row: {
+          amount: number | null
+          balance_after: number | null
+          balance_derived: boolean
+          bank: string | null
+          category: string
+          category_edited: boolean
+          chain_gap: number | null
+          created_at: string
+          deposit_amount: number | null
+          direction: string
+          edited_at: string | null
+          id: string
+          is_reversal_refund: boolean
+          merchant: string | null
+          note: string | null
+          place: string | null
+          raw: string | null
+          seen_count: number
+          side: string
+          source: string
+          txn_date: string | null
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          amount?: number | null
+          balance_after?: number | null
+          balance_derived?: boolean
+          bank?: string | null
+          category?: string
+          category_edited?: boolean
+          chain_gap?: number | null
+          created_at?: string
+          deposit_amount?: number | null
+          direction?: string
+          edited_at?: string | null
+          id?: string
+          is_reversal_refund?: boolean
+          merchant?: string | null
+          note?: string | null
+          place?: string | null
+          raw?: string | null
+          seen_count?: number
+          side?: string
+          source?: string
+          txn_date?: string | null
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          amount?: number | null
+          balance_after?: number | null
+          balance_derived?: boolean
+          bank?: string | null
+          category?: string
+          category_edited?: boolean
+          chain_gap?: number | null
+          created_at?: string
+          deposit_amount?: number | null
+          direction?: string
+          edited_at?: string | null
+          id?: string
+          is_reversal_refund?: boolean
+          merchant?: string | null
+          note?: string | null
+          place?: string | null
+          raw?: string | null
+          seen_count?: number
+          side?: string
+          source?: string
+          txn_date?: string | null
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Relationships: []
+      }
       cash_reconciliations: {
         Row: {
           account_id: string
@@ -978,6 +1095,91 @@ export type Database = {
           },
         ]
       }
+      location_observations: {
+        Row: {
+          category: string
+          created_at: string | null
+          evidence: string | null
+          finding: string
+          id: string
+          location_id: string
+          observed_on: string
+          recommendation: string | null
+          severity: string
+          status: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          evidence?: string | null
+          finding: string
+          id?: string
+          location_id: string
+          observed_on: string
+          recommendation?: string | null
+          severity: string
+          status?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          evidence?: string | null
+          finding?: string
+          id?: string
+          location_id?: string
+          observed_on?: string
+          recommendation?: string | null
+          severity?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_observations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      location_profile: {
+        Row: {
+          brand_assets: string | null
+          constraints_notes: string | null
+          equipment: string | null
+          location_id: string
+          operating_model: string | null
+          pricing_control: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          brand_assets?: string | null
+          constraints_notes?: string | null
+          equipment?: string | null
+          location_id: string
+          operating_model?: string | null
+          pricing_control?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          brand_assets?: string | null
+          constraints_notes?: string | null
+          equipment?: string | null
+          location_id?: string
+          operating_model?: string | null
+          pricing_control?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_profile_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: true
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       location_terms: {
         Row: {
           amount: number | null
@@ -1015,6 +1217,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "location_terms_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      location_zones: {
+        Row: {
+          active: boolean | null
+          approx_facings: number | null
+          branded: boolean | null
+          created_at: string | null
+          id: string
+          lit: boolean | null
+          location_id: string
+          name: string
+          notes: string | null
+          signage: string | null
+          tier: string | null
+          traffic: string | null
+          zone_key: string
+        }
+        Insert: {
+          active?: boolean | null
+          approx_facings?: number | null
+          branded?: boolean | null
+          created_at?: string | null
+          id?: string
+          lit?: boolean | null
+          location_id: string
+          name: string
+          notes?: string | null
+          signage?: string | null
+          tier?: string | null
+          traffic?: string | null
+          zone_key: string
+        }
+        Update: {
+          active?: boolean | null
+          approx_facings?: number | null
+          branded?: boolean | null
+          created_at?: string | null
+          id?: string
+          lit?: boolean | null
+          location_id?: string
+          name?: string
+          notes?: string | null
+          signage?: string | null
+          tier?: string | null
+          traffic?: string | null
+          zone_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_zones_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
@@ -1234,6 +1492,84 @@ export type Database = {
           },
         ]
       }
+      packaging_formats: {
+        Row: {
+          active: boolean
+          applicable_product_ids: string[]
+          created_at: string
+          display_zone: string | null
+          end_date: string | null
+          gifting_suitable: boolean
+          id: string
+          impulse_suitable: boolean
+          label_seal_cost: number | null
+          material: string | null
+          name: string
+          notes: string | null
+          pack_size_g: number | null
+          package_cost: number | null
+          packaging_type: string | null
+          premium_score: number | null
+          prep_cost: number | null
+          prep_minutes: number | null
+          season: string | null
+          seasonal: boolean
+          shelf_space: string | null
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          applicable_product_ids?: string[]
+          created_at?: string
+          display_zone?: string | null
+          end_date?: string | null
+          gifting_suitable?: boolean
+          id?: string
+          impulse_suitable?: boolean
+          label_seal_cost?: number | null
+          material?: string | null
+          name: string
+          notes?: string | null
+          pack_size_g?: number | null
+          package_cost?: number | null
+          packaging_type?: string | null
+          premium_score?: number | null
+          prep_cost?: number | null
+          prep_minutes?: number | null
+          season?: string | null
+          seasonal?: boolean
+          shelf_space?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          applicable_product_ids?: string[]
+          created_at?: string
+          display_zone?: string | null
+          end_date?: string | null
+          gifting_suitable?: boolean
+          id?: string
+          impulse_suitable?: boolean
+          label_seal_cost?: number | null
+          material?: string | null
+          name?: string
+          notes?: string | null
+          pack_size_g?: number | null
+          package_cost?: number | null
+          packaging_type?: string | null
+          premium_score?: number | null
+          prep_cost?: number | null
+          prep_minutes?: number | null
+          season?: string | null
+          seasonal?: boolean
+          shelf_space?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       physical_counts: {
         Row: {
           avg_cost_at_count: number | null
@@ -1404,87 +1740,10 @@ export type Database = {
         }
         Relationships: []
       }
-      packaging_formats: {
-        Row: {
-          active: boolean
-          applicable_product_ids: string[]
-          created_at: string
-          display_zone: string | null
-          end_date: string | null
-          gifting_suitable: boolean
-          id: string
-          impulse_suitable: boolean
-          label_seal_cost: number | null
-          material: string | null
-          name: string
-          notes: string | null
-          pack_size_g: number | null
-          package_cost: number | null
-          packaging_type: string | null
-          premium_score: number | null
-          prep_cost: number | null
-          prep_minutes: number | null
-          season: string | null
-          seasonal: boolean
-          shelf_space: string | null
-          start_date: string | null
-          updated_at: string
-        }
-        Insert: {
-          active?: boolean
-          applicable_product_ids?: string[]
-          created_at?: string
-          display_zone?: string | null
-          end_date?: string | null
-          gifting_suitable?: boolean
-          id?: string
-          impulse_suitable?: boolean
-          label_seal_cost?: number | null
-          material?: string | null
-          name: string
-          notes?: string | null
-          pack_size_g?: number | null
-          package_cost?: number | null
-          packaging_type?: string | null
-          premium_score?: number | null
-          prep_cost?: number | null
-          prep_minutes?: number | null
-          season?: string | null
-          seasonal?: boolean
-          shelf_space?: string | null
-          start_date?: string | null
-          updated_at?: string
-        }
-        Update: {
-          active?: boolean
-          applicable_product_ids?: string[]
-          created_at?: string
-          display_zone?: string | null
-          end_date?: string | null
-          gifting_suitable?: boolean
-          id?: string
-          impulse_suitable?: boolean
-          label_seal_cost?: number | null
-          material?: string | null
-          name?: string
-          notes?: string | null
-          pack_size_g?: number | null
-          package_cost?: number | null
-          packaging_type?: string | null
-          premium_score?: number | null
-          prep_cost?: number | null
-          prep_minutes?: number | null
-          season?: string | null
-          seasonal?: boolean
-          shelf_space?: string | null
-          start_date?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       products: {
         Row: {
           active: boolean
+          adjacent_product_ids: string[] | null
           alt_pos_codes: string[]
           avg_cost: number
           base_unit: string
@@ -1492,36 +1751,36 @@ export type Database = {
           category_id: string | null
           created_at: string
           current_stock: number
-          id: string
-          do_not_discontinue: boolean
-          is_traffic_driver: boolean
-          quantity_breaks: Json | null
-          adjacent_product_ids: string[] | null
           display_zone: string | null
+          do_not_discontinue: boolean
           facings: number | null
+          id: string
           impulse_type: string | null
-          min_order_qty: number | null
-          pack_size_g: number | null
-          packaging_cost: number | null
-          packaging_format: string | null
-          shelf_level: string | null
-          supplier_lead_days: number | null
-          tier: string | null
+          is_traffic_driver: boolean
           low_stock_threshold: number | null
           market_code: string | null
+          min_order_qty: number | null
           name_ar: string | null
           name_en: string
           notes: string | null
+          pack_size_g: number | null
+          packaging_cost: number | null
+          packaging_format: string | null
           pos_code: string | null
+          quantity_breaks: Json | null
           reference_cost: number | null
           sale_unit: string | null
           selling_price: number | null
+          shelf_level: string | null
+          supplier_lead_days: number | null
+          tier: string | null
           unit_type: Database["public"]["Enums"]["product_unit_type"]
           updated_at: string
           vendor: string | null
         }
         Insert: {
           active?: boolean
+          adjacent_product_ids?: string[] | null
           alt_pos_codes?: string[]
           avg_cost?: number
           base_unit?: string
@@ -1529,36 +1788,36 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           current_stock?: number
-          id?: string
-          do_not_discontinue?: boolean
-          is_traffic_driver?: boolean
-          quantity_breaks?: Json | null
-          adjacent_product_ids?: string[] | null
           display_zone?: string | null
+          do_not_discontinue?: boolean
           facings?: number | null
+          id?: string
           impulse_type?: string | null
-          min_order_qty?: number | null
-          pack_size_g?: number | null
-          packaging_cost?: number | null
-          packaging_format?: string | null
-          shelf_level?: string | null
-          supplier_lead_days?: number | null
-          tier?: string | null
+          is_traffic_driver?: boolean
           low_stock_threshold?: number | null
           market_code?: string | null
+          min_order_qty?: number | null
           name_ar?: string | null
           name_en: string
           notes?: string | null
+          pack_size_g?: number | null
+          packaging_cost?: number | null
+          packaging_format?: string | null
           pos_code?: string | null
+          quantity_breaks?: Json | null
           reference_cost?: number | null
           sale_unit?: string | null
           selling_price?: number | null
+          shelf_level?: string | null
+          supplier_lead_days?: number | null
+          tier?: string | null
           unit_type?: Database["public"]["Enums"]["product_unit_type"]
           updated_at?: string
           vendor?: string | null
         }
         Update: {
           active?: boolean
+          adjacent_product_ids?: string[] | null
           alt_pos_codes?: string[]
           avg_cost?: number
           base_unit?: string
@@ -1566,30 +1825,29 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           current_stock?: number
-          id?: string
-          do_not_discontinue?: boolean
-          is_traffic_driver?: boolean
-          quantity_breaks?: Json | null
-          adjacent_product_ids?: string[] | null
           display_zone?: string | null
+          do_not_discontinue?: boolean
           facings?: number | null
+          id?: string
           impulse_type?: string | null
-          min_order_qty?: number | null
-          pack_size_g?: number | null
-          packaging_cost?: number | null
-          packaging_format?: string | null
-          shelf_level?: string | null
-          supplier_lead_days?: number | null
-          tier?: string | null
+          is_traffic_driver?: boolean
           low_stock_threshold?: number | null
           market_code?: string | null
+          min_order_qty?: number | null
           name_ar?: string | null
           name_en?: string
           notes?: string | null
+          pack_size_g?: number | null
+          packaging_cost?: number | null
+          packaging_format?: string | null
           pos_code?: string | null
+          quantity_breaks?: Json | null
           reference_cost?: number | null
           sale_unit?: string | null
           selling_price?: number | null
+          shelf_level?: string | null
+          supplier_lead_days?: number | null
+          tier?: string | null
           unit_type?: Database["public"]["Enums"]["product_unit_type"]
           updated_at?: string
           vendor?: string | null
@@ -1686,88 +1944,6 @@ export type Database = {
           },
         ]
       }
-      sale_items: {
-        Row: {
-          cogs_at_sale: number | null
-          created_at: string
-          edited_at: string | null
-          id: string
-          is_estimated: boolean
-          line_total: number
-          notes: string | null
-          product_id: string | null
-          quantity: number
-          raw_product_name: string | null
-          sale_id: string
-          tax_amount: number
-          unit_price: number | null
-          updated_at: string
-          verification: Database["public"]["Enums"]["verification_status"]
-          void_reason: string | null
-          voided_at: string | null
-        }
-        Insert: {
-          cogs_at_sale?: number | null
-          created_at?: string
-          edited_at?: string | null
-          id?: string
-          is_estimated?: boolean
-          line_total: number
-          notes?: string | null
-          product_id?: string | null
-          quantity: number
-          raw_product_name?: string | null
-          sale_id: string
-          tax_amount?: number
-          unit_price?: number | null
-          updated_at?: string
-          verification?: Database["public"]["Enums"]["verification_status"]
-          void_reason?: string | null
-          voided_at?: string | null
-        }
-        Update: {
-          cogs_at_sale?: number | null
-          created_at?: string
-          edited_at?: string | null
-          id?: string
-          is_estimated?: boolean
-          line_total?: number
-          notes?: string | null
-          product_id?: string | null
-          quantity?: number
-          raw_product_name?: string | null
-          sale_id?: string
-          tax_amount?: number
-          unit_price?: number | null
-          updated_at?: string
-          verification?: Database["public"]["Enums"]["verification_status"]
-          void_reason?: string | null
-          voided_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sale_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sale_items_sale_id_fkey"
-            columns: ["sale_id"]
-            isOneToOne: false
-            referencedRelation: "sales"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sale_items_sale_id_fkey"
-            columns: ["sale_id"]
-            isOneToOne: false
-            referencedRelation: "v_active_sales"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       retail_experiments: {
         Row: {
           attribution_confidence: string | null
@@ -1860,6 +2036,88 @@ export type Database = {
           voided_at?: string | null
         }
         Relationships: []
+      }
+      sale_items: {
+        Row: {
+          cogs_at_sale: number | null
+          created_at: string
+          edited_at: string | null
+          id: string
+          is_estimated: boolean
+          line_total: number
+          notes: string | null
+          product_id: string | null
+          quantity: number
+          raw_product_name: string | null
+          sale_id: string
+          tax_amount: number
+          unit_price: number | null
+          updated_at: string
+          verification: Database["public"]["Enums"]["verification_status"]
+          void_reason: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          cogs_at_sale?: number | null
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          is_estimated?: boolean
+          line_total: number
+          notes?: string | null
+          product_id?: string | null
+          quantity: number
+          raw_product_name?: string | null
+          sale_id: string
+          tax_amount?: number
+          unit_price?: number | null
+          updated_at?: string
+          verification?: Database["public"]["Enums"]["verification_status"]
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          cogs_at_sale?: number | null
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          is_estimated?: boolean
+          line_total?: number
+          notes?: string | null
+          product_id?: string | null
+          quantity?: number
+          raw_product_name?: string | null
+          sale_id?: string
+          tax_amount?: number
+          unit_price?: number | null
+          updated_at?: string
+          verification?: Database["public"]["Enums"]["verification_status"]
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_sales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales: {
         Row: {
@@ -2113,6 +2371,7 @@ export type Database = {
       }
       strategist_actions: {
         Row: {
+          accepted_at: string | null
           amount: number | null
           baseline: Json | null
           category: string
@@ -2129,24 +2388,24 @@ export type Database = {
           finding_id: string | null
           funding_status: string
           id: string
-          accepted_at: string | null
-          started_at: string | null
-          overdue_notified_at: string | null
-          linked_exception_id: string | null
           latest_date: string | null
+          linked_exception_id: string | null
           outcome_metrics: Json | null
           outcome_state: string
+          overdue_notified_at: string | null
           priority: string
           recurrence: string | null
           recurring_amount: number | null
           review_date: string | null
           screen_link: string
           source: string
+          started_at: string | null
           status: string
           success_criteria: string | null
           title: string
         }
         Insert: {
+          accepted_at?: string | null
           amount?: number | null
           baseline?: Json | null
           category?: string
@@ -2163,24 +2422,24 @@ export type Database = {
           finding_id?: string | null
           funding_status?: string
           id?: string
-          accepted_at?: string | null
-          started_at?: string | null
-          overdue_notified_at?: string | null
-          linked_exception_id?: string | null
           latest_date?: string | null
+          linked_exception_id?: string | null
           outcome_metrics?: Json | null
           outcome_state?: string
+          overdue_notified_at?: string | null
           priority?: string
           recurrence?: string | null
           recurring_amount?: number | null
           review_date?: string | null
           screen_link?: string
           source: string
+          started_at?: string | null
           status?: string
           success_criteria?: string | null
           title: string
         }
         Update: {
+          accepted_at?: string | null
           amount?: number | null
           baseline?: Json | null
           category?: string
@@ -2197,19 +2456,18 @@ export type Database = {
           finding_id?: string | null
           funding_status?: string
           id?: string
-          accepted_at?: string | null
-          started_at?: string | null
-          overdue_notified_at?: string | null
-          linked_exception_id?: string | null
           latest_date?: string | null
+          linked_exception_id?: string | null
           outcome_metrics?: Json | null
           outcome_state?: string
+          overdue_notified_at?: string | null
           priority?: string
           recurrence?: string | null
           recurring_amount?: number | null
           review_date?: string | null
           screen_link?: string
           source?: string
+          started_at?: string | null
           status?: string
           success_criteria?: string | null
           title?: string
@@ -2515,6 +2773,56 @@ export type Database = {
           },
         ]
       }
+      v_bank_month: {
+        Row: {
+          banked: number | null
+          cash_out: number | null
+          cheque_count: number | null
+          cheques_net: number | null
+          kept_as_cash: number | null
+          month: string | null
+          movements: number | null
+          personal_spend: number | null
+          unreadable_breaks: number | null
+        }
+        Relationships: []
+      }
+      v_cheque_ledger: {
+        Row: {
+          cycle_days: number | null
+          cycle_end: string | null
+          cycle_gross: number | null
+          cycle_start: string | null
+          deductions: number | null
+          id: string | null
+          net_received: number | null
+          pos_sales_in_range: number | null
+          received_date: string | null
+        }
+        Insert: {
+          cycle_days?: never
+          cycle_end?: string | null
+          cycle_gross?: number | null
+          cycle_start?: string | null
+          deductions?: never
+          id?: string | null
+          net_received?: number | null
+          pos_sales_in_range?: never
+          received_date?: string | null
+        }
+        Update: {
+          cycle_days?: never
+          cycle_end?: string | null
+          cycle_gross?: number | null
+          cycle_start?: string | null
+          deductions?: never
+          id?: string | null
+          net_received?: number | null
+          pos_sales_in_range?: never
+          received_date?: string | null
+        }
+        Relationships: []
+      }
       v_open_settlement: {
         Row: {
           accumulated_revenue: number | null
@@ -2581,6 +2889,18 @@ export type Database = {
         Args: { p_sale_id: string }
         Returns: boolean
       }
+      cheque_for_date: {
+        Args: { p_date: string }
+        Returns: {
+          cheque_id: string
+          cycle_days: number
+          cycle_end: string
+          cycle_gross: number
+          cycle_start: string
+          net_received: number
+          received_date: string
+        }[]
+      }
       create_purchase: {
         Args: {
           p_invoice_ref: string
@@ -2642,21 +2962,6 @@ export type Database = {
         Args: { p_period_id: string }
         Returns: undefined
       }
-      record_cash_count: {
-        Args: {
-          p_account_id: string
-          p_bank_balance: number | null
-          p_count_date: string
-          p_counted: number
-          p_counted_source: string
-          p_expected: number
-          p_idempotency_key: string | null
-          p_is_opening_baseline: boolean
-          p_notes: string | null
-          p_verification: string
-        }
-        Returns: Json
-      }
       recompute_all_product_costs: { Args: never; Returns: undefined }
       recompute_product_costs: {
         Args: { p_product_id: string }
@@ -2665,6 +2970,21 @@ export type Database = {
       recompute_product_stock: {
         Args: { p_product_id: string }
         Returns: undefined
+      }
+      record_cash_count: {
+        Args: {
+          p_account_id: string
+          p_bank_balance: number
+          p_count_date: string
+          p_counted: number
+          p_counted_source: string
+          p_expected: number
+          p_idempotency_key: string
+          p_is_opening_baseline: boolean
+          p_notes: string
+          p_verification: string
+        }
+        Returns: Json
       }
       record_physical_count: {
         Args: {

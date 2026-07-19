@@ -449,3 +449,27 @@ export async function setLocationTerm(locationId: string, type: Enums<"term_type
   });
   if (error) throw error;
 }
+
+// ── Bank card ledger (SMS-derived; see core/read/bank.ts) ───────────────────
+/** Re-categorise one bank row. Sets category_edited so a re-import of the SMS
+ *  data never overwrites the owner's judgement with the import's first guess. */
+export async function setBankCategory(
+  id: string,
+  category: string,
+  side: "business" | "personal" | "check" | "ignore",
+): Promise<void> {
+  const { error } = await requireEngine().from("bank_transactions")
+    .update({ category, side, category_edited: true, edited_at: new Date().toISOString() })
+    .eq("id", id).is("voided_at", null);
+  if (error) throw error;
+  void logAudit({ action: "bank.recategorise", entityType: "bank_transactions", entityId: id, detail: { category, side } });
+}
+
+/** Free-text note on a bank row — the place to record what a shop actually was. */
+export async function setBankNote(id: string, note: string): Promise<void> {
+  const { error } = await requireEngine().from("bank_transactions")
+    .update({ note: note.trim() || null, edited_at: new Date().toISOString() })
+    .eq("id", id).is("voided_at", null);
+  if (error) throw error;
+  void logAudit({ action: "bank.note", entityType: "bank_transactions", entityId: id, detail: { note } });
+}

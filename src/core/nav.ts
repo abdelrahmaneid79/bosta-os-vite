@@ -23,6 +23,7 @@ export const NAV_SECTIONS: NavSection[] = [
     { to: "/money", label: "Cash" },
     { to: "/expenses", label: "Expenses" },
     { to: "/cheques", label: "Cheques" },
+    { to: "/bank", label: "Bank card" },
   ] },
   { id: "insights", label: "Insights", icon: "M22 12h-4l-3 8L9 4l-3 8H2", accent: "#54D69A", tabs: [
     { to: "/health", label: "Strategist" },

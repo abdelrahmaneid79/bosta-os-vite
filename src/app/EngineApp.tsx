@@ -36,6 +36,7 @@ const productImport = () => import("@/features/engine/product-import");
 const daySalesImport = () => import("@/features/engine/day-sales-import");
 const opening = () => import("@/features/engine/opening");
 const performance = () => import("@/features/engine/performance");
+const bank = () => import("@/features/engine/bank");
 const qa = () => import("@/features/qa/QAScreen");
 const L = <M, K extends keyof M>(load: () => Promise<M>, key: K) =>
   lazy(() => load().then((m) => ({ default: m[key] as unknown as React.ComponentType })));
@@ -53,6 +54,7 @@ const SettingsScreen = L(more, "SettingsScreen");
 const ReceiptsScreen = lazy(() => receipts().then((m) => ({ default: m.ReceiptsScreen })));
 const HistoryImportScreen = lazy(() => import("@/features/engine/history-import").then((m) => ({ default: m.HistoryImportScreen })));
 const PerformanceScreen = L(performance, "PerformanceScreen");
+const BankScreen = L(bank, "BankScreen");
 const QAScreen = L(qa, "QAScreen");
 const PreferencesScreen = L(more, "PreferencesScreen");
 const ProductDetailScreen = L(product, "ProductDetailScreen");
@@ -88,7 +90,7 @@ const EL: Record<string, React.ReactNode> = {
   "/dashboard": <DashboardScreen />,
   "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <DaySalesPhotoImport />, "/sales/product-lines/file": <ProductLineImportScreen />,
   "/stock": <StockScreen />, "/purchases": <PurchasesScreen />, "/costs": <ProductCostImportScreen />,
-  "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/settlements": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
+  "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/bank": <BankScreen />, "/settlements": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/performance": <PerformanceScreen />,
   "/health": <StrategistScreen />,
   "/settings": <SettingsScreen />, "/settings/prefs": <PreferencesScreen />, "/settings/opening": <OpeningBalancesScreen />, "/settings/history": <HistoryImportScreen />, "/system": <SystemCheckScreen />, "/qa": <QAScreen />,
