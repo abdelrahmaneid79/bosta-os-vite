@@ -14,6 +14,8 @@ import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { egp, num } from "@/core/utils/format";
+/** Table cells carry bare numbers — the unit is named once in the header. */
+const bare = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
@@ -102,8 +104,8 @@ export function StockScreen() {
       <Guarded q={q} empty={!!s && s.positions.length === 0}>
         <DeckTile style={{ padding: 0 }}>
           <div className="scroll">
-            <table className="tbl">
-              <thead><tr><th>Product</th><th className="r">On hand</th><th className="r">Stock value</th></tr></thead>
+            <table className="dtbl">
+              <thead><tr><th>Product</th><th className="r">On hand</th><th className="r">Value (EGP)</th></tr></thead>
               <tbody>
                 {positions.map((p) => (
                   <tr key={p.id} className="prodcell" onClick={() => setDetailId(p.id)}>
@@ -111,10 +113,16 @@ export function StockScreen() {
                     <td className="r" style={{ color: p.isNegative ? "var(--red)" : p.onHand === 0 ? "rgb(var(--faint))" : undefined }}>
                       {p.onHand === 0 ? "—" : num(p.onHand)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span>
                     </td>
-                    <td className="r">{p.hasCost && p.onHand !== 0 ? egp(p.stockValue) : <span style={{ color: "rgb(var(--faint))", fontFamily: "Satoshi", fontWeight: 500 }}>{p.hasCost ? "—" : "add cost"}</span>}</td>
+                    <td className="r">{p.hasCost && p.onHand !== 0 ? bare(p.stockValue) : <span style={{ color: "rgb(var(--faint))", fontFamily: "Satoshi", fontWeight: 500 }}>{p.hasCost ? "—" : "add cost"}</span>}</td>
                   </tr>
                 ))}
               </tbody>
+              {positions.length > 0 && (
+                <tfoot><tr>
+                  <td>{positions.length} products</td><td />
+                  <td className="r">{bare(positions.reduce((a, p) => a + (p.hasCost ? p.stockValue : 0), 0))}</td>
+                </tr></tfoot>
+              )}
             </table>
           </div>
         </DeckTile>
@@ -149,17 +157,17 @@ function ManageProducts() {
       <div style={{ fontSize: 13, color: "rgb(var(--muted))", marginBottom: 14 }}>{list.length} products · edit prices, activate/deactivate, or remove.</div>
       {prods.isLoading ? <SkeletonRows rows={5} /> : (
         <div className="scroll" style={{ maxHeight: "52vh" }}>
-          <table className="etbl">
-            <thead><tr><th>Product</th><th className="r">Selling price</th><th className="r">Status</th><th style={{ width: 92 }} /></tr></thead>
+          <table className="dtbl">
+            <thead><tr><th>Product</th><th className="r">Price (EGP)</th><th className="r">Status</th><th style={{ width: 104 }} /></tr></thead>
             <tbody>
               {list.map((p) => (
                 <tr key={p.id}>
                   <td>{p.name_en}{p.name_ar ? <span className="ar" style={{ color: "rgb(var(--dim))", fontSize: 12 }}> · {p.name_ar}</span> : null}</td>
-                  <td className="r">{p.selling_price != null ? egp(p.selling_price) : "—"}</td>
+                  <td className="r">{p.selling_price != null ? bare(p.selling_price) : "—"}</td>
                   <td className="r"><button onClick={() => toggle.mutate({ id: p.id, active: !p.active })} className="pill2" style={{ cursor: "pointer", color: p.active ? "var(--green)" : "rgb(var(--faint))" }}>{p.active ? "active" : "off"}</button></td>
                   <td className="r" style={{ whiteSpace: "nowrap" }}>
-                    <button className="addbtn" style={{ padding: "6px 10px" }} onClick={() => setEdit(p)}>Edit</button>
-                    <button onClick={() => setDel(p)} title="Remove" style={{ marginLeft: 6, color: "rgb(var(--faint))", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✕</button>
+                    <button className="act" onClick={() => setEdit(p)} title="Edit product" aria-label="Edit product">✎</button>
+                    <button className="act danger" style={{ marginLeft: 6 }} onClick={() => setDel(p)} title="Remove product" aria-label="Remove product">✕</button>
                   </td>
                 </tr>
               ))}
@@ -243,13 +251,13 @@ export function SalesScreen() {
                 <span><DayDot sig="red" />doesn’t reconcile</span>
               </div>
               <div className="scroll" style={{ maxHeight: 590 }}>
-                <table className="tbl">
-                  <thead><tr><th>Date</th><th className="r">Revenue</th></tr></thead>
+                <table className="dtbl">
+                  <thead><tr><th>Date</th><th className="r">Revenue (EGP)</th></tr></thead>
                   <tbody>
                     {rows.map((r) => (
                       <tr key={r.id} className="daycell" onClick={() => setDetail(r)}>
                         <td><DayDot sig={daySignal(r)} />{fmtDate(r.date, "EEE d MMM yyyy")}</td>
-                        <td className="r">{egp(r.total)}</td>
+                        <td className="r">{bare(r.total)}</td>
                       </tr>
                     ))}
                     {rows.length === 0 && <tr><td colSpan={2} style={{ textAlign: "center", color: "rgb(var(--faint))", padding: 28 }}>No sales recorded yet.</td></tr>}
@@ -392,19 +400,18 @@ export function PurchasesScreen() {
       <Guarded q={q} empty={entries === 0}>
         <DeckTile style={{ padding: 0 }}>
           <div className="scroll">
-            <table className="tbl">
-              <thead><tr><th>Product</th><th>Date</th><th className="r">Qty × cost</th><th className="r">Total</th><th /></tr></thead>
+            <table className="dtbl">
+              <thead><tr><th>Product</th><th>Date</th><th className="r">Qty × cost</th><th className="r">Total (EGP)</th><th style={{ width: 56 }} /></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="prodcell" onClick={() => setDetailId(r.productId)}>
                     <td>{r.productName}</td>
                     <td>{fmtDate(r.date, "d MMM yyyy")}</td>
-                    <td className="r">{num(r.quantity)} × {egp(r.unitCost)}</td>
-                    <td className="r">{egp(r.totalCost)}</td>
+                    <td className="r">{num(r.quantity)} × {bare(r.unitCost)}</td>
+                    <td className="r">{bare(r.totalCost)}</td>
                     <td className="r" style={{ width: 44 }}>
-                      <button title="Void this purchase" aria-label="Void this purchase"
-                        onClick={(e) => { e.stopPropagation(); setVoidAsk({ id: r.id, label: `Void ${r.productName} · ${egp(r.totalCost)} on ${fmtDate(r.date)}? Stock and weighted cost are recomputed.` }); }}
-                        style={{ width: 32, height: 32, borderRadius: 9, border: "1px solid rgba(255,92,114,.3)", background: "rgba(255,92,114,.08)", color: "var(--red)", cursor: "pointer", fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                      <button className="act danger" title="Void this purchase" aria-label="Void this purchase"
+                        onClick={(e) => { e.stopPropagation(); setVoidAsk({ id: r.id, label: `Void ${r.productName} · ${egp(r.totalCost)} on ${fmtDate(r.date)}? Stock and weighted cost are recomputed.` }); }}>✕</button>
                     </td>
                   </tr>
                 ))}

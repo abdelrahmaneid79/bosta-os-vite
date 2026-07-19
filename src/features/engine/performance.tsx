@@ -335,8 +335,8 @@ function ActivityPanel() {
   if ((feed.data?.length ?? 0) === 0) return <EmptyState title="Nothing recorded yet" hint="Your sales, purchases and cash show up here" />;
   return (
     <div className="scroll" style={{ maxHeight: "70vh" }}>
-      <table className="tbl">
-        <thead><tr><th>Date</th><th>What happened</th><th className="r">Amount</th></tr></thead>
+      <table className="dtbl">
+        <thead><tr><th>Date</th><th>What happened</th><th className="r">Amount (EGP)</th></tr></thead>
         <tbody>
           {feed.data!.map((e) => (
             <tr key={`${e.kind}-${e.id}`} className="prodcell" onClick={() => navigate(e.route)}>
@@ -346,7 +346,7 @@ function ActivityPanel() {
                 {e.label}
               </td>
               <td className="r" style={{ color: e.amount > 0 ? "var(--green)" : "rgb(var(--muted))" }}>
-                {e.amount !== 0 ? `${e.amount > 0 ? "+" : "−"}${egp(Math.abs(e.amount))}` : "—"}
+                {e.amount !== 0 ? `${e.amount > 0 ? "+" : "−"}${Math.abs(e.amount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
               </td>
             </tr>
           ))}

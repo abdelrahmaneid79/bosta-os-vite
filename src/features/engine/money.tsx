@@ -23,6 +23,8 @@ import { useUI } from "@/store/ui";
 
 const en = isEngineConfigured;
 const monthKey = (d: string) => d.slice(0, 7);
+/** Table cells carry bare numbers — the unit is named once in the header. */
+const bare = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const KIND_LABEL: Record<string, string> = {
   cheque: "cheque in", withdrawal: "you took out", expense: "expense",
   purchase: "stock purchase", cash_in: "cash in", cash_out: "cash out",
@@ -121,18 +123,26 @@ export function MoneyScreen() {
           </div>
           <div className="scroll" style={{ flex: 1, maxHeight: "none" }}>
             {mv.isLoading ? <div style={{ padding: 16 }}><SkeletonRows /></div> : mv.isError ? <div style={{ padding: 16 }}><ErrorState message={String((mv.error as Error)?.message)} /></div> : (
-              <table className="tbl">
-                <thead><tr><th>Date</th><th>Flow</th><th className="r">Amount</th><th style={{ width: 34 }} /></tr></thead>
+              <table className="dtbl">
+                <thead><tr><th>Date</th><th>Flow</th><th className="r">Amount (EGP)</th></tr></thead>
                 <tbody>
                   {movements.map((m) => (
                     <tr key={m.id} onClick={() => setSelMv(m)} style={{ cursor: "pointer" }}>
                       <td>{fmtDate(m.date, "EEE d MMM yyyy")}</td>
                       <td style={{ textTransform: "capitalize" }}>{m.label} <span style={{ color: "rgb(var(--dim))", fontSize: 12 }}>· {KIND_LABEL[m.kind] ?? m.kind.replace(/_/g, " ")}</span></td>
-                      <td className="r" style={{ color: m.amount >= 0 ? "var(--green)" : "var(--red)" }}>{m.amount >= 0 ? "+" : "−"}{egp(Math.abs(m.amount))}</td>
+                      <td className="r" style={{ color: m.amount >= 0 ? "var(--green)" : "var(--red)" }}>{m.amount >= 0 ? "+" : "−"}{bare(Math.abs(m.amount))}</td>
                     </tr>
                   ))}
                   {movements.length === 0 && <tr><td colSpan={3} style={{ textAlign: "center", color: "rgb(var(--faint))", padding: 28 }}>No cash flow in this range.</td></tr>}
                 </tbody>
+                {movements.length > 0 && (
+                  <tfoot><tr>
+                    <td>Net</td><td />
+                    <td className="r" style={{ color: movements.reduce((a, m) => a + m.amount, 0) >= 0 ? "var(--green)" : "var(--red)" }}>
+                      {bare(movements.reduce((a, m) => a + m.amount, 0))}
+                    </td>
+                  </tr></tfoot>
+                )}
               </table>
             )}
           </div>
@@ -241,20 +251,26 @@ export function ExpensesScreen() {
                 <button className="addbtn" style={{ marginLeft: "auto" }} onClick={() => setAddOpen(true)}>+ Add expense</button>
               </div>
               <div className="scroll" style={{ flex: 1, maxHeight: "none" }}>
-                <table className="tbl">
-                  <thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th className="r">Amount</th><th style={{ width: 34 }} /></tr></thead>
+                <table className="dtbl">
+                  <thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th className="r">Amount (EGP)</th><th style={{ width: 56 }} /></tr></thead>
                   <tbody>
                     {rows.map((e) => (
                       <tr key={e.id}>
                         <td>{fmtDate(e.date, "EEE d MMM yyyy")}</td>
                         <td style={{ textTransform: "capitalize" }}>{e.category}</td>
                         <td style={{ color: "rgb(var(--dim))" }}>{e.notes || "—"}</td>
-                        <td className="r">{egp(e.amount)}</td>
-                        <td><button onClick={() => setVoidId(e.id)} title="Void" style={{ color: "rgb(var(--faint))", cursor: "pointer", background: "none", border: "none", fontSize: 12 }} onMouseEnter={(ev) => (ev.currentTarget.style.color = "var(--red)")} onMouseLeave={(ev) => (ev.currentTarget.style.color = "rgb(var(--faint))")}>✕</button></td>
+                        <td className="r">{bare(e.amount)}</td>
+                        <td className="r"><button className="act danger" onClick={() => setVoidId(e.id)} title="Void expense" aria-label="Void expense">✕</button></td>
                       </tr>
                     ))}
                     {rows.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "rgb(var(--faint))", padding: 28 }}>No expenses in this range.</td></tr>}
                   </tbody>
+                  {rows.length > 0 && (
+                    <tfoot><tr>
+                      <td>Total</td><td /><td />
+                      <td className="r">{bare(rows.reduce((a, e) => a + e.amount, 0))}</td><td />
+                    </tr></tfoot>
+                  )}
                 </table>
               </div>
             </DeckTile>

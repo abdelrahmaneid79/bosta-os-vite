@@ -10,6 +10,8 @@ import { Modal } from "@/components/ui/Modal";
 import { SkeletonRows, ErrorState, EmptyState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { egp, num, pct } from "@/core/utils/format";
+/** Table cells carry bare numbers — the unit is named once in the header. */
+const bare = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 import { fmtDate } from "@/core/utils/date";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
@@ -157,15 +159,15 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
       <Eyebrow>Sale lines · {p.saleLines.length}</Eyebrow>
       {p.saleLines.length === 0 ? <Card><p className="text-sm text-dim">No sales in range.</p></Card> : (
         <Card className="!p-0"><div className="scroll" style={{ maxHeight: 360 }}>
-          <table className="tbl">
-            <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Unit price</th><th className="r">Amount</th></tr></thead>
+          <table className="dtbl">
+            <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Price (EGP)</th><th className="r">Amount (EGP)</th></tr></thead>
             <tbody>
               {p.saleLines.slice(0, 60).map((l, i) => (
                 <tr key={i}>
                   <td>{fmtDate(l.date, "d MMM yyyy")}</td>
                   <td className="r">{num(l.qty)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
-                  <td className="r">{egp(l.unitPrice ?? 0)}{l.hasCogs ? "" : <span style={{ color: "var(--amber)", fontSize: 11 }}> · no cost</span>}</td>
-                  <td className="r" style={{ color: "var(--green)" }}>{egp(l.lineTotal)}</td>
+                  <td className="r">{bare(l.unitPrice ?? 0)}{l.hasCogs ? "" : <span style={{ color: "var(--amber)", fontSize: 11 }}> · no cost</span>}</td>
+                  <td className="r" style={{ color: "var(--green)" }}>{bare(l.lineTotal)}</td>
                 </tr>
               ))}
             </tbody>
@@ -177,18 +179,26 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
       <Eyebrow>Purchase batches · {p.purchases.length}</Eyebrow>
       {p.purchases.length === 0 ? <Card><p className="text-sm text-dim">No purchases in range.</p></Card> : (
         <Card className="!p-0"><div className="scroll" style={{ maxHeight: 360 }}>
-          <table className="tbl">
-            <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Unit cost</th><th className="r">Total</th></tr></thead>
+          <table className="dtbl">
+            <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Cost (EGP)</th><th className="r">Total (EGP)</th></tr></thead>
             <tbody>
               {p.purchases.map((b) => (
                 <tr key={b.id}>
                   <td>{fmtDate(b.date, "d MMM yyyy")}</td>
                   <td className="r">{num(b.qty)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
-                  <td className="r">{egp(b.unitCost)}</td>
-                  <td className="r">{egp(b.totalCost)}</td>
+                  <td className="r">{bare(b.unitCost)}</td>
+                  <td className="r">{bare(b.totalCost)}</td>
                 </tr>
               ))}
             </tbody>
+            {p.purchases.length > 0 && (
+              <tfoot><tr>
+                <td>Total</td>
+                <td className="r">{num(p.purchases.reduce((a, b) => a + b.qty, 0))}</td>
+                <td />
+                <td className="r">{bare(p.purchases.reduce((a, b) => a + b.totalCost, 0))}</td>
+              </tr></tfoot>
+            )}
           </table>
         </div></Card>
       )}
