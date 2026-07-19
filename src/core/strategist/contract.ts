@@ -185,6 +185,23 @@ export interface CashBlock {
   /** true once a cash count has also recorded a bank/other-liquid balance */
   bankBalanceRecorded: boolean;
   hasLiveData: boolean;        // false today: no live movements/counts
+  /** What the owner actually takes out, read off the bank card. Absent until
+   *  the bank history is loaded. This is NOT an expense and never belongs in
+   *  the P&L — it is what he removes from the business AFTER profit, and any
+   *  advice about affordability is wrong without it. */
+  ownerDraw?: OwnerDrawBlock;
+}
+
+export interface OwnerDrawBlock {
+  /** drawings + personal card spending, averaged per month */
+  perMonth: Metric;
+  /** what the business earned per month over the same span */
+  profitPerMonth: Metric;
+  /** taken out as a share of profit; over 100 means drawing more than earning */
+  pctOfProfit: Metric;
+  monthsMeasured: Metric;
+  /** cheque money kept as cash rather than banked, over the whole span */
+  keptFromCheques: Metric;
 }
 
 export interface ChequesBlock {

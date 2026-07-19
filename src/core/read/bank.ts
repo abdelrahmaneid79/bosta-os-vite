@@ -235,3 +235,26 @@ export function summariseBurn(rows: BurnMonth[]): BurnSummary {
     excludedMonths: rows.length - usable.length,
   };
 }
+
+/** Roll the burn months into the single shape the strategist needs, so its
+ *  advice knows what is actually leaving the business. Returns null when no
+ *  bank history is loaded — the strategist then simply omits the block rather
+ *  than reasoning from a zero. */
+export async function getOwnerBurnRollup(): Promise<{
+  months: number; drawPerMonth: number; profitPerMonth: number;
+  pctOfProfit: number | null; keptFromCheques: number;
+} | null> {
+  const [burn, months] = await Promise.all([getBurnMonths(), getBankMonths()]);
+  if (!burn.length) return null;
+  const s = summariseBurn(burn);
+  if (!s.months) return null;
+  const kept = months.filter((m) => m.movements > 0)
+    .reduce((t, m) => t + (m.chequesNet - m.banked), 0);
+  return {
+    months: s.months,
+    drawPerMonth: Math.round(s.tookOutPerMonth),
+    profitPerMonth: Math.round(s.profitPerMonth),
+    pctOfProfit: s.pctOfProfit,
+    keptFromCheques: Math.round(kept),
+  };
+}

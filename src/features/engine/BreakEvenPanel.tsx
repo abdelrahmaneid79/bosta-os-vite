@@ -53,6 +53,13 @@ export function BreakEvenPanel() {
   // the tick the fill has to keep up with. Clamped so the label stays on-card.
   const pacePct = b.daysInMonth > 0
     ? Math.min(96, Math.max(4, (b.daysElapsed / b.daysInMonth) * 100)) : null;
+  // Two thresholds now live on one bar: covering the costs, and covering the
+  // costs PLUS what he actually takes out. Scale to the further of the two so
+  // neither marker leaves the track.
+  const d = b.ownerDraw;
+  const axisTop = Math.max(b.breakEvenRevenue, d?.target ?? 0);
+  const scaledPct = axisTop > 0 ? Math.min(100, (b.revenue / axisTop) * 100) : 0;
+  const drawMarkPct = d && axisTop > 0 ? Math.min(99, (d.target / axisTop) * 100) : null;
 
   return (
     <DeckTile>
@@ -101,11 +108,17 @@ export function BreakEvenPanel() {
           })}
         </div>
 
-        {/* the progress line itself — its own layer under the days */}
+        {/* the progress line itself — its own layer under the days.
+            The bar is scaled to whichever target is further out, so the two
+            thresholds can sit on one line without either falling off it. */}
         <div className="be-bar">
-          <i style={{ width: `${barPct}%` }} />
+          <i style={{ width: `${scaledPct}%` }} />
           {pacePct != null && !pastBreakEven && (
             <span className="be-tick" style={{ left: `${pacePct}%` }} aria-hidden="true" />
+          )}
+          {drawMarkPct != null && (
+            <span className="be-mark" style={{ left: `${drawMarkPct}%` }}
+              title={`${bare(d!.target)} covers costs and the ${bare(d!.perMonth)} you take out`} aria-hidden="true" />
           )}
         </div>
       </div>
@@ -157,6 +170,21 @@ export function BreakEvenPanel() {
             about <b className="tnum" style={{ color: b.projectedProfit > 0 ? "var(--green)" : "var(--red)" }}>{egp(b.projectedProfit)}</b> profit.</>
         ) : (
           <>No sales recorded yet this month.</>
+        )}
+        {d && (
+          <span className="be-draw">
+            {d.covered ? (
+              <>Past <b className="tnum">{egp(d.target)}</b> — this month covers its costs
+                <em> and</em> the <b className="tnum">{egp(d.perMonth)}</b> you normally take out.</>
+            ) : (
+              <>Breaking even is not the same as paying yourself. You take about{" "}
+                <b className="tnum">{egp(d.perMonth)}</b> a month, so this month needs{" "}
+                <b className="tnum">{egp(d.target)}</b> to cover both —{" "}
+                <b className="tnum">{egp(d.stillNeeded)}</b> more
+                {d.requiredDailyRunRate != null && <> ({bare(d.requiredDailyRunRate)}/day)</>}.</>
+            )}
+            <i> Based on {d.basis}, from your bank card.</i>
+          </span>
         )}
         <span className="be-note">
           Covers {egp(b.fixedCosts.rent)} rent + {egp(b.fixedCosts.ownCosts)} {b.fixedCosts.ownCostsBasis}, plus the mall&rsquo;s 3%.

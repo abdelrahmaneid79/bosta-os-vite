@@ -52,6 +52,51 @@ export interface BreakEvenSnapshot extends BreakEvenResult {
   projectedProfit: number;
   /** % of the break-even bar already covered (can exceed 100) */
   progressPct: number;
+  /** The SECOND threshold, from the bank card: covering the fixed costs is not
+   *  the same as covering what the owner actually lives on. Null when no bank
+   *  history is loaded — the panel then simply does not show it. */
+  ownerDraw: OwnerDrawTarget | null;
+}
+
+export interface OwnerDrawTarget {
+  /** Average taken out per month — drawings plus personal card spending. */
+  perMonth: number;
+  monthsUsed: number;
+  /** Revenue this month must reach to cover fixed costs AND that. */
+  target: number;
+  stillNeeded: number;
+  covered: boolean;
+  /** Daily rate needed across the days left to reach it. */
+  requiredDailyRunRate: number | null;
+  basis: string;
+}
+
+/** Revenue needed to cover the fixed base AND what the owner habitually takes.
+ *  Pure, so the rule is testable without a database.
+ *
+ *  Single months swing hard — stock bought in one month sells across the next
+ *  two — so the draw is averaged over every complete month available rather
+ *  than read off the latest one. Months with no cost of sales are already
+ *  excluded upstream; a negative month is kept, because it is a real offset. */
+export function ownerDrawTarget(
+  monthly: { drawings: number; personalCard: number }[],
+  fixedMonthly: number,
+  cmFraction: number,
+  revenueSoFar: number,
+  daysRemaining: number,
+): OwnerDrawTarget | null {
+  if (!monthly.length || cmFraction <= 0) return null;
+  const total = monthly.reduce((s, m) => s + m.drawings + m.personalCard, 0);
+  const perMonth = Math.round(total / monthly.length);
+  if (perMonth <= 0) return null;
+  const target = Math.round((fixedMonthly + perMonth) / cmFraction);
+  const stillNeeded = Math.max(0, target - revenueSoFar);
+  return {
+    perMonth, monthsUsed: monthly.length, target, stillNeeded,
+    covered: stillNeeded === 0,
+    requiredDailyRunRate: daysRemaining > 0 ? Math.round(stillNeeded / daysRemaining) : null,
+    basis: `your average over ${monthly.length} month${monthly.length === 1 ? "" : "s"}`,
+  };
 }
 
 /** THE MONTHLY OBLIGATION — pure, so the rule can be tested directly.
@@ -99,7 +144,7 @@ export async function getBreakEven(): Promise<BreakEvenSnapshot> {
     return d.toISOString().slice(0, 10);
   }
 
-  const [dayTotals, lines, trailing, opexRows, rentRows] = await Promise.all([
+  const [dayTotals, lines, trailing, opexRows, rentRows, burnRows] = await Promise.all([
     // Authoritative revenue: the day total on the sale itself. Some days are
     // recorded as a total only (no product breakdown), so summing sale_items
     // would silently under-report them.
@@ -132,6 +177,11 @@ export async function getBreakEven(): Promise<BreakEvenSnapshot> {
       .is("settlement_periods.voided_at", null)
       .order("amount", { ascending: false })
       .limit(60),
+    // What the owner actually takes out, from the bank card. Absent until the
+    // bank history is loaded, in which case the second threshold is hidden.
+    sb.from("v_owner_burn")
+      .select("month,drawings_residual,personal_card_spend,cogs_missing")
+      .neq("cogs_missing", true),
   ]);
   if (dayTotals.error) throw dayTotals.error;
   if (lines.error) throw lines.error;
@@ -234,9 +284,14 @@ export async function getBreakEven(): Promise<BreakEvenSnapshot> {
     });
   }
 
+  const burn = (burnRows.error ? [] : burnRows.data ?? [])
+    .filter((r) => r.month && r.month < month)      // complete months only
+    .map((r) => ({ drawings: Number(r.drawings_residual ?? 0), personalCard: Number(r.personal_card_spend ?? 0) }));
+  const ownerDraw = ownerDrawTarget(burn, fixedMonthly, cmFraction, revenue, daysRemaining);
+
   return {
     ...base,
-    month, daysInMonth, daysElapsed, daysRemaining, days,
+    month, daysInMonth, daysElapsed, daysRemaining, days, ownerDraw,
     fixedCosts: { rent: monthlyRent, ownCosts, total: fixedMonthly, ownCostsBasis },
     revenueStillNeeded,
     requiredDailyRunRate: daysRemaining > 0 ? Math.round(revenueStillNeeded / daysRemaining) : null,

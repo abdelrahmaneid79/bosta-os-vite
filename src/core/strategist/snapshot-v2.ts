@@ -14,6 +14,7 @@ import { getProfitReadout, type ProfitReadout } from "@/core/read/profit";
 import { getProductProfit, type ProductProfit } from "@/core/read/products";
 import { getStockSummary, type StockSummary } from "@/core/read/stock";
 import { getCashPosition, getCashSummary, type CashPosition, type CashSummary } from "@/core/read/money";
+import { getOwnerBurnRollup } from "@/core/read/bank";
 import type { ChequeCycle } from "@/core/settlement/cheque-cycle";
 import { getChequeCycle, getSettlementStatements, type SettlementStatement } from "@/core/read/settlements";
 import { getExpenseCategoryTrends, type ExpenseCatStat } from "@/core/read/expenses";
@@ -50,6 +51,14 @@ export interface SnapshotInputs {
   missingData: MissingIssue[];
   ownerAnswers: OwnerContextAnswers | null;
   liveOps: LiveOpsConfig;
+  /** null until the bank card history is loaded */
+  ownerBurn: OwnerBurnRollup | null;
+}
+
+/** Rolled up from v_owner_burn — complete months only. */
+export interface OwnerBurnRollup {
+  months: number; drawPerMonth: number; profitPerMonth: number;
+  pctOfProfit: number | null; keptFromCheques: number;
 }
 
 /* ── pure helpers ─────────────────────────────────────────────────────── */
@@ -323,6 +332,22 @@ export function composeSnapshotV2(i: SnapshotInputs): StrategistSnapshot {
         : missing("cash_reconciliations", "all-time", "/money", "never counted"),
       bankBalanceRecorded: i.latestCashCount?.bankBalance != null,
       hasLiveData: cashHasData,
+      // The owner draws cash from the cheques and from ATMs. Until the bank
+      // card was loaded this was invisible, and any advice that assumed profit
+      // stays in the business was reasoning about money that had already left.
+      ...(i.ownerBurn ? { ownerDraw: {
+        perMonth: metric(r0(i.ownerBurn.drawPerMonth), "v_owner_burn", `${i.ownerBurn.months} complete months`, "/bank",
+          { basis: "calculated", confidence: "medium",
+            note: "drawings (cash left after stock and running costs) plus personal card spending. A residual: it absorbs unrecorded stock and wages." }),
+        profitPerMonth: metric(r0(i.ownerBurn.profitPerMonth), "v_owner_burn", `${i.ownerBurn.months} complete months`, "/performance", { basis: "calculated" }),
+        pctOfProfit: i.ownerBurn.pctOfProfit == null
+          ? missing("v_owner_burn", "period", "/bank", "the business made nothing over the span, so there is no ratio")
+          : metric(r1(i.ownerBurn.pctOfProfit), "v_owner_burn", `${i.ownerBurn.months} complete months`, "/bank",
+              { basis: "calculated", note: "over 100 means more is being taken out than the business earns" }),
+        monthsMeasured: metric(i.ownerBurn.months, "v_owner_burn", "complete months only", "/bank"),
+        keptFromCheques: metric(r0(i.ownerBurn.keptFromCheques), "v_bank_month", "bank window", "/bank",
+          { basis: "calculated", note: "cheque money never banked — taken straight as cash" }),
+      } } : {}),
     },
     cheques: {
       totalReceived: metric(r0(i.cycle.totalReceived), "settlement/cheque-cycle.getChequeCycle", "all-time", "/cheques"),
@@ -433,7 +458,7 @@ export async function assembleSnapshotV2(): Promise<StrategistSnapshot> {
   const { period, compare } = defaultPeriods(daily, today);
 
   const months = [...new Set(daily.filter((d) => d.total > 0).map((d) => d.date.slice(0, 7)))].sort().slice(-6);
-  const [profitPeriod, profitCompare, productsPeriod, productsCompare, stock, cashPos, cashSummary, latestCashCount, cycle, statements, expenseTrends, missingData, ownerAnswers, liveOps, ...profitMonthReadouts] = await Promise.all([
+  const [profitPeriod, profitCompare, productsPeriod, productsCompare, stock, cashPos, cashSummary, latestCashCount, cycle, statements, expenseTrends, missingData, ownerAnswers, liveOps, ownerBurn, ...profitMonthReadouts] = await Promise.all([
     getProfitReadout(period),
     getProfitReadout(compare),
     getProductProfit(period),
@@ -448,6 +473,7 @@ export async function assembleSnapshotV2(): Promise<StrategistSnapshot> {
     getMissingData(),
     loadOwnerContext(),
     loadLiveOps(),
+    getOwnerBurnRollup(),
     ...months.map((m) => getProfitReadout(monthBounds(m))),
   ] as const);
 
@@ -457,6 +483,6 @@ export async function assembleSnapshotV2(): Promise<StrategistSnapshot> {
     profitMonths: months.map((m, idx) => ({ month: m, readout: profitMonthReadouts[idx] })),
     productsPeriod, productsCompare,
     stock, cashPos, cashSummary, latestCashCount, cycle, statements,
-    expenseTrends, missingData, ownerAnswers, liveOps,
+    expenseTrends, missingData, ownerAnswers, liveOps, ownerBurn,
   });
 }

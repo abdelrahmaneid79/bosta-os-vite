@@ -13,6 +13,7 @@ import { cn } from "@/core/utils/cn";
 import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getCashLedger, getCashSummary, getMoneyAccounts } from "@/core/read/money";
+import { getBankMonths, getBurnMonths, summariseBurn } from "@/core/read/bank";
 import { getChequeLedger } from "@/core/read/settlements";
 import { getExpenses } from "@/core/read/expenses";
 import { voidMovement, voidCheque, voidExpense } from "@/core/db/mutations";
@@ -25,6 +26,34 @@ const KIND_LABEL: Record<string, string> = {
   cheque: "cheque in", withdrawal: "you took out", expense: "expense",
   purchase: "stock purchase", cash_in: "cash in", cash_out: "cash out",
 };
+
+/** The Cash screen only ever saw movements the owner typed in. The bank card
+ *  knows what actually happened — how much of each cheque never reached the
+ *  bank, and how much he takes out. This strip surfaces that here, where he
+ *  looks for cash, and hands off to the full screen for the detail. */
+function BankReality() {
+  const nav = useNavigate();
+  const months = useQuery({ queryKey: ["bank-months"], queryFn: getBankMonths, enabled: en });
+  const burnQ = useQuery({ queryKey: ["owner-burn"], queryFn: getBurnMonths, enabled: en });
+  const rows = (months.data ?? []).filter((m) => m.movements > 0);
+  if (!rows.length) return null;
+  const burn = summariseBurn(burnQ.data ?? []);
+  const kept = rows.reduce((s2, m) => s2 + (m.chequesNet - m.banked), 0);
+  const cashOut = rows.reduce((s2, m) => s2 + m.cashOut, 0);
+  const over = burn.pctOfProfit != null && burn.pctOfProfit > 100;
+  return (
+    <DeckTile onClick={() => nav("/bank")} className="cursor-pointer">
+      <TileHead name="From your bank card" right={<span className="text-[12px] font-semibold text-pink">Open →</span>} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Kept from cheques" value={egp(kept)} color="rgb(var(--pink))" sub="never reached the bank" />
+        <Stat label="Drawn at machines" value={egp(cashOut)} color="rgb(var(--warn))" sub="cash for stock" />
+        <Stat label="You take out" value={burn.months ? egp(burn.tookOutPerMonth) : "—"} color="rgb(var(--warn))" sub="a month, on average" />
+        <Stat label="The business makes" value={burn.months ? egp(burn.profitPerMonth) : "—"} color={over ? "rgb(var(--bad))" : "rgb(var(--good))"}
+          sub={burn.pctOfProfit != null ? `you take ${Math.round(burn.pctOfProfit)}% of it` : "a month"} />
+      </div>
+    </DeckTile>
+  );
+}
 
 // ── Money / Cash ───────────────────────────────────────────────────────────
 export function MoneyScreen() {
@@ -69,6 +98,8 @@ export function MoneyScreen() {
         <button className="addbtn" onClick={() => setSheet("withdraw")}>Withdraw</button>
         <button className="qadd" style={{ height: 38 }} onClick={() => setSheet("count")}><span>Count cash</span></button>
       </div>
+
+      <div style={{ marginBottom: 16 }}><BankReality /></div>
 
       <div className="statgrid">
         <Stat label="Cash on hand" color="rgb(var(--cyan))" value={c ? (c.balance == null ? "—" : egp(c.balance)) : "—"} sub={<div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{c?.since ? `counted ${fmtDate(c.since)}` : "count to set →"}</div>} />

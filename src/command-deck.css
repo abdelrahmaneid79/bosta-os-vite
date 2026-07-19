@@ -454,6 +454,13 @@
 /* today's pace mark rides ON the track, not floating above it */
 .cdk .be-tick{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:1px;
   background:rgba(255,255,255,.9);box-shadow:0 0 8px rgba(0,0,0,.6);transform:translateX(-1px)}
+/* the second threshold: where the month covers its costs AND the owner's draw.
+   Dashed and cooler than the pace tick so the two never read as the same thing. */
+.cdk .be-mark{position:absolute;top:-5px;bottom:-5px;width:0;border-left:2px dashed var(--amber);
+  transform:translateX(-1px);opacity:.85}
+.cdk .be-draw{display:block;margin-top:8px;font-size:12px;line-height:1.55;color:var(--cd-dim)}
+.cdk .be-draw b{color:var(--cd-text);font-weight:700}
+.cdk .be-draw i{display:block;margin-top:2px;font-size:11px;color:var(--cd-faint);font-style:normal}
 
 .cdk .be-read{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin-top:10px;
   font-size:12px;color:var(--cd-dim);font-variant-numeric:tabular-nums;min-height:17px}
