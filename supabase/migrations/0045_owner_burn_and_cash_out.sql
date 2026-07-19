@@ -1,41 +1,38 @@
 -- =====================================================================
--- 0046: pair failed ATM attempts with their reversal notice, and stop
--- counting them as cash the owner walked away with.
+-- 0045: what the business earned vs what the owner actually took out,
+-- and cash-out measured from the balance chain rather than inferred.
 --
--- A failed withdrawal produces TWO messages: a debit, then a reversal with no
--- balance. bank_transactions held the debit, bank_reversals held the notice,
--- and nothing linked them — so cash withdrawn was overstated by 241,600 and
--- the owner-drawings residual inherited the whole error. That is a ~90% swing
--- on the number this whole exercise exists to produce, so it matters.
+-- WHY NOTHING IS BOOKED AS AN EXPENSE
+-- The obvious move after loading the bank card would be to turn 1,098,180 of
+-- ATM withdrawals into purchase or expense rows. That is wrong twice over. A
+-- cash withdrawal is not spending — it is the owner's own money moving from
+-- bank to pocket. And the stock it eventually buys is ALREADY in the P&L as
+-- cogs_at_sale on every sale line. Booking both would double-count about a
+-- million pounds and turn a profitable year into a fictional loss. So the
+-- withdrawals stay as what they are and this reconciles rather than invents.
 --
--- Pairing is by amount, oldest debit first, one debit consumed per notice. A
--- reversal notice states the exact figure, and repeated amounts are handled by
--- consuming one at a time. 19 of 20 pair; the unmatched 13,300 on 17/08 is one
--- of the two reversals whose refund the chain could never confirm either,
--- because that whole stretch of the recording is unreadable — consistent, not
--- a matching failure.
+-- HOW CASH OUT IS MEASURED, AND A BUG NOT TO REPEAT
+-- A failed ATM attempt sends a debit and then a reversal notice carrying no
+-- balance. An earlier attempt at this added a was_reversed flag and paired
+-- reversals to debits BY AMOUNT ALONE. That mis-paired 8 of 20 — a reversal
+-- on 27/01 claimed a 4,000 withdrawal on 17/08 — and, worse, it flagged rows
+-- where dedupe had already merged a failed attempt and its successful retry
+-- into one row (both reported the same balance), deleting 23,000 of cash that
+-- genuinely left.
 --
--- Also adds v_owner_burn: what the business earned against what the owner
--- actually took out. NOTHING is booked as an expense — see the note there.
+-- The balance chain already answers this without inference: when a refund
+-- lands, it shows up as an upward gap on the next row (is_reversal_refund).
+-- So cash out = cash debits MINUS the refunds the chain actually observes.
+-- Purely measured, and it handles the merged case correctly by construction.
+-- The flag is gone; do not bring it back.
+--
+-- Of 254,900 in reversal notices the chain observes 218,600 returning. The
+-- other 36,300 is two notices: the 23,000 whose merged row already nets out,
+-- and a 13,300 whose debit message the recording never captured at all.
 -- =====================================================================
-alter table bank_transactions
-  add column if not exists was_reversed boolean not null default false;
-
-with pairs as (
-  select t.id,
-         row_number() over (partition by t.amount order by t.txn_date, t.balance_after desc) as rn
-    from bank_transactions t
-   where t.voided_at is null and t.direction = 'debit'
-     and t.category in ('cash_stock','cash_small')
-),
-need as (select amount, count(*) as n from bank_reversals group by amount)
-update bank_transactions b
-   set was_reversed = true
-  from pairs p, need n
- where b.id = p.id and n.amount = b.amount and p.rn <= n.n;
-
 drop view if exists v_owner_burn;
 drop view if exists v_bank_month;
+alter table bank_transactions drop column if exists was_reversed;
 
 create view v_bank_month as
 with span as (
@@ -46,9 +43,9 @@ m as (
   select to_char(txn_date,'YYYY-MM') as month,
          sum(coalesce(deposit_amount,0)) as banked,
          sum(case when direction='debit' and category in ('cash_stock','cash_small')
-                   and not was_reversed then amount else 0 end) as cash_out,
-         sum(case when direction='debit' and category in ('cash_stock','cash_small')
-                   and was_reversed then amount else 0 end) as cash_attempts_reversed,
+                  then amount else 0 end)
+           - sum(case when is_reversal_refund then coalesce(chain_gap,0) else 0 end) as cash_out,
+         sum(case when is_reversal_refund then coalesce(chain_gap,0) else 0 end) as refunds_returned,
          sum(case when direction='debit' and side='personal' then amount else 0 end) as personal_spend,
          count(*) as movements,
          count(*) filter (where chain_gap is not null and abs(chain_gap) > 10
@@ -70,24 +67,16 @@ select coalesce(m.month, c.month) as month,
        coalesce(m.banked, 0) as banked,
        coalesce(c.cheques_net, 0) - coalesce(m.banked,0) as kept_as_cash,
        coalesce(m.cash_out, 0) as cash_out,
-       coalesce(m.cash_attempts_reversed, 0) as cash_attempts_reversed,
+       coalesce(m.refunds_returned, 0) as refunds_returned,
        coalesce(m.personal_spend, 0) as personal_spend,
        coalesce(m.movements, 0) as movements,
        coalesce(m.unreadable_breaks, 0) as unreadable_breaks
   from m full outer join c on c.month = m.month
  order by 1;
 
--- WHY NOTHING IS BOOKED AS AN EXPENSE
--- The obvious move after loading the bank card would be to turn 1,098,180 of
--- ATM withdrawals into purchase or expense rows. That is wrong twice over. A
--- cash withdrawal is not spending — it is the owner's own money moving from
--- bank to pocket. And the stock it eventually buys is ALREADY in the P&L as
--- cogs_at_sale on every sale line. Booking both would double-count about a
--- million pounds and turn a profitable year into a fictional loss.
---
 -- drawings_residual is a RESIDUAL and absorbs every upstream error. Two things
 -- would make it overstate what he really pocketed: stock bought but not yet
--- sold (inventory_movements is empty, so this cannot be measured), and wages
+-- sold (inventory_movements is empty, so this cannot be measured) and wages
 -- under-recorded (only ~46k of salary on file for 13 months). Both are shown
 -- in the app rather than silently absorbed.
 create view v_owner_burn as
@@ -135,6 +124,8 @@ select
   coalesce(bank.kept_as_cash,0) + coalesce(bank.cash_out,0)
     - coalesce(cg.cogs,0) - coalesce(ex.running_costs,0) as drawings_residual,
   coalesce(bank.personal_spend, 0) as personal_card_spend,
+  -- Sales recorded but no cost of sales: the product breakdown is missing, so
+  -- this month's profit would be the whole revenue. Excluded from every average.
   (coalesce(rev.revenue,0) > 0 and coalesce(cg.cogs,0) = 0) as cogs_missing,
   coalesce(bank.unreadable_breaks, 0) as unreadable_breaks
 from rev

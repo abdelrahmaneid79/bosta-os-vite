@@ -13,7 +13,8 @@ const txn = (o: Partial<BankTxn>): BankTxn => ({
 const month = (o: Partial<BankMonth>): BankMonth => ({
   month: o.month ?? "2025-08", chequesNet: o.chequesNet ?? 0, chequeCount: o.chequeCount ?? 0,
   banked: o.banked ?? 0, keptAsCash: o.keptAsCash ?? 0, cashOut: o.cashOut ?? 0,
-  personalSpend: o.personalSpend ?? 0, movements: o.movements ?? 1, unreadableBreaks: o.unreadableBreaks ?? 0,
+  personalSpend: o.personalSpend ?? 0, movements: o.movements ?? 1,
+  refundsReturned: o.refundsReturned ?? 0, unreadableBreaks: o.unreadableBreaks ?? 0,
 });
 const rev = (amount: number, refundConfirmed = true): BankReversal =>
   ({ id: String(amount), dayMonth: "17/08", merchant: "BM BR GARD", amount, refundConfirmed, note: null });
@@ -29,16 +30,18 @@ describe("bank overview", () => {
     expect(o.keptAsCash).toBe(30_000);
   });
 
-  it("excludes failed ATM attempts from cash out — the money never left", () => {
-    // A reversed withdrawal texts a debit and then a refund. Counting the debit
-    // would double the cash the owner actually walked away with.
+  it("takes cash out as given — refunds are netted off upstream, not here", () => {
+    // The view already subtracts the refund the chain shows returning. Doing it
+    // again in the client understated cash withdrawn by the whole reversal
+    // total, so this guards against reintroducing that double-subtraction.
     const o = buildOverview(
       [txn({ amount: 17_300, isReversalRefund: true })],
-      [month({ cashOut: 60_000 })],
+      [month({ cashOut: 60_000, refundsReturned: 17_300 })],
       [rev(17_300)],
     );
-    expect(o.cashOut).toBe(60_000 - 17_300);
+    expect(o.cashOut).toBe(60_000);
     expect(o.reversedTotal).toBe(17_300);
+    expect(o.refundsReturned).toBe(17_300);
   });
 
   it("ignores months with no movements so empty months never dilute the totals", () => {
