@@ -38,6 +38,7 @@ import { getExpenseCategoryTrends, getExpenses } from "@/core/read/expenses";
 import { getActivityFeed } from "@/core/read/activity";
 import { getStockSummary } from "@/core/read/stock";
 import { getCheques } from "@/core/read/settlements";
+import { getBurnMonths, summariseBurn } from "@/core/read/bank";
 import { getBudgetStatus } from "@/core/read/budgets";
 import { getRevenueForecast } from "@/core/read/forecast";
 import { priorRange } from "@/core/time";
@@ -81,6 +82,7 @@ const MODE_LABEL: Record<ChartMode, string> = { daily: "Daily", trend: "Trend", 
 /* ── the screen ─────────────────────────────────────────────────────────── */
 
 export function PerformanceScreen() {
+  const nav = useNavigate();
   const range = useActiveRange();
   const rk = useFilters((s) => s.rangeKey);
   const accStart = useBooksStartDate();
@@ -90,6 +92,7 @@ export function PerformanceScreen() {
   const a = useQuery({ queryKey: ["analytics", range, accStart], queryFn: () => getAnalytics(range, accStart), enabled: en });
   const profit = useQuery({ queryKey: ["profit", range, accStart], queryFn: () => getProfitReadout(range, accStart), enabled: en });
   const lifetime = useQuery({ queryKey: ["lifetime-products"], queryFn: getLifetimeProducts, enabled: en });
+  const burnQ = useQuery({ queryKey: ["owner-burn"], queryFn: getBurnMonths, enabled: en });
 
   if (!en) return <EmptyState title="Sign in to see how you're doing" />;
   if (a.isLoading || profit.isLoading) return <div className="space-y-4"><SkeletonRows rows={3} /><SkeletonRows rows={6} /></div>;
@@ -109,6 +112,17 @@ export function PerformanceScreen() {
 
   const rev = p?.revenue ?? 0;
   const share = (n: number) => (rev > 0 ? (n / rev) * 100 : 0);
+
+  // What the owner took out over the SAME months the page is showing. Drawings
+  // sit below the profit line — they are an appropriation of profit, never an
+  // expense — so they extend the story rather than changing any figure above.
+  // Only months fully inside the chosen range count, so a part-month never
+  // drags in a whole month's drawings.
+  const burnInRange = (burnQ.data ?? []).filter(
+    (m) => !m.cogsMissing && m.month >= range.from.slice(0, 7) && m.month <= range.to.slice(0, 7),
+  );
+  const draw = burnInRange.length ? summariseBurn(burnInRange) : null;
+  const leftIn = p?.netProfit != null && draw ? p.netProfit - draw.tookOut : null;
 
   return (
     <div className="space-y-4">
@@ -140,7 +154,34 @@ export function PerformanceScreen() {
           <Band label="− Running costs" amount={p ? egp(p.operatingExpenses) : "—"} pctWidth={share(p?.operatingExpenses ?? 0)} tone="bg-warn/70" />
           <Band label="= Yours to keep" amount={p ? (p.netProfit == null ? "—" : egp(p.netProfit)) : "—"}
             pctWidth={share(p?.netProfit ?? 0)} tone="bg-pink" strong />
+          {draw && (
+            <>
+              <Band label="− What you took out" amount={egp(draw.tookOut)} pctWidth={share(draw.tookOut)} tone="bg-warn/70" />
+              <Band label="= Left in the business" amount={leftIn == null ? "—" : egp(leftIn)}
+                pctWidth={share(Math.max(0, leftIn ?? 0))} tone={leftIn != null && leftIn < 0 ? "bg-bad" : "bg-good"} strong />
+            </>
+          )}
         </div>
+
+        {draw && (
+          <button type="button" onClick={() => nav("/bank")}
+            className="mt-4 w-full rounded-xl border border-white/[0.09] bg-white/[0.03] px-3.5 py-3 text-left transition hover:bg-white/[0.06] active:scale-[0.995] motion-reduce:active:scale-100">
+            <div className="text-[12.5px] leading-relaxed text-dim">
+              {leftIn != null && leftIn < 0 ? (
+                <>You took <b className="text-text">{egp(draw.tookOut)}</b> out of{" "}
+                  <b className="text-text">{egp(p?.netProfit ?? 0)}</b> of profit — <b className="text-bad">{egp(-leftIn)} more than it made</b>.
+                  Nothing was left in to absorb a bad month.</>
+              ) : (
+                <>You took <b className="text-text">{egp(draw.tookOut)}</b> out and left{" "}
+                  <b className="text-good">{egp(leftIn ?? 0)}</b> in the business.</>
+              )}
+              <span className="mt-1 block text-[11.5px] text-dim/70">
+                From your bank card, over {draw.months} complete month{draw.months === 1 ? "" : "s"} in this range.
+                It is what is left after stock and running costs, so it also absorbs any purchase or wage you never recorded. Open the bank card →
+              </span>
+            </div>
+          </button>
+        )}
 
         {p && !p.complete && (
           <div className="mt-4 rounded-xl border border-warn/30 bg-warn/[0.07] px-3.5 py-2.5 text-[12.5px] text-warn">

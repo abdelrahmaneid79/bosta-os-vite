@@ -295,6 +295,56 @@ export function cashFindings(s: StrategistSnapshot, cash: CashState, obligations
     ));
   }
 
+  // THE OWNER IS TAKING OUT MORE THAN THE BUSINESS EARNS
+  // Nothing else in the engine can see this: drawings sit below the profit
+  // line, so a month can look profitable while the money has already gone.
+  // Only fires on a real ratio over a meaningful span — never on one month.
+  const draw = s.cash.ownerDraw;
+  if (draw && (draw.monthsMeasured.value ?? 0) >= 3 && draw.pctOfProfit.value != null) {
+    const pct = draw.pctOfProfit.value;
+    const perMonth = draw.perMonth.value ?? 0;
+    const profitPm = draw.profitPerMonth.value ?? 0;
+    if (pct > 100) {
+      const overPerMonth = Math.round(perMonth - profitPm);
+      out.push(cashFinding(
+        "owner-draw-exceeds-profit", "warning",
+        `You are taking out more than the business earns`,
+        `Over ${draw.monthsMeasured.value} months you took about ${Math.round(perMonth).toLocaleString()} a month while the business made about ${Math.round(profitPm).toLocaleString()} — ${Math.round(pct)}% of it. Nothing is left in, so a weak month has to come out of your own pocket rather than out of a cushion the business built.`,
+        [ev("Taken out per month", draw.perMonth), ev("Profit per month", draw.profitPerMonth),
+         ev("Share of profit", draw.pctOfProfit), ev("Cheque money kept as cash", draw.keptFromCheques)],
+        {
+          impactEgp: overPerMonth > 0 ? overPerMonth : null,
+          urgency: "this_month",
+          confidence: "medium",
+          assumptions: ["Drawings are what is left after stock and running costs, so they also absorb any purchase or wage that was never recorded."],
+          resolutionCriteria: "drawings fall below profit over a full month, or the unrecorded purchases and wages are entered so the figure sharpens",
+          action: {
+            title: `Cap what you take at ${Math.round(profitPm).toLocaleString()} a month`,
+            action: `Set a fixed monthly amount at or below ${Math.round(profitPm).toLocaleString()} and leave the rest in. Recording your stock purchases and wages as you go will also sharpen this number — it is currently a leftover, not a measurement.`,
+            rationale: "Drawing everything the business makes leaves no reserve, so any dip is funded personally or by delaying stock.",
+            screenLink: "/bank",
+            urgency: "this_month",
+          },
+        },
+      ));
+    }
+  }
+
+  // cheque money never banked — a cash-handling exposure worth naming
+  if (draw && (draw.keptFromCheques.value ?? 0) > 0) {
+    const kept = Math.round(draw.keptFromCheques.value ?? 0);
+    out.push(cashFinding(
+      "cheque-cash-kept", "fact",
+      `${kept.toLocaleString()} of cheque money never reached the bank`,
+      "You bank part of each cheque and keep the rest as cash. That is a choice, not an error — but cash outside the account is the part no statement can ever evidence for you, and it is where the uncertainty in every cash figure comes from.",
+      [ev("Cheque money kept as cash", draw.keptFromCheques)],
+      {
+        urgency: "monitor", confidence: "medium",
+        resolutionCriteria: "not a problem to fix — context for reading every cash number",
+      },
+    ));
+  }
+
   // unfunded obligations horizon
   if (cash.available.verifiedCash != null && obligations.next30 > cash.available.verifiedCash) {
     out.push(cashFinding(

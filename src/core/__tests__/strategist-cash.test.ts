@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { makeSnapshot } from "@/core/strategist/analysis/fixture";
 import { metric, missing } from "@/core/strategist/contract";
-import { buildObligationCalendar, composeCashState, computeReserve } from "@/core/strategist/analysis/cash";
+import { buildObligationCalendar, composeCashState, computeReserve, cashFindings } from "@/core/strategist/analysis/cash";
 import { assessAffordability, assessWithdrawalV2 } from "@/core/strategist/analysis/affordability";
 import { projectCash, computeRunway } from "@/core/strategist/analysis/forecast-cash";
 import { buildStrategyReport } from "@/core/strategist/analysis/report";
@@ -276,5 +276,71 @@ describe("cash priorities", () => {
     expect(c).toBeDefined();
     expect(c!.urgency).toBe("monitor");
     expect(c!.class).toBe("fact");
+  });
+});
+
+/** Cycle 12 — the owner-draw findings. Drawings sit BELOW the profit line, so
+ *  nothing else in the engine can see them: a month reads profitable while the
+ *  money has already left. These pin when the strategist may say so. */
+describe("owner draw findings", () => {
+  const withDraw = (perMonth: number, profitPm: number, pct: number | null, months = 12, kept = 0) =>
+    makeSnapshot({
+      cash: {
+        latestCount: metric(60_000, "cash_reconciliations (latest)", "2026-05-29", "/money"),
+        countAgeDays: metric(2, "cash_reconciliations", "latest", "/money", { basis: "calculated" }),
+        hasLiveData: true,
+        ownerDraw: {
+          perMonth: metric(perMonth, "v_owner_burn", P, "/bank", { basis: "calculated" }),
+          profitPerMonth: metric(profitPm, "v_owner_burn", P, "/performance", { basis: "calculated" }),
+          pctOfProfit: pct == null
+            ? missing("v_owner_burn", P, "/bank", "no profit to compare against")
+            : metric(pct, "v_owner_burn", P, "/bank", { basis: "calculated" }),
+          monthsMeasured: metric(months, "v_owner_burn", P, "/bank"),
+          keptFromCheques: metric(kept, "v_bank_month", P, "/bank", { basis: "calculated" }),
+        },
+      },
+    });
+  const find = (s: ReturnType<typeof makeSnapshot>, id: string) => {
+    const obligations = buildObligationCalendar(s);
+    return cashFindings(s, composeCashState(s, obligations), obligations).find((f) => f.id === id);
+  };
+
+  it("warns when more is taken out than the business earns", () => {
+    const f = find(withDraw(28_717, 26_202, 110), "owner-draw-exceeds-profit")!;
+    expect(f).toBeDefined();
+    expect(f.class).toBe("warning");
+    expect(f.actionable).toBe(true);
+    expect(f.impactEgp).toBe(2_515);            // the monthly overdraw
+  });
+
+  it("stays quiet when drawings sit inside profit", () => {
+    expect(find(withDraw(15_000, 26_000, 58), "owner-draw-exceeds-profit")).toBeUndefined();
+  });
+
+  it("refuses to judge on a short span — one bad month is not a pattern", () => {
+    // Drawings swing on stock timing; two months cannot establish a habit.
+    expect(find(withDraw(40_000, 10_000, 400, 2), "owner-draw-exceeds-profit")).toBeUndefined();
+  });
+
+  it("stays quiet when there is no ratio rather than assuming the worst", () => {
+    expect(find(withDraw(20_000, 0, null), "owner-draw-exceeds-profit")).toBeUndefined();
+  });
+
+  it("says nothing at all when no bank history is loaded", () => {
+    expect(find(counted(), "owner-draw-exceeds-profit")).toBeUndefined();
+    expect(find(counted(), "cheque-cash-kept")).toBeUndefined();
+  });
+
+  it("names cheque money kept as cash as context, not as a fault", () => {
+    const f = find(withDraw(20_000, 30_000, 66, 12, 293_040), "cheque-cash-kept")!;
+    expect(f.class).toBe("fact");
+    expect(f.actionable).toBe(false);
+    expect(f.urgency).toBe("monitor");
+  });
+
+  it("carries the caveat that drawings absorb unrecorded stock and wages", () => {
+    const f = find(withDraw(28_717, 26_202, 110), "owner-draw-exceeds-profit")!;
+    expect(f.assumptions?.join(" ")).toMatch(/never recorded/i);
+    expect(f.confidence).toBe("medium");
   });
 });
