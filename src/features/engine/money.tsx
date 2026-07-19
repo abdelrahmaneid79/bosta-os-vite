@@ -14,7 +14,7 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getCashLedger, getCashSummary, getMoneyAccounts } from "@/core/read/money";
 import { getBankMonths, getBurnMonths, summariseBurn } from "@/core/read/bank";
-import { CountUp } from "@/components/ui/motion";
+import { CountUp, Sheet } from "@/components/ui/motion";
 import { getChequeLedger } from "@/core/read/settlements";
 import { getExpenses } from "@/core/read/expenses";
 import { voidMovement, voidCheque, voidExpense } from "@/core/db/mutations";
@@ -61,6 +61,8 @@ export function MoneyScreen() {
   const r = useActiveRange();
   const [sheet, setSheet] = useState<null | "count" | "in" | "out" | "withdraw">(null);
   const [voidMv, setVoidMv] = useState<string | null>(null);
+  type Mv = (typeof all)[number];
+  const [selMv, setSelMv] = useState<Mv | null>(null);
   const [filter, setFilter] = useState<"all" | "in" | "out" | "withdrawals">("all");
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
@@ -123,14 +125,13 @@ export function MoneyScreen() {
                 <thead><tr><th>Date</th><th>Flow</th><th className="r">Amount</th><th style={{ width: 34 }} /></tr></thead>
                 <tbody>
                   {movements.map((m) => (
-                    <tr key={m.id}>
+                    <tr key={m.id} onClick={() => setSelMv(m)} style={{ cursor: "pointer" }}>
                       <td>{fmtDate(m.date, "EEE d MMM yyyy")}</td>
                       <td style={{ textTransform: "capitalize" }}>{m.label} <span style={{ color: "rgb(var(--dim))", fontSize: 12 }}>· {KIND_LABEL[m.kind] ?? m.kind.replace(/_/g, " ")}</span></td>
                       <td className="r" style={{ color: m.amount >= 0 ? "var(--green)" : "var(--red)" }}>{m.amount >= 0 ? "+" : "−"}{egp(Math.abs(m.amount))}</td>
-                      <td>{m.id.startsWith("mv-") ? <button onClick={() => setVoidMv(m.id.slice(3))} title="Void" style={{ color: "rgb(var(--faint))", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>✕</button> : null}</td>
                     </tr>
                   ))}
-                  {movements.length === 0 && <tr><td colSpan={4} style={{ textAlign: "center", color: "rgb(var(--faint))", padding: 28 }}>No cash flow in this range.</td></tr>}
+                  {movements.length === 0 && <tr><td colSpan={3} style={{ textAlign: "center", color: "rgb(var(--faint))", padding: 28 }}>No cash flow in this range.</td></tr>}
                 </tbody>
               </table>
             )}
@@ -154,6 +155,30 @@ export function MoneyScreen() {
       </div>
 
       {sheet && <Modal open onClose={() => setSheet(null)} title={titles[sheet]}><CashForm mode={sheet} onDone={() => setSheet(null)} /></Modal>}
+      <Sheet open={!!selMv} onClose={() => setSelMv(null)} title="Movement">
+        {selMv && (
+          <div>
+            <div style={{ textAlign: "center", padding: "10px 0 4px" }}>
+              <div className="disp tnum" style={{ fontSize: 40, fontWeight: 700, letterSpacing: "-.02em", color: selMv.amount >= 0 ? "var(--green)" : "var(--red)" }}>
+                {selMv.amount >= 0 ? "+" : "−"}{egp(Math.abs(selMv.amount))}
+              </div>
+              <div style={{ fontSize: 13, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 4, textTransform: "capitalize" }}>
+                {selMv.label} · {KIND_LABEL[selMv.kind] ?? selMv.kind.replace(/_/g, " ")}
+              </div>
+            </div>
+            <div style={{ borderTop: "1px solid var(--stroke2)", marginTop: 16, paddingTop: 4 }}>
+              <div className="lrow"><div style={{ flex: 1 }} className="lname">Date</div><div className="lamt">{fmtDate(selMv.date, "EEEE d MMM yyyy")}</div></div>
+            </div>
+            {selMv.id.startsWith("mv-") && (
+              <button type="button"
+                onClick={() => { const id = selMv.id.slice(3); setSelMv(null); setVoidMv(id); }}
+                style={{ width: "100%", marginTop: 20, padding: "13px 0", borderRadius: 13, border: "1px solid rgba(255,92,114,.35)", background: "rgba(255,92,114,.1)", color: "var(--red)", fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>
+                Void this movement
+              </button>
+            )}
+          </div>
+        )}
+      </Sheet>
       <Confirm open={!!voidMv} title="Void this movement?" danger busy={del.isPending}
         message="The cash balance is recomputed without this entry. The row is kept for audit." confirmLabel="Void"
         onConfirm={() => voidMv && del.mutate(voidMv)} onClose={() => setVoidMv(null)} />

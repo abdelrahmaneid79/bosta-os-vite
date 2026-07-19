@@ -45,7 +45,9 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line py-14 text-center">
-      {icon && <div className="mb-3 text-pink">{icon}</div>}
+      {/* the peanut greets every empty state unless a screen brings its own icon */}
+      {icon ? <div className="mb-3 text-pink">{icon}</div>
+        : <img src="/assets/bosta-mascot.svg" alt="" className="mb-3 h-12 w-12 opacity-70" />}
       <div className="font-display text-base font-semibold text-text">{title}</div>
       {hint && <div className="mt-1 max-w-sm text-sm text-dim">{hint}</div>}
       {action && <div className="mt-4">{action}</div>}
