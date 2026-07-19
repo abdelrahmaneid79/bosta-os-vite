@@ -177,15 +177,53 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           : effectiveView === "expense" ? <ExpenseForm onDone={close} />
           : effectiveView === "cashcount" ? <CashForm mode="count" onDone={close} />
           : (
-          <div className="space-y-2">
-            {([["sale", "New sale"], ["purchase", "Add purchase"], ["product", "Add product"], ["expense", "Add expense"], ["cashcount", "Count cash"]] as const).map(([v, label]) => (
-              <button key={v} onClick={() => setView(v)} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
-                <span className="font-display text-sm font-semibold text-text">{label}</span>
-              </button>
-            ))}
-            <button onClick={() => { close(); navigate("/sales/import"); }} className="lift row-hover flex w-full items-center gap-3 rounded-xl border border-line bg-panel p-3 text-left">
-              <span className="font-display text-sm font-semibold text-text">Import receipt / screenshot</span>
-              <span className="ml-auto rounded-full bg-pink/15 px-2 py-0.5 text-[10px] font-semibold text-pink">CSV · Excel · image</span>
+          <div className="space-y-2.5">
+            {/* THE daily action: one hero button, everything else supports it */}
+            <button onClick={() => setView("sale")}
+              className="qa-in group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl p-4 text-left transition active:scale-[0.98] motion-reduce:active:scale-100"
+              style={{ background: "linear-gradient(135deg,var(--mag),var(--cd-violet))", boxShadow: "0 14px 34px -12px rgba(255,77,187,.65)" }}>
+              <span className="pointer-events-none absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/20 blur-2xl transition-transform duration-500 group-hover:scale-125" />
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white shadow-[inset_0_1px_0_rgba(255,255,255,.35)]">
+                <Icon d={I.sales} className="h-5 w-5" w={2.2} />
+              </span>
+              <span className="relative">
+                <span className="block font-display text-[16px] font-semibold text-white">New sale</span>
+                <span className="block text-[11.5px] font-semibold text-white/75">log today's take</span>
+              </span>
+              <Icon d="M9 18l6-6-6-6" className="ml-auto h-4 w-4 text-white/80" w={2.4} />
+            </button>
+
+            {/* the supporting four: same size, own colour, icon chip + label */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {([
+                ["purchase", "Purchase", "stock in", I.inventory, "157,107,255"],
+                ["expense", "Expense", "money out", I.reports, "255,177,62"],
+                ["product", "Product", "new item", I.plus, "39,229,204"],
+                ["cashcount", "Count cash", "drawer check", I.money, "66,226,154"],
+              ] as const).map(([v, label, sub, d, rgb], i) => (
+                <button key={v} onClick={() => setView(v)}
+                  className="qa-in flex items-center gap-3 rounded-2xl border border-line bg-panel p-3.5 text-left transition hover:border-white/20 active:scale-[0.97] motion-reduce:active:scale-100"
+                  style={{ animationDelay: `${(i + 1) * 40}ms` }}>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                    style={{ background: `rgba(${rgb},.14)`, color: `rgb(${rgb})` }}>
+                    <Icon d={d} className="h-[18px] w-[18px]" w={2.1} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-display text-[13.5px] font-semibold text-text">{label}</span>
+                    <span className="block text-[10.5px] font-semibold text-faint">{sub}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <button onClick={() => { close(); navigate("/sales/import"); }}
+              className="qa-in flex w-full items-center gap-3 rounded-2xl border border-dashed border-line bg-panel/60 p-3.5 text-left transition hover:border-pink/40 active:scale-[0.98] motion-reduce:active:scale-100"
+              style={{ animationDelay: "200ms" }}>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink/12 text-pink">
+                <Icon d={I.search} className="h-[18px] w-[18px]" w={2.1} />
+              </span>
+              <span className="font-display text-[13.5px] font-semibold text-text">Import receipt</span>
+              <span className="ml-auto rounded-full bg-pink/15 px-2 py-0.5 text-[10px] font-bold text-pink">CSV · Excel · photo</span>
             </button>
           </div>
         )}
