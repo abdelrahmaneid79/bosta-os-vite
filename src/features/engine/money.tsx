@@ -14,6 +14,7 @@ import { isEngineConfigured } from "@/core/db/engine";
 import { useActiveRange } from "@/store/filters";
 import { getCashLedger, getCashSummary, getMoneyAccounts } from "@/core/read/money";
 import { getBankMonths, getBurnMonths, summariseBurn } from "@/core/read/bank";
+import { CountUp } from "@/components/ui/motion";
 import { getChequeLedger } from "@/core/read/settlements";
 import { getExpenses } from "@/core/read/expenses";
 import { voidMovement, voidCheque, voidExpense } from "@/core/db/mutations";
@@ -102,8 +103,8 @@ export function MoneyScreen() {
       <div style={{ marginBottom: 16 }}><BankReality /></div>
 
       <div className="statgrid">
-        <Stat label="Cash on hand" color="rgb(var(--cyan))" value={c ? (c.balance == null ? "—" : egp(c.balance)) : "—"} sub={<div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{c?.since ? `counted ${fmtDate(c.since)}` : "count to set →"}</div>} />
-        <Stat label="Money in" color="var(--green)" value={c ? egp(c.inflow) : "—"} />
+        <Stat label="Cash on hand" color="rgb(var(--cyan))" value={c ? (c.balance == null ? "—" : <CountUp value={c.balance} format={egp} />) : "—"} sub={<div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{c?.since ? `counted ${fmtDate(c.since)}` : "count to set →"}</div>} />
+        <Stat label="Money in" color="var(--green)" value={c ? <CountUp value={c.inflow} format={egp} /> : "—"} />
         <Stat label="Money out" color="var(--red)" value={c ? egp(Math.abs(c.outflow)) : "—"} />
         <Stat label="Withdrawals" color="var(--amber)" value={c ? egp(c.withdrawals) : "—"} />
       </div>

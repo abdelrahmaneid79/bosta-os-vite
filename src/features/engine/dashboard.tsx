@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef } from "react";
+import { CountUp, Sheet } from "@/components/ui/motion";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart } from "@/components/charts";
@@ -137,6 +138,7 @@ export function DashboardScreen() {
   const month = monthBoundsCairo();
   const histFrom = ALL_TIME_FROM;
   const [trendR, setTrendR] = useState<"1D" | "1W" | "1M" | "3M" | "6M" | "All" | "Custom">("3M");
+  const [sheet, setSheet] = useState<null | "spend" | "week" | "cheques">(null);
   const [cFrom, setCFrom] = useState("");
   const [cTo, setCTo] = useState("");
 
@@ -224,34 +226,18 @@ export function DashboardScreen() {
           Some data didn't load — figures below may be incomplete. Reload to retry.
         </div>
       )}
-      {/* ── ticker ─────────────────────────────────────────────────────── */}
-      <div className="ticker">
-        <div className="tk">
-          <div className="tkic" style={{ background: "rgba(255,77,187,.14)", color: "var(--mag)" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.rev}</svg></div>
-          <div><div className="tkl">Revenue · {monthShort}</div><div className="tkv tnum">{money2(d.monthRev)}{revDelta != null && <em style={{ color: revDelta >= 0 ? "var(--green)" : "var(--red)", fontStyle: "normal", fontSize: 11, fontWeight: 700 }}> {revDelta >= 0 ? "▲" : "▼"}{Math.abs(revDelta).toFixed(1)}%</em>}</div></div>
-        </div>
-        <div className="tk">
-          <div className="tkic" style={{ background: "rgba(157,107,255,.14)", color: "rgb(var(--violet))" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.spend}</svg></div>
-          <div><div className="tkl">Spend · {monthShort}</div><div className="tkv tnum">{money2(monthSpend)}</div></div>
-        </div>
-        <div className="tk">
-          <div className="tkic" style={{ background: "rgba(39,229,204,.14)", color: "rgb(var(--cyan))" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.bank}</svg></div>
-          <div><div className="tkl">Cheques logged</div><div className="tkv tnum">{cycle.data?.cheques.length ?? 0} · EGP {egpShortBare(cycle.data?.totalReceived ?? 0)}</div></div>
-        </div>
-        <div className="tk">
-          <div><div className="tkl">Books to</div><div className="tkv" style={{ fontSize: 14 }}>{fmtDate(d.latest, "d MMM yyyy")}</div></div>
-        </div>
-      </div>
-
-      {/* ── grid ───────────────────────────────────────────────────────── */}
+      {/* ═══ HERO — the one answer: how is this month going? ═══ */}
       <div className="deckgrid">
-        {/* hero — revenue for the latest reporting month */}
         <div className="tile hero">
           <div className="orb" />
           <div className="heronut"><img src="/assets/bosta-mascot.svg" alt="" /></div>
-          <div className="th"><span className="eyebrow">Revenue · {monthLabel}</span></div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 2 }}>{tradingDays} trading days</div>
-          <div className="hv tnum" style={{ marginTop: "auto" }}><span className="hcur">EGP</span>{money2(d.monthRev)}</div>
+          <div className="th"><span className="eyebrow">This month · {monthLabel}</span></div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 2 }}>
+            {tradingDays} trading days · books to {fmtDate(d.latest, "d MMM")}
+          </div>
+          <div className="hv tnum" style={{ marginTop: "auto" }}>
+            <span className="hcur">EGP</span>{daily.isLoading ? "…" : <CountUp value={d.monthRev} />}
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
             {revDelta != null && (
               <span className={`delta ${revDelta >= 0 ? "up" : "down"}`}>
@@ -259,41 +245,30 @@ export function DashboardScreen() {
                 {Math.abs(revDelta).toFixed(1)}%
               </span>
             )}
-            <span style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500 }}>{d.lastRev > 0 ? `vs EGP ${money2(d.lastRev)} in ${prevMonthShort}` : "first month"} · EGP {money2(avgPerDay)}/day avg</span>
+            <span style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500 }}>
+              {d.lastRev > 0 ? `vs ${prevMonthShort}` : "first month"} · EGP {money2(avgPerDay)}/day
+            </span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: netCash >= 0 ? "var(--green)" : "var(--red)", marginLeft: "auto" }}>
+              {netCash >= 0 ? "+" : "−"}EGP {money2(Math.abs(netCash))} kept after everything
+            </span>
           </div>
           <div style={{ marginTop: 14 }}>{daily.isLoading ? null : <AreaChart data={heroData} id="hero" height={110} strong />}</div>
         </div>
 
-        {/* spend */}
-        <div className="tile spend">
-          <div className="th"><span className="tname">Spend · {monthShort}</span></div>
-          <div className="bn tnum"><small>EGP</small>{money2(monthSpend)}</div>
-          <div className="bar" style={{ marginTop: 18 }}><i style={{ width: `${spendRatio}%`, background: "linear-gradient(90deg,rgb(var(--violet)),var(--mag))" }} /></div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 10 }}>{spendRatio}% of revenue · {stockShare}% on stock</div>
-        </div>
-
-        {/* net cash */}
-        <div className="tile netcash">
-          <div className="th"><span className="tname">Net cash · {monthShort}</span></div>
-          <div className="bn tnum" style={{ color: netCash >= 0 ? "var(--green)" : "var(--red)" }}><small>EGP</small>{money2(netCash)}</div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginTop: 18 }}>{marginPct}% kept from every pound</div>
-        </div>
-
-        {/* performance gauge */}
+        {/* ═══ PULSE — how healthy, at a glance ═══ */}
         <div className="tile perf">
-          <HealthGauge score={marginPct} suffix="%" color={gaugeCol} label="Net cash margin" />
-          <div className="hbody">
-            <span className="eyebrow">Cash conversion · {monthShort}</span>
-            <div className="hhead">EGP {money2(d.lifetimeRev)} earned to date.</div>
-            <div className="hstats">
-              <div className="hstat"><div className="l">Lifetime revenue</div><div className="v tnum">{egpShortBare(d.lifetimeRev)}</div></div>
-              <div className="hstat"><div className="l">Cheques settled</div><div className="v tnum">{egpShortBare(cycle.data?.totalReceived ?? 0)}</div></div>
-              <div className="hstat"><div className="l">Best month</div><div className="v tnum">{d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(2, 4)}` : "—"}</div></div>
-            </div>
+          <HealthGauge score={marginPct} suffix="%" color={gaugeCol} label="Kept from every pound" />
+          <div className="hstats" style={{ width: "100%" }}>
+            <div className="hstat"><div className="l">Lifetime</div><div className="v tnum">{egpShortBare(d.lifetimeRev)}</div></div>
+            <div className="hstat"><div className="l">Best month</div><div className="v tnum">{d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(2, 4)}` : "—"}</div></div>
+            <div className="hstat"><div className="l">Cheques in</div><div className="v tnum">{egpShortBare(cycle.data?.totalReceived ?? 0)}</div></div>
+          </div>
+          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, lineHeight: 1.5 }}>
+            {topVen ? `${topVen[0]} is your biggest supplier, ${venPct}% of stock spend.` : d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(0, 4)} is the record: EGP ${money2(d.best.v)}.` : "Log a few days to unlock insights."}
           </div>
         </div>
 
-        {/* revenue trend — daily */}
+        {/* ═══ TREND — the one interactive chart ═══ */}
         <div className="tile trend">
           <div className="th"><span className="tname">Revenue trend</span>
             <div className="seg big" style={{ marginLeft: "auto" }}>
@@ -311,64 +286,70 @@ export function DashboardScreen() {
           )}
           <div style={{ marginTop: 18 }}>{daily.isLoading ? <SkeletonRows rows={4} /> : <AreaChart data={trendData} id="trend" height={206} axis />}</div>
         </div>
-
-        {/* this week */}
-        <div className="tile catalog">
-          <div className="th"><span className="tname">This week</span><span className="eyebrow" style={{ marginLeft: "auto" }}>last 7 days</span></div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 4 }}>
-            <span className="disp" style={{ fontWeight: 700, fontSize: 27, letterSpacing: "-.02em" }}>EGP {money2(weekTotal)}</span>
-            {weekDelta != null && <span className={`delta ${weekDelta >= 0 ? "up" : "down"}`}>{weekDelta >= 0 ? "+" : ""}{weekDelta.toFixed(1)}%</span>}
-          </div>
-          <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 6, fontWeight: 500 }}>{fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM yyyy")} · was EGP {money2(priorTotal)}</div>
-          <div style={{ marginTop: 14 }}><BarChart data={weekBars} height={150} /></div>
-        </div>
-
-        {/* spend by category */}
-        <div className="tile spendcat">
-          <div className="th"><span className="tname">Spend by category</span><span className="eyebrow" style={{ marginLeft: "auto" }}>lifetime</span></div>
-          {spendAll.isLoading ? <SkeletonRows rows={4} /> : cats.length === 0 ? <Note>No expenses recorded.</Note> :
-            cats.map((c, i) => (
-              <div className="lrow" key={c.label}>
-                <span style={{ width: 9, height: 9, borderRadius: 3, background: CATCOL[i % CATCOL.length], flexShrink: 0 }} />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="lname" style={{ textTransform: "capitalize" }}>{c.label}</div>
-                  <div className="bar"><i style={{ width: `${(c.value / catMax) * 100}%`, background: CATCOL[i % CATCOL.length] }} /></div>
-                </div>
-                <div className="lamt tnum">{money2(c.value)}</div>
-              </div>
-            ))}
-        </div>
-
-        {/* recent cheques */}
-        <div className="tile cheques">
-          <div className="th"><span className="tname">Recent cheques</span><span className="tag" style={{ marginLeft: "auto", color: "rgb(var(--cyan))", background: "rgba(39,229,204,.12)" }}>{cycle.data?.cheques.length ?? 0} · {egpShortBare(cycle.data?.totalReceived ?? 0)}</span></div>
-          {cycle.isLoading ? <SkeletonRows rows={4} /> : cheques.length === 0 ? <Note>No cheques logged yet.</Note> :
-            cheques.map((c) => (
-              <div className="lrow" key={c.id}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="lname">Cheque deposited</div>
-                  <div className="lsub">{fmtDate(c.date, "d MMM yyyy")}</div>
-                </div>
-                <div className="lamt tnum" style={{ color: "rgb(var(--cyan))" }}>{money2(c.amount)}</div>
-              </div>
-            ))}
-        </div>
-
-        {/* quick insight */}
-        <div className="tile qinsight">
-          <div className="th"><span className="tname">Quick insight</span><Link className="go" to="/missing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M9 7h8v8" /></svg></Link></div>
-          <div style={{ fontFamily: "'Clash Display'", fontWeight: 600, fontSize: 18, letterSpacing: "-.01em", lineHeight: 1.25, marginTop: 4 }}>
-            {d.best.k ? `${MON[+d.best.k.slice(5, 7) - 1]} ${d.best.k.slice(0, 4)} was the strongest month on record` : "Log a few days to unlock insights"}
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 14 }}>
-            <span className="disp" style={{ fontWeight: 700, fontSize: 26, color: "var(--green)" }}>EGP {money2(d.best.v)}</span>
-            {d.best.k && <span className="delta up">peak</span>}
-          </div>
-          <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 10, fontWeight: 500, lineHeight: 1.5 }}>
-            {topVen ? `${topVen[0]} is your biggest supplier — EGP ${money2(topVen[1])}, ${venPct}% of stock spend.` : "Add supplier notes on purchases to see your top supplier."}
-          </div>
-        </div>
       </div>
+
+      {/* ═══ ONE TAP AWAY — spend, the week, cheques ═══ */}
+      <div className="chiprow">
+        <button type="button" className="chip" onClick={() => setSheet("spend")}>
+          <span className="cl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.spend}</svg>Spend · {monthShort}</span>
+          <span className="cv tnum">EGP {money2(monthSpend)}</span>
+          <span className="cs">{spendRatio}% of revenue · tap for categories</span>
+        </button>
+        <button type="button" className="chip" onClick={() => setSheet("week")}>
+          <span className="cl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.rev}</svg>This week</span>
+          <span className="cv tnum">EGP {money2(weekTotal)}</span>
+          <span className="cs">{weekDelta != null ? `${weekDelta >= 0 ? "+" : ""}${weekDelta.toFixed(1)}% on last week` : "tap for the days"}</span>
+        </button>
+        <button type="button" className="chip" onClick={() => setSheet("cheques")}>
+          <span className="cl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">{Ic.bank}</svg>Cheques</span>
+          <span className="cv tnum">{cycle.data?.cheques.length ?? 0} · {egpShortBare(cycle.data?.totalReceived ?? 0)}</span>
+          <span className="cs">tap for the latest</span>
+        </button>
+      </div>
+
+      {/* ═══ THE SHEETS — evidence behind each chip ═══ */}
+      <Sheet open={sheet === "spend"} onClose={() => setSheet(null)} title={`Spend · ${monthShort}`}>
+        <div style={{ fontSize: 13, color: "rgb(var(--dim))", fontWeight: 500, marginBottom: 14 }}>
+          EGP {money2(monthSpend)} this month · {stockShare}% of it on stock
+        </div>
+        {cats.length === 0 ? <Note>No expenses recorded.</Note> :
+          cats.map((c, i) => (
+            <div className="lrow" key={c.label}>
+              <span style={{ width: 9, height: 9, borderRadius: 3, background: CATCOL[i % CATCOL.length], flexShrink: 0 }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="lname" style={{ textTransform: "capitalize" }}>{c.label}</div>
+                <div className="bar"><i style={{ width: `${(c.value / catMax) * 100}%`, background: CATCOL[i % CATCOL.length] }} /></div>
+              </div>
+              <div className="lamt tnum">{money2(c.value)}</div>
+            </div>
+          ))}
+        <Link to="/expenses" style={{ display: "block", marginTop: 16, fontSize: 13, fontWeight: 700, color: "var(--mag)" }}>Open expenses →</Link>
+      </Sheet>
+
+      <Sheet open={sheet === "week"} onClose={() => setSheet(null)} title="This week, day by day">
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
+          <span className="disp" style={{ fontWeight: 700, fontSize: 26 }}>EGP {money2(weekTotal)}</span>
+          {weekDelta != null && <span className={`delta ${weekDelta >= 0 ? "up" : "down"}`}>{weekDelta >= 0 ? "+" : ""}{weekDelta.toFixed(1)}%</span>}
+        </div>
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", fontWeight: 500, marginBottom: 14 }}>
+          {fmtDate(weekDays[0], "d MMM")}–{fmtDate(d.latest, "d MMM yyyy")} · was EGP {money2(priorTotal)} the week before
+        </div>
+        <BarChart data={weekBars} height={170} />
+      </Sheet>
+
+      <Sheet open={sheet === "cheques"} onClose={() => setSheet(null)} title="Recent cheques">
+        {cheques.length === 0 ? <Note>No cheques logged yet.</Note> :
+          cheques.map((c) => (
+            <div className="lrow" key={c.id}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="lname">Cheque deposited</div>
+                <div className="lsub">{fmtDate(c.date, "d MMM yyyy")}</div>
+              </div>
+              <div className="lamt tnum" style={{ color: "rgb(var(--cyan))" }}>{money2(c.amount)}</div>
+            </div>
+          ))}
+        <Link to="/cheques" style={{ display: "block", marginTop: 16, fontSize: 13, fontWeight: 700, color: "var(--mag)" }}>Open cheques →</Link>
+      </Sheet>
     </div>
   );
 }

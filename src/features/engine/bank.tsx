@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/Modal";
 import { GroupedBarChart, DonutChart } from "@/components/charts";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { egp } from "@/core/utils/format";
+import { CountUp } from "@/components/ui/motion";
 import { fmtDate } from "@/core/utils/date";
 import { cn } from "@/core/utils/cn";
 import { isEngineConfigured } from "@/core/db/engine";
@@ -126,10 +127,10 @@ export function BankScreen() {
       </DeckTile>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Cheque money in" value={egp(o.chequesNet)} color="rgb(var(--good))" sub={`${active.reduce((s, m) => s + m.chequeCount, 0)} cheques, after the mall's rent and commission`} />
-        <Stat label="Reached the bank" value={egp(o.banked)} color="rgb(var(--teal))" sub={`${bankedPct}% of it`} />
-        <Stat label="Kept as cash" value={egp(o.keptAsCash)} color="rgb(var(--pink))" sub="never entered this account" />
-        <Stat label="Drawn out at machines" value={egp(o.cashOut)} color="rgb(var(--warn))" sub="on top of the cash you kept" />
+        <Stat label="Cheque money in" value={<CountUp value={o.chequesNet} format={egp} />} color="rgb(var(--good))" sub={`${active.reduce((s, m) => s + m.chequeCount, 0)} cheques, after the mall's rent and commission`} />
+        <Stat label="Reached the bank" value={<CountUp value={o.banked} format={egp} />} color="rgb(var(--teal))" sub={`${bankedPct}% of it`} />
+        <Stat label="Kept as cash" value={<CountUp value={o.keptAsCash} format={egp} />} color="rgb(var(--pink))" sub="never entered this account" />
+        <Stat label="Drawn out at machines" value={<CountUp value={o.cashOut} format={egp} />} color="rgb(var(--warn))" sub="on top of the cash you kept" />
       </div>
 
       <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-white/[0.09] bg-white/[0.04] p-1.5">
