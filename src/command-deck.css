@@ -740,7 +740,8 @@
 .cdk .sheet-x{margin-left:auto;width:36px;height:36px;border-radius:11px;border:1px solid var(--stroke);background:rgba(255,255,255,.04);color:var(--cd-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
 .cdk .sheet-x:hover{color:var(--cd-text);border-color:rgba(255,255,255,.2)}
 .cdk .sheet-x svg{width:16px;height:16px}
-.cdk .sheet-body{padding:4px 22px 26px;overflow-y:auto;overscroll-behavior:contain}
+.cdk .sheet-body{padding:0 22px 26px;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+.cdk .sheet-body>*:first-child{margin-top:4px}
 @media(min-width:900px){
   /* desktop: a levitating centered panel — big, wide, bordered, floating */
   .cdk.sheet-root{align-items:center;justify-content:center;padding:32px}
@@ -823,7 +824,7 @@
    unit named ONCE in the header (never per cell), a pinned total row, and NO
    inner scroll — the page or sheet is the only thing that scrolls. */
 .cdk .dtbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px;
-  border:1px solid var(--stroke);border-radius:14px;overflow:hidden}
+  border:1px solid var(--stroke);border-radius:14px}
 .cdk .dtbl th{background:rgba(255,255,255,.045);color:var(--cd-dim);font-size:10.5px;font-weight:800;
   letter-spacing:.09em;text-transform:uppercase;text-align:left;padding:11px 14px;
   border-bottom:1px solid var(--stroke)}
@@ -840,3 +841,40 @@
   cursor:pointer;font-size:12.5px;transition:.15s}
 .cdk .dtbl .act:hover{color:var(--cd-text);border-color:rgba(255,255,255,.22)}
 .cdk .dtbl .act.danger{color:var(--red);border-color:rgba(255,92,114,.3);background:rgba(255,92,114,.07)}
+
+
+/* ═══ STICKY TABLE CHROME — headers that stay while rows scroll ══════════════
+   The column names are the only thing that makes a number mean something, so
+   they ride along instead of scrolling away. A frosted band plus a soft drop
+   shadow makes the header read as floating ABOVE the rows rather than as a
+   row itself. Totals stick to the bottom edge for the same reason.
+
+   Requirement: no ancestor between the sticky cell and the scroll container
+   may set overflow:hidden — that is why .dtbl rounds its corner CELLS instead
+   of clipping the whole table. */
+.cdk .dtbl thead th,
+.cdk .etbl thead th,
+.cdk .tbl thead th{
+  position:sticky;top:0;z-index:3;
+  background:linear-gradient(180deg,rgba(23,26,36,.97),rgba(18,21,29,.95));
+  backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);
+  box-shadow:0 1px 0 var(--stroke),0 10px 18px -14px rgba(0,0,0,.9)}
+
+/* the totals row holds the bottom edge the same way */
+.cdk .dtbl tfoot td{position:sticky;bottom:0;z-index:2;
+  background:linear-gradient(180deg,rgba(38,20,33,.97),rgba(30,17,27,.96));
+  backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);
+  box-shadow:0 -1px 0 var(--stroke),0 -10px 18px -14px rgba(0,0,0,.9)}
+
+/* corners are rounded per-cell, since the table itself can no longer clip */
+.cdk .dtbl thead tr:first-child th:first-child{border-top-left-radius:13px}
+.cdk .dtbl thead tr:first-child th:last-child{border-top-right-radius:13px}
+.cdk .dtbl tfoot tr:last-child td:first-child{border-bottom-left-radius:13px}
+.cdk .dtbl tfoot tr:last-child td:last-child{border-bottom-right-radius:13px}
+.cdk .dtbl:not(:has(tfoot)) tbody tr:last-child td:first-child{border-bottom-left-radius:13px}
+.cdk .dtbl:not(:has(tfoot)) tbody tr:last-child td:last-child{border-bottom-right-radius:13px}
+
+@media (prefers-reduced-transparency:reduce){
+  .cdk .dtbl thead th,.cdk .etbl thead th,.cdk .tbl thead th{background:#171a24;backdrop-filter:none}
+  .cdk .dtbl tfoot td{background:#261421;backdrop-filter:none}
+}
