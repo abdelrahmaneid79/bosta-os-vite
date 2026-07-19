@@ -214,7 +214,7 @@ export function SalesScreen() {
     <div>
       <PageHdr title="Sales" sub={d.span ? d.span : "Your daily takings"}
         right={<>
-          <button className="addbtn" onClick={() => navigate("/sales/import")}>Import receipt</button>
+          <button className="addbtn" onClick={() => navigate("/sales/product-lines")}>Import report</button>
           <button className="qadd" style={{ height: 38 }} onClick={() => setAddOpen(true)}><span>+ New sale</span></button>
         </>} />
 

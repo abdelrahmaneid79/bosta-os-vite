@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 /** Import & receipts — accepts CSV, Excel (.xlsx/.xls) and images (PNG/JPG).
  *  CSV/Excel parse by columns; images are read with in-browser OCR (tesseract.js)
  *  into one or many {date, total} rows. Everything lands in an EDITABLE table so
@@ -39,7 +38,6 @@ async function readSpreadsheet(file: File): Promise<Row[]> {
 }
 
 export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
-  const navSw = useNavigate();
   const { reportSuccess, reportError, toast } = useUI();
   const qc = useQueryClient();
   const [kind, setKind] = useState<Kind>(fixedKind ?? "sales");
@@ -215,14 +213,6 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
 
   return (
     <div className="space-y-4">
-      {fixedKind === "sales" && (
-        <div className="mb-4 flex justify-center">
-          <div className="subtabs" style={{ margin: 0 }}>
-            <span onClick={() => navSw("/sales/product-lines")}>Day report · photo</span>
-            <span className="on">Bulk totals · file</span>
-          </div>
-        </div>
-      )}
       <div className="flex flex-wrap items-center gap-2">
         <Eyebrow>Upload CSV · Excel · or a photo/screenshot → review → approve</Eyebrow>
         <div className="flex-1" />

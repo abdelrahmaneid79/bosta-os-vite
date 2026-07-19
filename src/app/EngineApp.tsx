@@ -88,7 +88,7 @@ interface Group { id: string; label: string; icon: string; accent: string; tabs:
 // Map each route to its screen; nav structure/labels/icons come from core/nav.
 const EL: Record<string, React.ReactNode> = {
   "/dashboard": <DashboardScreen />,
-  "/sales": <SalesScreen />, "/sales/import": <ReceiptsScreen fixedKind="sales" />, "/sales/product-lines": <DaySalesPhotoImport />, "/sales/product-lines/file": <ProductLineImportScreen />,
+  "/sales": <SalesScreen />, "/sales/product-lines": <DaySalesPhotoImport />, "/sales/product-lines/file": <ProductLineImportScreen />,
   "/stock": <StockScreen />, "/purchases": <PurchasesScreen />, "/costs": <ProductCostImportScreen />,
   "/money": <MoneyScreen />, "/expenses": <ExpensesScreen />, "/cheques": <ChequesScreen />, "/bank": <BankScreen />, "/settlements": <ChequesScreen />, "/expenses/import": <ReceiptsScreen fixedKind="expenses" />,
   "/performance": <PerformanceScreen />,
@@ -216,7 +216,7 @@ function QuickSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
               ))}
             </div>
 
-            <button onClick={() => { close(); navigate("/sales/import"); }}
+            <button onClick={() => { close(); navigate("/sales/product-lines"); }}
               className="qa-in flex w-full items-center gap-3 rounded-2xl border border-dashed border-line bg-panel/60 p-3.5 text-left transition hover:border-pink/40 active:scale-[0.98] motion-reduce:active:scale-100"
               style={{ animationDelay: "200ms" }}>
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pink/12 text-pink">
@@ -366,7 +366,7 @@ function Shell() {
               {ALL_GROUPS.flatMap((g) => g.tabs.map((t) => (
                 <Route key={t.to} path={t.to} element={<Page group={g}>{t.el}</Page>} />
               )))}
-              <Route path="/imports" element={<Navigate to="/sales/import" replace />} />
+              <Route path="/imports" element={<Navigate to="/sales/product-lines" replace />} />
               {/* Reports + Gaps + Activity folded into Performance and the Strategist —
                   redirect the old routes so bookmarks and deep links still land. */}
               <Route path="/reports" element={<Navigate to="/performance" replace />} />
@@ -374,6 +374,7 @@ function Shell() {
               <Route path="/reconcile" element={<Navigate to="/performance" replace />} />
               <Route path="/missing" element={<Navigate to="/health" replace />} />
               <Route path="/activity" element={<Navigate to="/performance" replace />} />
+              <Route path="/sales/import" element={<Navigate to="/sales/product-lines" replace />} />
               <Route path="/expenses/import" element={<Page group={ALL_GROUPS.find((g) => g.id === "money")!}>{EL["/expenses/import"]}</Page>} />
               <Route path="/sales/product-lines/file" element={<Page group={ALL_GROUPS.find((g) => g.id === "sales")!}>{EL["/sales/product-lines/file"]}</Page>} />
               <Route path="/product/:id" element={<ProductDetailScreen />} />

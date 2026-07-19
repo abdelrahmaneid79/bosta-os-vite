@@ -8,9 +8,9 @@
  *  reconcile before Approve unlocks. Nothing saves until you approve; writes go
  *  through the existing create_sale_item RPC (money math untouched). */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Card, CardHead, Eyebrow, Button, Badge } from "@/components/ui";
+import { Card, Eyebrow, Button, Badge } from "@/components/ui";
 import { EmptyState, SkeletonRows } from "@/components/feedback";
 import { ProductPicker } from "@/components/ProductPicker";
 import { egp } from "@/core/utils/format";
@@ -69,7 +69,6 @@ async function fetchExistingDay(date: string, locationId: string): Promise<Exist
 interface LineMeta { conf: number; warnings: string[] }
 
 export function DaySalesPhotoImport() {
-  const nav = useNavigate();
   const { reportSuccess, reportError } = useUI();
   const qc = useQueryClient();
   const [imgUrl, setImgUrl] = useState<string | null>(null);
@@ -326,20 +325,19 @@ export function DaySalesPhotoImport() {
         </Card>
       )}
 
-      {/* One import surface: today's photo report or bulk day totals. The two
-          old tabs ("Daily report" / "Bulk totals") merged here — same jobs,
-          one obvious place, a segmented switch between them. */}
-      <div className="mb-4 flex justify-center">
-        <div className="subtabs" style={{ margin: 0 }}>
-          <span className="on">Day report · photo</span>
-          <span onClick={() => nav("/sales/import")}>Bulk totals · file</span>
-        </div>
-      </div>
       {!lines ? (
-        /* ───────── Upload ───────── */
-        <Card>
-          <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-8 text-center">
-            <CardHead title="Snap today's sales report" sub="Snap the report — you'll check it before saving" accent="pink" icon="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+        /* ───────── Upload — a small friendly thing, not a whole screen ───────── */
+        <div className="mx-auto max-w-xl rounded-3xl border border-dashed border-pink/30 bg-pink/[0.04] px-6 py-6">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pink/15 text-pink">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+              </span>
+              <div className="text-left">
+                <div className="font-display text-[15px] font-semibold text-text">Snap today's report</div>
+                <div className="text-[12px] font-semibold text-dim">you check it before it saves</div>
+              </div>
+            </div>
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
               <label className={`lift flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-pink px-5 py-3 font-display text-sm font-bold text-ink shadow-pink ${busy ? "pointer-events-none opacity-60" : ""}`}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
@@ -354,7 +352,7 @@ export function DaySalesPhotoImport() {
               : <Badge tone={rd.tone}>{rd.text}</Badge>}
             <p className="text-[12px] text-faint">Have a spreadsheet instead? <Link to="/sales/product-lines/file" className="text-pink underline">Use the file importer</Link>.</p>
           </div>
-        </Card>
+        </div>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
         <>
           {/* ───────── Header: photo + what we read ───────── */}
