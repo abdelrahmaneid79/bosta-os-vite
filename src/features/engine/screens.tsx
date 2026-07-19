@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, Eyebrow, Select } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
+import { CountUp, Sheet } from "@/components/ui/motion";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
@@ -74,7 +75,7 @@ export function StockScreen() {
     <div>
       <div className="statgrid">
         <Stat label="Products" color="var(--mag)" value={s ? s.positions.length : "—"} onClick={() => setManageOpen(true)} sub={<div style={{ fontSize: 11, color: "var(--mag)", fontWeight: 700, marginTop: 8 }}>Manage full list ↗</div>} />
-        <Stat label="Total stock value" color="rgb(var(--violet))" value={s ? egp(s.totalValue) : "—"} sub={s && s.totalValue === 0 ? <div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>count stock to set →</div> : undefined} />
+        <Stat label="Total stock value" color="rgb(var(--violet))" value={s ? <CountUp value={s.totalValue} format={egp} /> : "—"} sub={s && s.totalValue === 0 ? <div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>count stock to set →</div> : undefined} />
         <Stat label="Counted / uncounted" color="rgb(var(--cyan))" value={s ? `${counted} / ${s.positions.length - counted}` : "—"} />
         <Stat label="Missing cost" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
       </div>
@@ -121,9 +122,9 @@ export function StockScreen() {
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === "edit" ? "Edit product" : "Add product"}>
         <ProductForm product={modal?.mode === "edit" ? modal.product : undefined} onDone={() => setModal(null)} />
       </Modal>
-      <Modal open={!!detailId} onClose={() => setDetailId(null)} wide>
+      <Sheet open={!!detailId} onClose={() => setDetailId(null)} wide title="Product">
         {detailId && <ProductDetailScreen id={detailId} onClose={() => setDetailId(null)} />}
-      </Modal>
+      </Sheet>
       <Modal open={manageOpen} onClose={() => setManageOpen(false)} wide title="All products">
         <ManageProducts />
       </Modal>
@@ -220,10 +221,10 @@ export function SalesScreen() {
       {!isEngineConfigured ? <ConnectPanel /> : all.isError ? <ErrorState message={String((all.error as Error)?.message ?? "Read failed")} /> : all.isLoading ? <SkeletonRows rows={6} /> : (
         <>
           <div className="statgrid">
-            <Stat label="Lifetime revenue" value={egp(d.lifetime)} color="var(--mag)" />
+            <Stat label="Lifetime revenue" value={<CountUp value={d.lifetime} format={egp} />} color="var(--mag)" />
             <Stat label="Trading days" value={d.days} color="rgb(var(--violet))" />
-            <Stat label="Avg / day" value={egp(d.avgDay)} color="rgb(var(--cyan))" />
-            <Stat label="Best month" value={egp(d.best[1])} color="var(--green)" />
+            <Stat label="Avg / day" value={<CountUp value={d.avgDay} format={egp} />} color="rgb(var(--cyan))" />
+            <Stat label="Best month" value={<CountUp value={d.best[1]} format={egp} />} color="var(--green)" />
           </div>
 
           <div className="row2">
@@ -261,7 +262,7 @@ export function SalesScreen() {
       )}
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="New sale day" wide><SaleForm onDone={() => setAddOpen(false)} /></Modal>
-      {detail && <Modal open onClose={() => setDetail(null)} title={`Sale · ${fmtDate(detail.date)}`}><SaleDetail sale={detail} onClose={() => setDetail(null)} /></Modal>}
+      {detail && <Sheet open onClose={() => setDetail(null)} wide title={`Sale · ${fmtDate(detail.date)}`}><SaleDetail sale={detail} onClose={() => setDetail(null)} /></Sheet>}
     </div>
   );
 }
@@ -377,7 +378,7 @@ export function PurchasesScreen() {
         <button className="qadd" style={{ height: 38 }} onClick={() => setAddOpen(true)}><span>+ Add purchase</span></button>
       </div>
       <div className="statgrid c3">
-        <Stat label={productId ? "Spend · filtered" : "Stock spend · range"} color="var(--amber)" value={egp(filteredTotal)} />
+        <Stat label={productId ? "Spend · filtered" : "Stock spend · range"} color="var(--amber)" value={<CountUp value={filteredTotal} format={egp} />} />
         <Stat label="Entries" color="rgb(var(--cyan))" value={entries} sub={lump.length ? <div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{lump.length} historical</div> : undefined} />
         <Stat label="Avg / entry" color="rgb(var(--violet))" value={entries ? egp(filteredTotal / entries) : "—"} />
       </div>
@@ -394,8 +395,9 @@ export function PurchasesScreen() {
                     <td className="r">{num(r.quantity)} × {egp(r.unitCost)}</td>
                     <td className="r">{egp(r.totalCost)}</td>
                     <td className="r" style={{ width: 44 }}>
-                      <button title="Void this purchase" onClick={(e) => { e.stopPropagation(); setVoidAsk({ id: r.id, label: `Void ${r.productName} · ${egp(r.totalCost)} on ${fmtDate(r.date)}? Stock and weighted cost are recomputed.` }); }}
-                        style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: 14 }}>✕</button>
+                      <button title="Void this purchase" aria-label="Void this purchase"
+                        onClick={(e) => { e.stopPropagation(); setVoidAsk({ id: r.id, label: `Void ${r.productName} · ${egp(r.totalCost)} on ${fmtDate(r.date)}? Stock and weighted cost are recomputed.` }); }}
+                        style={{ width: 32, height: 32, borderRadius: 9, border: "1px solid rgba(255,92,114,.3)", background: "rgba(255,92,114,.08)", color: "var(--red)", cursor: "pointer", fontSize: 13, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>✕</button>
                     </td>
                   </tr>
                 ))}
@@ -413,7 +415,7 @@ export function PurchasesScreen() {
         </DeckTile>
       </Guarded>
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add purchase"><PurchaseForm onDone={() => setAddOpen(false)} /></Modal>
-      <Modal open={!!detailId} onClose={() => setDetailId(null)} wide>{detailId && <ProductDetailScreen id={detailId} onClose={() => setDetailId(null)} />}</Modal>
+      <Sheet open={!!detailId} onClose={() => setDetailId(null)} wide title="Product">{detailId && <ProductDetailScreen id={detailId} onClose={() => setDetailId(null)} />}</Sheet>
       <Confirm open={!!voidAsk} title="Void purchase" message={voidAsk?.label ?? ""} danger busy={doVoid.isPending}
         onConfirm={() => { if (voidAsk) doVoid.mutate(voidAsk.id); setVoidAsk(null); }} onClose={() => setVoidAsk(null)} />
     </div>
