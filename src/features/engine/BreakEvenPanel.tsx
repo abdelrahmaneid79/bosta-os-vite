@@ -173,17 +173,13 @@ export function BreakEvenPanel() {
         )}
         {d && (
           <span className="be-draw">
-            {d.covered ? (
-              <>Past <b className="tnum">{egp(d.target)}</b> — this month covers its costs
-                <em> and</em> the <b className="tnum">{egp(d.perMonth)}</b> you normally take out.</>
-            ) : (
-              <>Breaking even is not the same as paying yourself. You take about{" "}
-                <b className="tnum">{egp(d.perMonth)}</b> a month, so this month needs{" "}
-                <b className="tnum">{egp(d.target)}</b> to cover both —{" "}
-                <b className="tnum">{egp(d.stillNeeded)}</b> more
-                {d.requiredDailyRunRate != null && <> ({bare(d.requiredDailyRunRate)}/day)</>}.</>
-            )}
-            <i> Based on {d.basis}, from your bank card.</i>
+            <span className="be-draw-row">
+              <b className="tnum">{egp(b.breakEvenRevenue)}</b><i>covers costs</i>
+              <b className="tnum">{egp(d.target)}</b><i>covers you too</i>
+              {!d.covered && <><b className="tnum" style={{ color: "var(--amber)" }}>{egp(d.stillNeeded)}</b><i>to go{d.requiredDailyRunRate != null ? ` · ${bare(d.requiredDailyRunRate)}/day` : ""}</i></>}
+              {d.covered && <b style={{ color: "var(--green)" }}>covered ✓</b>}
+            </span>
+            <i>you take ~{egp(d.perMonth)}/month · from the bank card</i>
           </span>
         )}
         <span className="be-note">

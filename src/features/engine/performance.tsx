@@ -166,19 +166,12 @@ export function PerformanceScreen() {
         {draw && (
           <button type="button" onClick={() => nav("/bank")}
             className="mt-4 w-full rounded-xl border border-white/[0.09] bg-white/[0.03] px-3.5 py-3 text-left transition hover:bg-white/[0.06] active:scale-[0.995] motion-reduce:active:scale-100">
-            <div className="text-[12.5px] leading-relaxed text-dim">
-              {leftIn != null && leftIn < 0 ? (
-                <>You took <b className="text-text">{egp(draw.tookOut)}</b> out of{" "}
-                  <b className="text-text">{egp(p?.netProfit ?? 0)}</b> of profit — <b className="text-bad">{egp(-leftIn)} more than it made</b>.
-                  Nothing was left in to absorb a bad month.</>
-              ) : (
-                <>You took <b className="text-text">{egp(draw.tookOut)}</b> out and left{" "}
-                  <b className="text-good">{egp(leftIn ?? 0)}</b> in the business.</>
-              )}
-              <span className="mt-1 block text-[11.5px] text-dim/70">
-                From your bank card, over {draw.months} complete month{draw.months === 1 ? "" : "s"} in this range.
-                It is what is left after stock and running costs, so it also absorbs any purchase or wage you never recorded. Open the bank card →
-              </span>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 text-[12.5px]">
+              <span className="font-bold text-text">Took out {egp(draw.tookOut)}</span>
+              {leftIn != null && leftIn < 0
+                ? <span className="font-bold text-bad">{egp(-leftIn)} over profit</span>
+                : <span className="font-bold text-good">{egp(leftIn ?? 0)} left in</span>}
+              <span className="w-full text-[11.5px] font-semibold text-dim">{draw.months} months · from the bank card → </span>
             </div>
           </button>
         )}

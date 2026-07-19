@@ -112,10 +112,11 @@ export function BankScreen() {
             <span className="text-pink">{egp(o.keptAsCash)}</span>
             <span className="text-muted"> as cash.</span>
           </h2>
-          <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-            {o.from && o.to ? `${fmtDate(o.from, "d MMM yyyy")} → ${fmtDate(o.to, "d MMM yyyy")}` : ""} · {o.movements} movements read from your SMS.
-            You then drew {egp(o.cashOut)} more out at machines. Personal card spending across the whole period was {egp(o.personalSpend)}.
-          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-semibold">
+            {o.from && o.to && <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-muted">{fmtDate(o.from, "MMM yy")} → {fmtDate(o.to, "MMM yy")}</span>}
+            <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-muted">{o.movements} movements</span>
+            <span className="rounded-full bg-white/[0.06] px-3 py-1.5 text-muted">personal card {egp(o.personalSpend)}</span>
+          </div>
           <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/[0.07]">
             <div className="h-full rounded-full bg-gradient-to-r from-good to-teal transition-[width] duration-500" style={{ width: `${Math.min(100, bankedPct)}%` }} />
           </div>
@@ -147,10 +148,6 @@ export function BankScreen() {
         <div className="space-y-5">
           <DeckTile>
             <TileHead name="Where the cash goes" />
-            <p className="mb-4 text-[13px] leading-relaxed text-muted">
-              Two sources of cash — the part of each cheque you keep, and what you draw at machines.
-              Between them they have to cover stock, wages and packaging. What is left over is what you took for yourself.
-            </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-good/20 bg-good/[0.06] p-4">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-good">Cash you handled</div>
@@ -161,11 +158,13 @@ export function BankScreen() {
                 </div>
               </div>
               <div className="rounded-2xl border border-white/[0.09] bg-white/[0.03] p-4">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-muted">What it had to cover</div>
-                <p className="mt-3 text-[13px] leading-relaxed text-muted">
-                  Stock, wages and packaging come out of this cash — none of it is paid by card.
-                  Compare it against the cost of what you actually sold on the Performance screen.
-                </p>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-muted">It had to cover</div>
+                <div className="mt-3 space-y-2 text-[13px]">
+                  <div className="flex justify-between"><span className="text-muted">Stock</span><span className="font-semibold text-text">paid in cash</span></div>
+                  <div className="flex justify-between"><span className="text-muted">Wages</span><span className="font-semibold text-text">paid in cash</span></div>
+                  <div className="flex justify-between"><span className="text-muted">Packaging</span><span className="font-semibold text-text">paid in cash</span></div>
+                  <button type="button" onClick={() => setTab("burn")} className="mt-1 w-full rounded-xl bg-white/[0.05] px-3 py-2 text-left text-[12.5px] font-bold text-pink transition hover:bg-white/[0.08]">What was left → </button>
+                </div>
               </div>
             </div>
           </DeckTile>
@@ -175,52 +174,26 @@ export function BankScreen() {
             <GroupedBarChart data={flow} labelA="Banked" labelB="Cash out" colorA="rgb(var(--good))" colorB="rgb(var(--warn))" height={280} />
           </DeckTile>
 
-          <div className="grid gap-5 lg:grid-cols-2">
-            <DeckTile>
-              <TileHead name="What the card was spent on" />
-              <DonutChart data={mix} />
-            </DeckTile>
-            <DeckTile>
-              <TileHead name="Failed ATM attempts" right={<span className="text-[12px] font-semibold text-muted">{reversals.length}</span>} />
-              <p className="mb-3 text-[13px] leading-relaxed text-muted">
-                The machine texts a debit, then reverses it. The money never left, so none of this counts as spending.
-              </p>
-              <div className="mb-3 rounded-2xl border border-white/[0.09] bg-white/[0.03] px-4 py-3">
-                <div className="font-display text-xl text-text">{egp(o.reversedTotal)}</div>
-                <div className="text-[12px] text-muted">
-                  {reversals.filter((r) => r.refundConfirmed).length} of {reversals.length} confirmed refunded by the balance
-                </div>
-              </div>
-              <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
-                {reversals.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.03] px-3 py-2 text-[13px]">
-                    <span className="shrink-0 text-muted">{r.dayMonth}</span>
-                    <span className="truncate text-muted">{r.merchant ?? ""}</span>
-                    <span className="shrink-0 font-semibold tabular-nums text-text">{egp(r.amount)}</span>
-                    <span className={cn("shrink-0 text-[11px] font-bold", r.refundConfirmed ? "text-good" : "text-warn")}>
-                      {r.refundConfirmed ? "refunded" : "can't tell"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </DeckTile>
-          </div>
+          <DeckTile>
+            <TileHead name="What the card was spent on" />
+            <DonutChart data={mix} />
+          </DeckTile>
 
           <DeckTile>
-            <TileHead name="How much of this to trust" />
-            <div className="space-y-2.5 text-[13px] leading-relaxed text-muted">
-              <p>
-                Every SMS states the balance left after it, so the messages chain together. Where the chain is
-                unbroken the figures are exact — nothing can hide. <span className="font-semibold text-text">{o.exactMonths} of {o.totalMonths} months</span> are like that.
-              </p>
-              <p>
-                Where the recording skipped a message the chain breaks, and a cheque arriving and cash leaving in the
-                same gap cancel each other out — only the net shows. Those months are marked below. It means
-                "kept as cash" is a ceiling in those months, not an exact figure.
-              </p>
-              <p className="text-text">
-                A bank statement would settle it completely. This is as far as the text messages can go.
-              </p>
+            <TileHead name="How exact is this" />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between rounded-xl bg-good/[0.07] px-4 py-3">
+                <span className="text-[13px] font-semibold text-text">Exact months</span>
+                <span className="text-[13px] font-bold tabular-nums text-good">{o.exactMonths} of {o.totalMonths}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-warn/[0.07] px-4 py-3">
+                <span className="text-[13px] font-semibold text-text">Months with gaps</span>
+                <span className="text-[12px] font-bold text-warn">kept = ceiling</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-white/[0.04] px-4 py-3">
+                <span className="text-[13px] font-semibold text-text">To settle it fully</span>
+                <span className="text-[12px] font-bold text-muted">bank statement</span>
+              </div>
             </div>
           </DeckTile>
         </div>
@@ -240,12 +213,11 @@ export function BankScreen() {
                 </span>.
               </h3>
               {burn.pctOfProfit != null && (
-                <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-                  That is <span className="font-bold text-text">{Math.round(burn.pctOfProfit)}%</span> of everything the business earned.
-                  {burn.pctOfProfit > 98
-                    ? " Nothing is being left in to build a cushion — a bad month has to come out of your own pocket."
-                    : " The rest stays in the business."}
-                </p>
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/[0.06] px-3.5 py-1.5 text-[12.5px] font-bold">
+                  <span className={cn(burn.pctOfProfit > 100 ? "text-bad" : "text-warn")}>{Math.round(burn.pctOfProfit)}% of profit</span>
+                  <span className="text-muted">·</span>
+                  <span className="text-muted">{burn.pctOfProfit > 98 ? "no cushion left in" : "rest stays in"}</span>
+                </div>
               )}
               <div className="mt-4 flex h-2.5 w-full overflow-hidden rounded-full bg-white/[0.07]">
                 <div className="h-full bg-gradient-to-r from-warn to-pink" style={{ width: `${Math.min(100, burn.pctOfProfit ?? 0)}%` }} />
@@ -282,10 +254,7 @@ export function BankScreen() {
 
           <DeckTile>
             <TileHead name="Month by month" />
-            <p className="mb-3 text-[12px] leading-relaxed text-muted">
-              Single months swing hard and some go negative — stock bought in one month gets sold across the next two,
-              so the cash and the cost never land together. Read the year, not the month.
-            </p>
+            <p className="mb-3 text-[12px] font-semibold text-muted">Months swing on stock timing. Read the year.</p>
             <div className="-mx-1 overflow-x-auto">
               <table className="w-full min-w-[560px] text-[13px]">
                 <thead>
@@ -322,23 +291,18 @@ export function BankScreen() {
           </DeckTile>
 
           <DeckTile>
-            <TileHead name="What could move this number" />
-            <div className="space-y-2.5 text-[13px] leading-relaxed text-muted">
-              <p>
-                "What you took" is what is left after the stock and the bills — it is not a figure anyone wrote down,
-                so it quietly absorbs every gap elsewhere. Two gaps would make it look bigger than it really is.
-              </p>
-              <p>
-                <span className="font-semibold text-text">Stock you bought but have not sold yet.</span> The cash went out;
-                the cost only appears when it sells. Nothing in BostaOS tracks stock movements yet, so this cannot be measured —
-                if you built up stock over the year, you took out less than this says.
-              </p>
-              <p>
-                <span className="font-semibold text-text">Wages.</span> Only {egp(45950)} of salary is on file for the whole
-                period. If the real figure is nearer 8,000 a month, about 50,000 of what looks like your drawings was actually wages.
-              </p>
-              <p className="text-text">Recording purchases and wages as you go is what turns this from an estimate into a fact.</p>
+            <TileHead name="Could shrink this number" />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between rounded-xl bg-white/[0.04] px-4 py-3">
+                <span className="text-[13px] font-semibold text-text">Stock bought, not yet sold</span>
+                <span className="text-[12px] font-bold text-warn">not tracked yet</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-white/[0.04] px-4 py-3">
+                <span className="text-[13px] font-semibold text-text">Wages on file</span>
+                <span className="text-[13px] font-bold tabular-nums text-warn">{egp(45950)} / 13 mo</span>
+              </div>
             </div>
+            <p className="mt-3 text-[12px] font-semibold text-muted">Record purchases and wages → this becomes exact.</p>
           </DeckTile>
         </div>
       )}
@@ -402,7 +366,7 @@ export function BankScreen() {
             ))}
           </div>
           <DeckTile>
-            <p className="mb-3 text-[12px] text-muted">Tap any row to change what it counts as. Your change sticks — re-importing will not undo it.</p>
+            <p className="mb-3 text-[12px] font-semibold text-muted">Tap a row to recategorise. Edits stick.</p>
             <div className="space-y-1">
               {rows.slice(0, 400).map((t) => (
                 <button key={t.id} type="button" onClick={() => setEdit(t)}
