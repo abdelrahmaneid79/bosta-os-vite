@@ -878,3 +878,54 @@
   .cdk .dtbl thead th,.cdk .etbl thead th,.cdk .tbl thead th{background:#171a24;backdrop-filter:none}
   .cdk .dtbl tfoot td{background:#261421;backdrop-filter:none}
 }
+
+/* ═══ ELEMENT POLISH — the non-table surfaces ════════════════════════════════
+   Same principles as the tables: real edges, honest depth, one radius family,
+   and feedback you can feel. */
+
+/* Inputs: a focus ring you can actually see, and a search that reads as search */
+.cdk .input{transition:border-color .16s,box-shadow .16s,background .16s}
+.cdk .input:hover{border-color:rgba(255,255,255,.16)}
+.cdk .input:focus{border-color:rgba(255,77,187,.55);box-shadow:0 0 0 3px rgba(255,77,187,.13);background:rgba(255,255,255,.055)}
+.cdk select.input,.cdk select{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat;background-position:right 13px center;background-size:15px}
+.cdk input[type="date"]{color-scheme:dark}
+
+/* Filter pills (vendors, categories): one shared shape, brand fill when on */
+.cdk .fpill{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;
+  font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--stroke);
+  background:rgba(255,255,255,.035);color:var(--cd-muted);
+  transition:transform .15s,border-color .15s,color .15s,background .15s}
+@media(hover:hover){.cdk .fpill:hover{color:var(--cd-text);border-color:rgba(255,255,255,.2)}}
+.cdk .fpill:active{transform:scale(.96)}
+.cdk .fpill.on{background:linear-gradient(135deg,var(--mag),var(--cd-violet));border-color:transparent;color:#fff;
+  box-shadow:0 8px 20px -10px rgba(255,77,187,.7)}
+.cdk .fpill em{font-style:normal;opacity:.6;font-variant-numeric:tabular-nums}
+
+/* Secondary + primary buttons: consistent lift, real press, disabled honesty */
+.cdk .btn:hover{transform:translateY(-1px);filter:brightness(1.06);box-shadow:0 12px 26px -12px rgba(255,77,187,.75)}
+.cdk .btn:disabled,.cdk .addbtn:disabled,.cdk .qadd:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none;filter:none}
+.cdk .qadd:hover{transform:translateY(-1px);filter:brightness(1.06)}
+
+/* Status chips: a shape family instead of ad-hoc inline styles */
+.cdk .chipx{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+  font-size:11px;font-weight:800;letter-spacing:.02em;white-space:nowrap;border:1px solid transparent}
+.cdk .chipx.good{background:rgba(66,226,154,.13);color:var(--green);border-color:rgba(66,226,154,.22)}
+.cdk .chipx.warn{background:rgba(255,177,62,.13);color:var(--amber);border-color:rgba(255,177,62,.22)}
+.cdk .chipx.bad{background:rgba(255,92,114,.13);color:var(--red);border-color:rgba(255,92,114,.22)}
+.cdk .chipx.mute{background:rgba(255,255,255,.05);color:var(--cd-muted);border-color:var(--stroke2)}
+
+/* Tiles: hairline top highlight so cards read as lit from above, not flat */
+.cdk .tile::before{content:'';position:absolute;inset:0 0 auto 0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)}
+
+/* Section headers: the label and its value share one baseline */
+.cdk .th{align-items:baseline}
+
+/* Scroll boxes never trap the page: they only scroll when they must */
+.cdk .scroll{overscroll-behavior:contain}
+
+@media (prefers-reduced-motion:reduce){
+  .cdk .btn:hover,.cdk .qadd:hover,.cdk .addbtn:hover,.cdk .fpill:active{transform:none}
+}

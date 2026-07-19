@@ -13,6 +13,7 @@ import { CountUp, Sheet } from "@/components/ui/motion";
 import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import { cn } from "@/core/utils/cn";
 import { egp, num } from "@/core/utils/format";
 /** Table cells carry bare numbers — the unit is named once in the header. */
 const bare = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -81,8 +82,14 @@ export function StockScreen() {
         <Stat label="Counted / uncounted" color="rgb(var(--cyan))" value={s ? `${counted} / ${s.positions.length - counted}` : "—"} />
         <Stat label="Missing cost" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
       </div>
-      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        <input className="input" style={{ flex: 1 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search stock…" />
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "stretch" }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"
+            style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: "rgb(var(--faint))", pointerEvents: "none" }}>
+            <circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />
+          </svg>
+          <input className="input" style={{ paddingLeft: 40 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search stock…" />
+        </div>
         <button className="addbtn" onClick={() => setManageOpen(true)}>Products</button>
         <button className="qadd" style={{ height: "auto" }} onClick={() => setModal({ mode: "add" })}><span>+ Add product</span></button>
       </div>
@@ -92,11 +99,9 @@ export function StockScreen() {
             const on = vendor === v;
             const count = v === "All" ? (s?.positions ?? []).length : v === "Unassigned" ? (s?.positions ?? []).filter((p) => !p.vendor).length : (s?.positions ?? []).filter((p) => p.vendor === v).length;
             return (
-              <button key={v} onClick={() => setVendor(v)} style={{
-                padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer",
-                border: on ? "1px solid var(--mag)" : "1px solid rgb(var(--line))",
-                background: on ? "var(--mag)" : "transparent", color: on ? "#fff" : "rgb(var(--muted))",
-              }}>{v} <span style={{ opacity: 0.7 }}>· {count}</span></button>
+              <button key={v} className={cn("fpill", on && "on")} onClick={() => setVendor(v)}>
+                {v}<em>{count}</em>
+              </button>
             );
           })}
         </div>
@@ -299,7 +304,7 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
       <div style={{ display: "flex", alignItems: "center", gap: 26, flexWrap: "wrap" }}>
         <div><div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600 }}>Day total</div><div className="disp" style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-.01em" }}>{egp(sale.total)}</div></div>
         <div><div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600 }}>Breakdown</div><div className="disp" style={{ fontWeight: 700, fontSize: 22, letterSpacing: "-.01em" }}>{egp(lineSum)}</div></div>
-        <span className="recon" style={{ marginLeft: "auto", color: ok ? "var(--green)" : "var(--amber)", background: ok ? "rgba(66,226,154,.13)" : "rgba(255,177,62,.12)" }}>
+        <span className={cn("chipx", ok ? "good" : "warn")} style={{ marginLeft: "auto" }}>
           {ok ? "reconciled" : diff > 0 ? `${egp(diff)} unallocated` : `${egp(-diff)} over`}
         </span>
       </div>
