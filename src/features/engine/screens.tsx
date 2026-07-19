@@ -299,26 +299,33 @@ function SaleDetail({ sale, onClose }: { sale: SaleRowVM; onClose: () => void })
 
       {/* editable product table */}
       {items.isLoading ? <SkeletonRows rows={3} /> : (
-        <div className="scroll" style={{ overflowX: "auto" }}>
-        <table className="etbl">
-          <thead><tr><th>Product</th><th className="r">Qty sold</th><th className="r">Unit price</th><th className="r">Amount</th><th style={{ width: 74 }} /></tr></thead>
+        <table className="dtbl">
+          <thead><tr><th>Product</th><th className="r">Qty</th><th className="r">Price (EGP)</th><th className="r">Amount (EGP)</th><th style={{ width: 84 }} /></tr></thead>
           <tbody>
             {lines.map((l) => (
               <tr key={l.id}>
                 <td>{l.name}{!l.hasCogs && <span style={{ color: "var(--amber)", fontSize: 11 }}> · no cost</span>}</td>
                 <td className="r">{num(l.qty)}</td>
-                <td className="r">{egp(l.unitPrice ?? 0)}</td>
-                <td className="r">{egp(l.lineTotal)}</td>
+                <td className="r">{(l.unitPrice ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+                <td className="r">{l.lineTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
                 <td className="r" style={{ whiteSpace: "nowrap" }}>
-                  <button onClick={() => setEditItem(l)} title="Edit" style={{ color: "rgb(var(--dim))", background: "none", border: "none", cursor: "pointer", fontSize: 13 }}>✎</button>
-                  <button onClick={() => setConfirm({ kind: "line", item: l })} title="Void" style={{ color: "rgb(var(--faint))", background: "none", border: "none", cursor: "pointer", fontSize: 13, marginLeft: 6 }}>✕</button>
+                  <button className="act" onClick={() => setEditItem(l)} title="Edit line" aria-label="Edit line">✎</button>
+                  <button className="act danger" onClick={() => setConfirm({ kind: "line", item: l })} title="Void line" aria-label="Void line" style={{ marginLeft: 6 }}>✕</button>
                 </td>
               </tr>
             ))}
             {lines.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "rgb(var(--dim))", padding: "22px 12px" }}>No product lines yet — add what sold below.</td></tr>}
           </tbody>
+          {lines.length > 0 && (
+            <tfoot><tr>
+              <td>Total</td>
+              <td className="r">{num(lines.reduce((a, l) => a + l.qty, 0))}</td>
+              <td />
+              <td className="r">{lineSum.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+              <td />
+            </tr></tfoot>
+          )}
         </table>
-        </div>
       )}
 
       {/* add line */}

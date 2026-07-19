@@ -742,9 +742,9 @@
 .cdk .sheet-x svg{width:16px;height:16px}
 .cdk .sheet-body{padding:4px 22px 26px;overflow-y:auto;overscroll-behavior:contain}
 @media(min-width:900px){
-  .cdk.sheet-root{align-items:stretch;justify-content:flex-end}
-  .cdk .sheet-panel{max-width:480px;max-height:none;height:100dvh;border-radius:26px 0 0 26px;border-bottom:1px solid var(--stroke);
-    transform:translateX(32px)}
+  .cdk.sheet-root{align-items:stretch;justify-content:flex-start}
+  .cdk .sheet-panel{max-width:480px;max-height:none;height:100dvh;border-radius:0 26px 26px 0;border-bottom:1px solid var(--stroke);
+    transform:translateX(-32px)}
   .cdk .sheet-panel.wide{max-width:640px}
   .cdk .sheet-panel.on{transform:translateX(0)}
   .cdk .sheet-grab{display:none}
@@ -813,3 +813,27 @@
 .cdk .qa-in{animation:qa-rise .34s cubic-bezier(.22,1,.36,1) both}
 @keyframes qa-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @media (prefers-reduced-motion:reduce){.cdk .qa-in{animation:none}}
+
+
+/* ═══ TABLE STANDARD (.dtbl) — owner spec ════════════════════════════════════
+   Visible borders on every cell edge, right-aligned tabular numbers with the
+   unit named ONCE in the header (never per cell), a pinned total row, and NO
+   inner scroll — the page or sheet is the only thing that scrolls. */
+.cdk .dtbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px;
+  border:1px solid var(--stroke);border-radius:14px;overflow:hidden}
+.cdk .dtbl th{background:rgba(255,255,255,.045);color:var(--cd-dim);font-size:10.5px;font-weight:800;
+  letter-spacing:.09em;text-transform:uppercase;text-align:left;padding:11px 14px;
+  border-bottom:1px solid var(--stroke)}
+.cdk .dtbl td{padding:11px 14px;border-bottom:1px solid var(--stroke2);color:var(--cd-text)}
+.cdk .dtbl th+th,.cdk .dtbl td+td{border-left:1px solid var(--stroke2)}
+.cdk .dtbl tbody tr:last-child td{border-bottom:1px solid var(--stroke2)}
+.cdk .dtbl .r{text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1}
+.cdk .dtbl tbody tr{transition:background .14s}
+@media(hover:hover){.cdk .dtbl tbody tr:hover{background:rgba(255,255,255,.03)}}
+.cdk .dtbl tfoot td{background:rgba(255,77,187,.06);border-bottom:none;border-top:1px solid var(--stroke);
+  font-weight:800;font-family:'Clash Display','Satoshi',sans-serif;letter-spacing:-.01em}
+.cdk .dtbl .act{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+  border-radius:9px;border:1px solid var(--stroke);background:rgba(255,255,255,.03);color:var(--cd-muted);
+  cursor:pointer;font-size:12.5px;transition:.15s}
+.cdk .dtbl .act:hover{color:var(--cd-text);border-color:rgba(255,255,255,.22)}
+.cdk .dtbl .act.danger{color:var(--red);border-color:rgba(255,92,114,.3);background:rgba(255,92,114,.07)}
