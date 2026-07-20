@@ -295,26 +295,46 @@ function AlertBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-[61] mt-2 w-[340px] max-w-[92vw] animate-rise overflow-hidden rounded-3xl border border-line bg-panel shadow-pop">
-            <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <div className="font-display text-sm font-bold">Alerts {openAlerts.length > 0 && <span className="text-dim">· {openAlerts.length}</span>}</div>
-              <NavLink to="/health" onClick={() => setOpen(false)} className="text-[12px] font-semibold text-pink">Open strategist →</NavLink>
+          <div className="absolute right-0 z-[61] mt-2 w-[380px] max-w-[92vw] animate-rise overflow-hidden rounded-3xl border border-white/[0.12] bg-panel shadow-pop"
+            style={{ boxShadow: "0 40px 90px -24px rgba(0,0,0,.9), 0 12px 40px -16px rgba(255,77,187,.15), inset 0 1px 0 rgba(255,255,255,.07)" }}>
+            <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+              <div className="font-display text-sm font-bold">Needs you</div>
+              {(() => { const c = { critical: 0, warning: 0, info: 0 }; for (const a of openAlerts) c[a.severity]++;
+                return <div className="flex items-center gap-1.5">
+                  {c.critical > 0 && <span className="chipx bad">{c.critical} urgent</span>}
+                  {c.warning > 0 && <span className="chipx warn">{c.warning} soon</span>}
+                  {c.info > 0 && <span className="chipx mute">{c.info} fyi</span>}
+                </div>; })()}
+              <NavLink to="/health" onClick={() => setOpen(false)} className="ml-auto text-[12px] font-semibold text-pink">Strategist →</NavLink>
             </div>
             <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
               {q.isLoading ? <div className="px-4 py-6 text-center text-sm text-dim">Checking…</div>
                 : openAlerts.length === 0 ? (
                   <div className="px-4 py-8 text-center">
-                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-good/10 text-good"><Icon d="M5 13l4 4L19 7" className="h-5 w-5" /></div>
+                    <img src="/assets/bosta-mascot.svg" alt="" className="mx-auto mb-2 h-10 w-10 opacity-70" />
                     <div className="text-sm font-semibold text-good">All clear</div>
                     <div className="mt-0.5 text-[12px] text-dim">Nothing needs you right now.</div>
                   </div>
                 ) : (
-                <div className="divide-y divide-line">
-                  {openAlerts.map((a) => (
-                    <div key={a.key} className="row-hover px-4 py-3">
-                      <div className="flex items-start gap-2.5">
-                        <span className={cn("mt-1.5 h-2 w-2 flex-shrink-0 rounded-full", SEV_DOT[a.severity])} />
-                        <div className="min-w-0 flex-1">
+                /* Two layers of priority: the BUSINESS first (stock, cash,
+                   settlements, trends), the BOOKS second (imports, data
+                   quality). Within each, alerts arrive pre-sorted by severity. */
+                (["biz", "books"] as const).map((layer) => {
+                  const BIZ = new Set(["stock", "cash", "settlement", "trend", "budget"]);
+                  const items = openAlerts.filter((a) => BIZ.has(a.category) === (layer === "biz"));
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={layer}>
+                      <div className="flex items-center gap-2 bg-white/[0.03] px-4 py-2">
+                        <span className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-faint">
+                          {layer === "biz" ? "Bosta Bites" : "Books & data"}
+                        </span>
+                        <span className="h-px flex-1 bg-line" />
+                        <span className="tnum text-[10px] font-bold text-faint">{items.length}</span>
+                      </div>
+                      {items.map((a) => (
+                        <div key={a.key} className="row-hover relative px-4 py-3">
+                          <span className={cn("absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r-full", SEV_DOT[a.severity])} />
                           <div className="flex items-center gap-2">
                             <span className="font-display text-[13px] font-bold text-text">{a.title}</span>
                             {a.metric && <span className="ml-auto tnum text-[11px] text-dim">{a.metric}</span>}
@@ -325,10 +345,10 @@ function AlertBell() {
                             <button onClick={() => dismiss(a.key)} className="text-[12px] text-faint hover:text-text">Dismiss</button>
                           </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  );
+                })
               )}
             </div>
             {dismissed.length > 0 && (

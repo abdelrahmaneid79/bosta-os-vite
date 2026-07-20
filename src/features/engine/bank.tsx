@@ -356,15 +356,13 @@ export function BankScreen() {
 
       {tab === "rows" && (
         <div className="space-y-4">
-          <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-white/[0.09] bg-white/[0.04] p-1.5">
-            {([["all", "All"], ["business", "Business"], ["personal", "Personal"], ["check", "Check these"]] as const).map(([k, label]) => (
-              <button key={k} type="button" onClick={() => setFilter(k)}
-                className={cn("rounded-xl px-3.5 py-1.5 text-[12px] font-semibold transition active:scale-95 motion-reduce:active:scale-100",
-                  filter === k ? "bg-white/[0.12] text-text" : "text-muted hover:text-text")}>
-                {label}
-              </button>
-            ))}
-          </div>
+          <select className="input" style={{ width: "auto", padding: "9px 38px 9px 13px", fontSize: 13 }}
+            value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Filter movements">
+            <option value="all">All movements</option>
+            <option value="business">Business only</option>
+            <option value="personal">Personal only</option>
+            <option value="check">Needs a look</option>
+          </select>
           <DeckTile>
             <p className="mb-3 text-[12px] font-semibold text-muted">Tap a row to recategorise. Edits stick.</p>
             <div className="space-y-1">

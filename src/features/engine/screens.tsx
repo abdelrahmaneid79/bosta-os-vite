@@ -97,7 +97,12 @@ export function StockScreen() {
         <Stat label="Avg margin" color="rgb(var(--cyan))"
           value={avgMargin == null ? "—" : <span style={{ color: `var(--${marginTier(avgMargin) === "good" ? "green" : marginTier(avgMargin) === "ok" ? "teal" : marginTier(avgMargin) === "warn" ? "amber" : "red"})` }}>{avgMargin.toFixed(1)}%</span>}
           sub={avgMargin != null ? <div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{margined.length} priced products</div> : undefined} />
-        <Stat label="Missing cost" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
+        <Stat label="Thin or weak margins" color="var(--amber)"
+          value={margined.length ? margined.filter((p) => (p.margin ?? 0) < 22).length : "—"}
+          sub={(() => { const worst = [...margined].sort((a, b) => (a.margin ?? 0) - (b.margin ?? 0))[0];
+            return worst && worst.margin != null && worst.margin < 22
+              ? <div style={{ fontSize: 11, color: "var(--amber)", fontWeight: 700, marginTop: 8 }}>worst: {worst.nameEn} · {worst.margin.toFixed(0)}%</div>
+              : margined.length ? <div style={{ fontSize: 11, color: "var(--green)", fontWeight: 700, marginTop: 8 }}>all healthy ✓</div> : undefined; })()} />
       </div>
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "stretch" }}>
         <div style={{ position: "relative", flex: 1 }}>
@@ -110,24 +115,21 @@ export function StockScreen() {
         <button className="addbtn" onClick={() => setManageOpen(true)}>Products</button>
         <button className="qadd" style={{ height: "auto" }} onClick={() => setModal({ mode: "add" })}><span>+ Add product</span></button>
       </div>
-      {vendors.length > 0 && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-          {["All", ...vendors, ...(hasUnassigned ? ["Unassigned"] : [])].map((v) => {
-            const on = vendor === v;
-            const count = v === "All" ? (s?.positions ?? []).length : v === "Unassigned" ? (s?.positions ?? []).filter((p) => !p.vendor).length : (s?.positions ?? []).filter((p) => p.vendor === v).length;
-            return (
-              <button key={v} className={cn("fpill", on && "on")} onClick={() => setVendor(v)}>
-                {v}<em>{count}</em>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "rgb(var(--faint))" }}>Sort</span>
-        {([["margin", "Margin"], ["value", "Stock value"], ["name", "A–Z"]] as const).map(([k, label]) => (
-          <button key={k} className={cn("fpill", sort === k && "on")} onClick={() => setSort(k)}>{label}</button>
-        ))}
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        {vendors.length > 0 && (
+          <select className="input" style={{ width: "auto", padding: "9px 38px 9px 13px", fontSize: 13 }}
+            value={vendor} onChange={(e) => setVendor(e.target.value)} aria-label="Filter by supplier">
+            <option value="All">All suppliers · {(s?.positions ?? []).length}</option>
+            {vendors.map((v) => <option key={v} value={v}>{v} · {(s?.positions ?? []).filter((p) => p.vendor === v).length}</option>)}
+            {hasUnassigned && <option value="Unassigned">No supplier · {(s?.positions ?? []).filter((p) => !p.vendor).length}</option>}
+          </select>
+        )}
+        <select className="input" style={{ width: "auto", padding: "9px 38px 9px 13px", fontSize: 13 }}
+          value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort products">
+          <option value="margin">Sort · strongest margin</option>
+          <option value="value">Sort · stock value</option>
+          <option value="name">Sort · A to Z</option>
+        </select>
       </div>
       <Guarded q={q} empty={!!s && s.positions.length === 0}>
         <DeckTile style={{ padding: 0 }}>

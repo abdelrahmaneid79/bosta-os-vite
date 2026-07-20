@@ -117,9 +117,10 @@ export function MoneyScreen() {
         <DeckTile style={{ padding: 0, display: "flex", flexDirection: "column", height: 460 }}>
           <div style={{ padding: "22px 24px 8px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span className="tname">Cash flow</span>
-            <div className="seg" style={{ marginLeft: "auto" }}>
-              {flowFilters.map((f) => <span key={f.v} className={filter === f.v ? "on" : ""} onClick={() => setFilter(f.v)}>{f.label}</span>)}
-            </div>
+            <select className="input" style={{ marginLeft: "auto", width: "auto", padding: "8px 38px 8px 13px", fontSize: 13 }}
+              value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Filter cash flow">
+              {flowFilters.map((f) => <option key={f.v} value={f.v}>{f.v === "all" ? "All flow" : f.label}</option>)}
+            </select>
           </div>
           <div className="scroll" style={{ flex: 1, maxHeight: "none" }}>
             {mv.isLoading ? <div style={{ padding: 16 }}><SkeletonRows /></div> : mv.isError ? <div style={{ padding: 16 }}><ErrorState message={String((mv.error as Error)?.message)} /></div> : (

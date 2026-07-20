@@ -250,7 +250,7 @@ function SaleLines({ saleLines, baseUnit, avgCost, rangeLabelText }: {
         <table className="dtbl">
           <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Price (EGP)</th><th className="r">Amount (EGP)</th></tr></thead>
           <tbody>
-            {lines.slice(0, 60).map((l, i) => (
+            {lines.map((l, i) => (
               <tr key={i}>
                 <td>{fmtDate(l.date, "d MMM yyyy")}</td>
                 <td className="r">{num(l.qty)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{l ? baseUnit : ""}</span></td>
@@ -269,7 +269,6 @@ function SaleLines({ saleLines, baseUnit, avgCost, rangeLabelText }: {
           )}
         </table>
       </div></Card>
-      {!day && lines.length > 60 && <p className="text-[11px] text-dim">Showing the latest 60 of {lines.length} — pick a day to narrow.</p>}
     </>
   );
 }
