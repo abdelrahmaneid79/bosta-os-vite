@@ -103,9 +103,6 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
         </div>
       </Card>
 
-      {/* One day, under the lens: every sale day of this product, choosable */}
-      <DayLens saleLines={p.saleLines} baseUnit={p.baseUnit} avgCost={p.hasCost ? p.avgCost : null} />
-
       {/* Recommended action */}
       <div className={`rounded-3xl border p-5 shadow-card ${at.wrap}`}>
         <div className="flex items-start gap-3">
@@ -162,25 +159,11 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
         <p className="text-[12px] text-dim">Selling ≈{Math.round(p.unitsPerDay * 10) / 10} {p.baseUnit}/day in this range{p.daysCover != null ? ` · ~${Math.round(p.daysCover)} days of stock left` : ""}.</p>
       )}
 
-      {/* Sale lines */}
-      <Eyebrow>Sale lines · {p.saleLines.length}</Eyebrow>
-      {p.saleLines.length === 0 ? <Card><p className="text-sm text-dim">No sales in range.</p></Card> : (
-        <Card className="!p-0"><div className="scroll" style={{ maxHeight: 360 }}>
-          <table className="dtbl">
-            <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Price (EGP)</th><th className="r">Amount (EGP)</th></tr></thead>
-            <tbody>
-              {p.saleLines.slice(0, 60).map((l, i) => (
-                <tr key={i}>
-                  <td>{fmtDate(l.date, "d MMM yyyy")}</td>
-                  <td className="r">{num(l.qty)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span></td>
-                  <td className="r">{bare(l.unitPrice ?? 0)}{l.hasCogs ? "" : <span style={{ color: "var(--amber)", fontSize: 11 }}> · no cost</span>}</td>
-                  <td className="r" style={{ color: "var(--green)" }}>{bare(l.lineTotal)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div></Card>
-      )}
+      {/* Sale lines — the day filter lives HERE, on the table it filters.
+          Options show dates only; the figures appear once a day (or the
+          active range) is what's on screen. */}
+      <SaleLines saleLines={p.saleLines} baseUnit={p.baseUnit}
+        avgCost={p.hasCost ? p.avgCost : null} rangeLabelText={rangeLabel(rk, range)} />
 
       {/* Purchases */}
       <Eyebrow>Purchase batches · {p.purchases.length}</Eyebrow>
@@ -217,46 +200,76 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
 }
 
 
-/** One picked day for this product: sold · took · profit · margin.
- *  Profit prices the day's quantity at the CURRENT average cost — the sale
- *  lines don't carry their historical cost — and says so on the tile. */
-function DayLens({ saleLines, baseUnit, avgCost }: {
-  saleLines: { date: string; qty: number; lineTotal: number }[];
+/** The sale-lines table with its own day filter. "All days" shows the active
+ *  range; picking a day narrows the table AND the figures strip above it.
+ *  Dropdown options are dates only — the numbers belong to the reading,
+ *  not the menu. Profit prices quantity at the CURRENT average cost (sale
+ *  lines carry no historical cost) and the strip says so. */
+function SaleLines({ saleLines, baseUnit, avgCost, rangeLabelText }: {
+  saleLines: { date: string; qty: number; unitPrice: number | null; lineTotal: number; hasCogs: boolean }[];
   baseUnit: string;
   avgCost: number | null;
+  rangeLabelText: string;
 }) {
-  const days = useMemo(() => {
-    const m = new Map<string, { qty: number; total: number }>();
-    for (const l of saleLines) {
-      const d = m.get(l.date) ?? { qty: 0, total: 0 };
-      d.qty += l.qty; d.total += l.lineTotal; m.set(l.date, d);
-    }
-    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]));
-  }, [saleLines]);
   const [day, setDay] = useState<string>("");
-  if (days.length === 0) return null;
-  const sel = day || days[0][0];
-  const d = days.find(([k]) => k === sel)?.[1] ?? { qty: 0, total: 0 };
-  const cost = avgCost != null ? d.qty * avgCost : null;
-  const profit = cost != null ? d.total - cost : null;
-  const margin = profit != null && d.total > 0 ? (profit / d.total) * 100 : null;
+  const days = useMemo(() => [...new Set(saleLines.map((l) => l.date))].sort((a, b) => b.localeCompare(a)), [saleLines]);
+  const lines = day ? saleLines.filter((l) => l.date === day) : saleLines;
+  const qty = lines.reduce((a, l) => a + l.qty, 0);
+  const total = lines.reduce((a, l) => a + l.lineTotal, 0);
+  const profit = avgCost != null ? total - qty * avgCost : null;
+  const margin = profit != null && total > 0 ? (profit / total) * 100 : null;
   const tier = margin != null ? marginTier(margin) : null;
+
+  if (saleLines.length === 0) return (
+    <>
+      <Eyebrow>Sale lines</Eyebrow>
+      <Card><p className="text-sm text-dim">No sales in range.</p></Card>
+    </>
+  );
   return (
-    <Card>
+    <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Eyebrow>One day</Eyebrow>
+        <Eyebrow>Sale lines · {lines.length}</Eyebrow>
         <select className="input" style={{ width: "auto", padding: "8px 38px 8px 13px", fontSize: 13 }}
-          value={sel} onChange={(e) => setDay(e.target.value)} aria-label="Pick a sale day">
-          {days.map(([k, v]) => <option key={k} value={k}>{fmtDate(k, "EEE d MMM yyyy")} · {egpShort(v.total)}</option>)}
+          value={day} onChange={(e) => setDay(e.target.value)} aria-label="Filter to one day">
+          <option value="">All days · {rangeLabelText}</option>
+          {days.map((d) => <option key={d} value={d}>{fmtDate(d, "EEE d MMM yyyy")}</option>)}
         </select>
       </div>
-      <div className="dlens" style={{ marginTop: 14 }}>
-        <div className="fig"><div className="l">Sold</div><div className="v">{num(d.qty)} <small style={{ fontSize: 12, color: "rgb(var(--dim))" }}>{baseUnit}</small></div></div>
-        <div className="fig"><div className="l">Took (EGP)</div><div className="v" style={{ color: "var(--green)" }}>{d.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
-        <div className="fig"><div className="l">Profit (EGP)</div><div className="v" style={{ color: profit == null ? "rgb(var(--faint))" : profit >= 0 ? "var(--green)" : "var(--red)" }}>{profit == null ? "—" : profit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+
+      {/* the reading for what's on screen — a day, or the whole range */}
+      <div className="dlens">
+        <div className="fig"><div className="l">Sold</div><div className="v">{num(qty)} <small style={{ fontSize: 12, color: "rgb(var(--dim))" }}>{baseUnit}</small></div></div>
+        <div className="fig"><div className="l">Took (EGP)</div><div className="v" style={{ color: "var(--green)" }}>{bare(total)}</div></div>
+        <div className="fig"><div className="l">Profit (EGP)</div><div className="v" style={{ color: profit == null ? "rgb(var(--faint))" : profit >= 0 ? "var(--green)" : "var(--red)" }}>{profit == null ? "—" : bare(profit)}</div>
           {profit != null && <div style={{ fontSize: 10, color: "rgb(var(--faint))", marginTop: 3 }}>at current cost</div>}</div>
         <div className="fig"><div className="l">Margin</div><div className="v">{margin == null ? <span style={{ color: "rgb(var(--faint))" }}>add cost</span> : <span className={`chipx ${tier}`}>{margin.toFixed(1)}% · {TIER_WORD[tier!]}</span>}</div></div>
       </div>
-    </Card>
+
+      <Card className="!p-0"><div className="scroll" style={{ maxHeight: 360 }}>
+        <table className="dtbl">
+          <thead><tr><th>Date</th><th className="r">Qty</th><th className="r">Price (EGP)</th><th className="r">Amount (EGP)</th></tr></thead>
+          <tbody>
+            {lines.slice(0, 60).map((l, i) => (
+              <tr key={i}>
+                <td>{fmtDate(l.date, "d MMM yyyy")}</td>
+                <td className="r">{num(l.qty)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{l ? baseUnit : ""}</span></td>
+                <td className="r">{bare(l.unitPrice ?? 0)}{l.hasCogs ? "" : <span style={{ color: "var(--amber)", fontSize: 11 }}> · no cost</span>}</td>
+                <td className="r" style={{ color: "var(--green)" }}>{bare(l.lineTotal)}</td>
+              </tr>
+            ))}
+          </tbody>
+          {lines.length > 0 && (
+            <tfoot><tr>
+              <td>Total</td>
+              <td className="r">{num(qty)}</td>
+              <td />
+              <td className="r">{bare(total)}</td>
+            </tr></tfoot>
+          )}
+        </table>
+      </div></Card>
+      {!day && lines.length > 60 && <p className="text-[11px] text-dim">Showing the latest 60 of {lines.length} — pick a day to narrow.</p>}
+    </>
   );
 }
