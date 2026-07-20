@@ -929,3 +929,23 @@
 @media (prefers-reduced-motion:reduce){
   .cdk .btn:hover,.cdk .qadd:hover,.cdk .addbtn:hover,.cdk .fpill:active{transform:none}
 }
+
+/* ═══ MARGIN VISUALS — the inventory's colour language ══════════════════════
+   Every margin ships as word + % + meter, so colour is never the only signal.
+   Tiers: strong ≥35 · healthy ≥22 · thin ≥12 · weak below. */
+.cdk .chipx.ok{background:rgba(39,229,204,.12);color:var(--cd-cyan);border-color:rgba(39,229,204,.22)}
+.cdk .mcell{display:flex;flex-direction:column;gap:5px;min-width:96px}
+.cdk .mmeter{height:4px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden}
+.cdk .mmeter i{display:block;height:100%;border-radius:2px;transition:width .5s cubic-bezier(.22,1,.36,1)}
+.cdk .mmeter.good i{background:linear-gradient(90deg,var(--teal),var(--green))}
+.cdk .mmeter.ok i{background:linear-gradient(90deg,rgb(var(--cyan)),var(--teal))}
+.cdk .mmeter.warn i{background:linear-gradient(90deg,var(--amber),#ffcf7a)}
+.cdk .mmeter.bad i{background:linear-gradient(90deg,var(--red),#ff8a9a)}
+@media (prefers-reduced-motion:reduce){.cdk .mmeter i{transition:none}}
+
+/* Day lens (product sheet): one picked day, four figures */
+.cdk .dlens{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:680px){.cdk .dlens{grid-template-columns:1fr 1fr}}
+.cdk .dlens .fig{border:1px solid var(--stroke2);border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.025)}
+.cdk .dlens .fig .l{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--cd-faint)}
+.cdk .dlens .fig .v{font-family:'Clash Display','Satoshi',sans-serif;font-weight:600;font-size:20px;letter-spacing:-.01em;margin-top:5px;font-variant-numeric:tabular-nums;white-space:nowrap}

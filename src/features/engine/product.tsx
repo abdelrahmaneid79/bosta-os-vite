@@ -2,7 +2,7 @@
  *  period KPIs over the global range, velocity & days-of-cover, sale lines and
  *  purchase batches, with quick actions. Honest: gross profit shows "unknown"
  *  when any sold line lacks a cost. */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Eyebrow, Stat, Badge, Button } from "@/components/ui";
@@ -21,6 +21,7 @@ import { getProductDetail } from "@/core/read/product-detail";
 import { getProducts } from "@/core/read/common";
 import { getLifetimeProducts } from "@/core/read/products";
 import { normalize } from "@/core/products/match";
+import { productMargin, marginTier, TIER_WORD } from "@/core/products/margin";
 import { recommendProductAction, type AdviceTone } from "@/core/products/advice";
 import { egpShort } from "@/core/utils/format";
 import { PurchaseForm, ProductForm } from "./forms";
@@ -95,9 +96,15 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
           <Stat label="On hand" value={`${num(p.onHand)} ${p.baseUnit}`} accent={p.isNegative ? "text-bad" : "text-text"} />
           <Stat label="Avg cost" value={p.hasCost ? `${egp(p.avgCost)}/${p.baseUnit}` : "—"} />
           <Stat label="Stock value" value={egp(p.stockValue)} />
-          <Stat label="Sells at" value={p.sellingPrice != null ? egp(p.sellingPrice) : "—"} />
+          <Stat label="Sells at" value={p.sellingPrice != null ? egp(p.sellingPrice) : "—"}
+            sub={(() => { const m = productMargin(p.sellingPrice, p.avgCost); if (m == null) return undefined;
+              const t = marginTier(m);
+              return <span className={`chipx ${t}`} style={{ marginTop: 8 }}>{m.toFixed(1)}% · {TIER_WORD[t]}</span>; })()} />
         </div>
       </Card>
+
+      {/* One day, under the lens: every sale day of this product, choosable */}
+      <DayLens saleLines={p.saleLines} baseUnit={p.baseUnit} avgCost={p.hasCost ? p.avgCost : null} />
 
       {/* Recommended action */}
       <div className={`rounded-3xl border p-5 shadow-card ${at.wrap}`}>
@@ -206,5 +213,50 @@ export function ProductDetailScreen({ id: idProp, onClose }: { id?: string; onCl
       <Modal open={buy} onClose={() => setBuy(false)} title="Add purchase"><PurchaseForm onDone={() => { setBuy(false); d.refetch(); }} /></Modal>
       {productRow && <Modal open={edit} onClose={() => setEdit(false)} title="Edit product"><ProductForm product={productRow} onDone={() => { setEdit(false); d.refetch(); }} /></Modal>}
     </div>
+  );
+}
+
+
+/** One picked day for this product: sold · took · profit · margin.
+ *  Profit prices the day's quantity at the CURRENT average cost — the sale
+ *  lines don't carry their historical cost — and says so on the tile. */
+function DayLens({ saleLines, baseUnit, avgCost }: {
+  saleLines: { date: string; qty: number; lineTotal: number }[];
+  baseUnit: string;
+  avgCost: number | null;
+}) {
+  const days = useMemo(() => {
+    const m = new Map<string, { qty: number; total: number }>();
+    for (const l of saleLines) {
+      const d = m.get(l.date) ?? { qty: 0, total: 0 };
+      d.qty += l.qty; d.total += l.lineTotal; m.set(l.date, d);
+    }
+    return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [saleLines]);
+  const [day, setDay] = useState<string>("");
+  if (days.length === 0) return null;
+  const sel = day || days[0][0];
+  const d = days.find(([k]) => k === sel)?.[1] ?? { qty: 0, total: 0 };
+  const cost = avgCost != null ? d.qty * avgCost : null;
+  const profit = cost != null ? d.total - cost : null;
+  const margin = profit != null && d.total > 0 ? (profit / d.total) * 100 : null;
+  const tier = margin != null ? marginTier(margin) : null;
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Eyebrow>One day</Eyebrow>
+        <select className="input" style={{ width: "auto", padding: "8px 38px 8px 13px", fontSize: 13 }}
+          value={sel} onChange={(e) => setDay(e.target.value)} aria-label="Pick a sale day">
+          {days.map(([k, v]) => <option key={k} value={k}>{fmtDate(k, "EEE d MMM yyyy")} · {egpShort(v.total)}</option>)}
+        </select>
+      </div>
+      <div className="dlens" style={{ marginTop: 14 }}>
+        <div className="fig"><div className="l">Sold</div><div className="v">{num(d.qty)} <small style={{ fontSize: 12, color: "rgb(var(--dim))" }}>{baseUnit}</small></div></div>
+        <div className="fig"><div className="l">Took (EGP)</div><div className="v" style={{ color: "var(--green)" }}>{d.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>
+        <div className="fig"><div className="l">Profit (EGP)</div><div className="v" style={{ color: profit == null ? "rgb(var(--faint))" : profit >= 0 ? "var(--green)" : "var(--red)" }}>{profit == null ? "—" : profit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+          {profit != null && <div style={{ fontSize: 10, color: "rgb(var(--faint))", marginTop: 3 }}>at current cost</div>}</div>
+        <div className="fig"><div className="l">Margin</div><div className="v">{margin == null ? <span style={{ color: "rgb(var(--faint))" }}>add cost</span> : <span className={`chipx ${tier}`}>{margin.toFixed(1)}% · {TIER_WORD[tier!]}</span>}</div></div>
+      </div>
+    </Card>
   );
 }

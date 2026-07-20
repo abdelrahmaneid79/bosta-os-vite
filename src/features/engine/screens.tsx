@@ -14,6 +14,7 @@ import { Confirm } from "@/components/ui/Confirm";
 import { EmptyState, SkeletonRows, ErrorState } from "@/components/feedback";
 import { DateRangePicker } from "@/components/DateRangePicker";
 import { cn } from "@/core/utils/cn";
+import { productMargin, marginTier, buyPrice, TIER_WORD } from "@/core/products/margin";
 import { egp, num } from "@/core/utils/format";
 /** Table cells carry bare numbers — the unit is named once in the header. */
 const bare = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -64,22 +65,38 @@ export function StockScreen() {
   const [modal, setModal] = useState<null | { mode: "add" } | { mode: "edit"; product: Tables<"products"> }>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [sort, setSort] = useState<"margin" | "name" | "value">("margin");
   const s = q.data;
   const byId = new Map((prods.data ?? []).map((p) => [p.id, p]));
   const term = search.trim().toLowerCase();
   const vendors = useMemo(() => Array.from(new Set((s?.positions ?? []).map((p) => p.vendor).filter((v): v is string => !!v))).sort(), [s]);
   const hasUnassigned = (s?.positions ?? []).some((p) => !p.vendor);
-  const positions = (s?.positions ?? []).filter((p) =>
+  // Live economics per product: buy = weighted avg cost (moves with every
+  // purchase, reference cost as fallback), margin = (sell − buy) / sell.
+  const enriched = (s?.positions ?? []).map((p) => {
+    const row = byId.get(p.id);
+    const buy = buyPrice(row?.avg_cost, row?.reference_cost);
+    const sell = row?.selling_price == null ? null : Number(row.selling_price);
+    const margin = productMargin(sell, row?.avg_cost, row?.reference_cost);
+    return { ...p, buy, sell, margin };
+  });
+  const positions = enriched.filter((p) =>
     (!term || p.nameEn.toLowerCase().includes(term) || (byId.get(p.id)?.name_ar ?? "").toLowerCase().includes(term))
     && (vendor === "All" || (vendor === "Unassigned" ? !p.vendor : p.vendor === vendor)),
-  );
-  const counted = (s?.positions ?? []).filter((p) => p.onHand !== 0).length;
+  ).sort((a, b) =>
+    sort === "margin" ? (b.margin ?? -1) - (a.margin ?? -1)
+    : sort === "value" ? b.stockValue - a.stockValue
+    : a.nameEn.localeCompare(b.nameEn));
+  const margined = enriched.filter((p) => p.margin != null);
+  const avgMargin = margined.length ? margined.reduce((t, p) => t + (p.margin ?? 0), 0) / margined.length : null;
   return (
     <div>
       <div className="statgrid">
         <Stat label="Products" color="var(--mag)" value={s ? s.positions.length : "—"} onClick={() => setManageOpen(true)} sub={<div style={{ fontSize: 11, color: "var(--mag)", fontWeight: 700, marginTop: 8 }}>Manage full list ↗</div>} />
         <Stat label="Total stock value" color="rgb(var(--violet))" value={s ? <CountUp value={s.totalValue} format={egp} /> : "—"} sub={s && s.totalValue === 0 ? <div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>count stock to set →</div> : undefined} />
-        <Stat label="Counted / uncounted" color="rgb(var(--cyan))" value={s ? `${counted} / ${s.positions.length - counted}` : "—"} />
+        <Stat label="Avg margin" color="rgb(var(--cyan))"
+          value={avgMargin == null ? "—" : <span style={{ color: `var(--${marginTier(avgMargin) === "good" ? "green" : marginTier(avgMargin) === "ok" ? "teal" : marginTier(avgMargin) === "warn" ? "amber" : "red"})` }}>{avgMargin.toFixed(1)}%</span>}
+          sub={avgMargin != null ? <div style={{ fontSize: 11, color: "rgb(var(--dim))", fontWeight: 600, marginTop: 8 }}>{margined.length} priced products</div> : undefined} />
         <Stat label="Missing cost" color="var(--amber)" value={s ? s.missingCostCount : "—"} />
       </div>
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "stretch" }}>
@@ -106,15 +123,33 @@ export function StockScreen() {
           })}
         </div>
       )}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "rgb(var(--faint))" }}>Sort</span>
+        {([["margin", "Margin"], ["value", "Stock value"], ["name", "A–Z"]] as const).map(([k, label]) => (
+          <button key={k} className={cn("fpill", sort === k && "on")} onClick={() => setSort(k)}>{label}</button>
+        ))}
+      </div>
       <Guarded q={q} empty={!!s && s.positions.length === 0}>
         <DeckTile style={{ padding: 0 }}>
           <div className="scroll">
             <table className="dtbl">
-              <thead><tr><th>Product</th><th className="r">On hand</th><th className="r">Value (EGP)</th></tr></thead>
+              <thead><tr><th>Product</th><th className="r">Buy (EGP)</th><th className="r">Sell (EGP)</th><th>Margin</th><th className="r">On hand</th><th className="r">Value (EGP)</th></tr></thead>
               <tbody>
                 {positions.map((p) => (
                   <tr key={p.id} className="prodcell" onClick={() => setDetailId(p.id)}>
                     <td style={{ fontSize: 14 }}>{p.marketCode && <span className="tnum" style={{ color: "rgb(var(--faint))", fontSize: 12, marginRight: 6 }}>#{p.marketCode}</span>}{p.nameEn}{p.vendor && <span style={{ marginLeft: 6, fontSize: 11, color: "rgb(var(--dim))", border: "1px solid rgb(var(--line))", borderRadius: 6, padding: "1px 6px", whiteSpace: "nowrap" }}>{p.vendor}</span>}{!p.active && <span style={{ color: "rgb(var(--faint))" }}> · inactive</span>}</td>
+                    <td className="r" style={{ color: p.buy == null ? "rgb(var(--faint))" : undefined }}>{p.buy == null ? "add cost" : bare(p.buy)}</td>
+                    <td className="r" style={{ color: p.sell == null ? "rgb(var(--faint))" : undefined }}>{p.sell == null ? "—" : bare(p.sell)}</td>
+                    <td>
+                      {p.margin == null ? <span style={{ color: "rgb(var(--faint))", fontSize: 12 }}>—</span> : (
+                        <div className="mcell">
+                          <span className={cn("chipx", marginTier(p.margin))} style={{ alignSelf: "flex-start" }}>
+                            {p.margin.toFixed(1)}% · {TIER_WORD[marginTier(p.margin)]}
+                          </span>
+                          <div className={cn("mmeter", marginTier(p.margin))}><i style={{ width: `${Math.min(100, (p.margin / 50) * 100)}%` }} /></div>
+                        </div>
+                      )}
+                    </td>
                     <td className="r" style={{ color: p.isNegative ? "var(--red)" : p.onHand === 0 ? "rgb(var(--faint))" : undefined }}>
                       {p.onHand === 0 ? "—" : num(p.onHand)} <span style={{ color: "rgb(var(--dim))", fontWeight: 400, fontSize: 12 }}>{p.baseUnit}</span>
                     </td>
@@ -124,7 +159,8 @@ export function StockScreen() {
               </tbody>
               {positions.length > 0 && (
                 <tfoot><tr>
-                  <td>{positions.length} products</td><td />
+                  <td>{positions.length} products</td><td /><td />
+                  <td>{avgMargin != null && <span style={{ fontSize: 12 }}>avg {avgMargin.toFixed(1)}%</span>}</td><td />
                   <td className="r">{bare(positions.reduce((a, p) => a + (p.hasCost ? p.stockValue : 0), 0))}</td>
                 </tr></tfoot>
               )}
