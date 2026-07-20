@@ -57,9 +57,9 @@ function Group({ title, checks }: { title: string; checks: Chk[] }) {
         {checks.length === 0 && <div className="px-4 py-3 text-sm text-dim">{isEngineConfigured ? "Checking…" : "Supabase not configured — checks skipped."}</div>}
         {checks.map((c) => (
           <div key={c.name} className="flex items-center gap-3 px-4 py-3">
-            <span className={`h-2.5 w-2.5 rounded-full ${c.ok == null ? "bg-dim" : c.ok ? "bg-good" : "bg-bad"}`} />
             <span className="flex-1 text-sm text-text">{c.name}</span>
-            <span className="text-[12px] text-dim">{c.detail}</span>
+            <span className="text-[12px] tabular-nums text-dim">{c.detail}</span>
+            <span className={`chipx ${c.ok == null ? "mute" : c.ok ? "good" : "bad"}`}>{c.ok == null ? "…" : c.ok ? "ok" : "failed"}</span>
           </div>
         ))}
       </div>

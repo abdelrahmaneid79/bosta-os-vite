@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import { DeckTile, PageHdr, SubpageCard } from "./deck";
 import { Button, Field, Input } from "@/components/ui";
 import { Modal } from "@/components/ui/Modal";
+import { Sheet } from "@/components/ui/motion";
 import { cn } from "@/core/utils/cn";
 import { SkeletonRows, ErrorState, EmptyState } from "@/components/feedback";
 import { isEngineConfigured } from "@/core/db/engine";
@@ -244,7 +245,7 @@ export function StrategistScreen() {
           badge={findings.length || undefined} onClick={() => setIntelOpen(true)} />
       </div>
 
-      <Modal open={!!opsOpen} onClose={() => setOpsOpen(false)} title="Run the day" wide>
+      <Sheet open={!!opsOpen} onClose={() => setOpsOpen(false)} title="Run the day" wide>
         <FixThesePanel />
         <OperationalExceptionsPanel exceptions={exceptions} loading={opsQ.isLoading}
           onAck={async (id) => { await acknowledgeException(id); qc.invalidateQueries({ queryKey: ["strategist-ops"] }); reportSuccess("Exceptions", "Acknowledged"); }}
@@ -267,10 +268,10 @@ export function StrategistScreen() {
         <ActionQueue actions={actionsQ.data ?? []} onUpdate={async (id, status, note) => {
           await updateActionStatus(id, status, note); qc.invalidateQueries({ queryKey: ["strategist-actions"] });
         }} />
-      </Modal>
+      </Sheet>
 
       {/* ═══ INTELLIGENCE — the full analysis, folded until wanted ═══ */}
-      <Modal open={!!intelOpen} onClose={() => setIntelOpen(false)} title="Intelligence" wide>
+      <Sheet open={!!intelOpen} onClose={() => setIntelOpen(false)} title="Intelligence" wide>
         <ExecutiveBriefing s={s} report={report} weekly={weekly} />
         <WhatMattersNow findings={findings} insightByFinding={insightByFinding} onEvidence={setDrawer}
           onStatus={async (row, status) => { await setInsightStatus(row.id, status); qc.invalidateQueries({ queryKey: ["strategist-insights"] }); }}
@@ -287,7 +288,7 @@ export function StrategistScreen() {
           }} />
         <ProductStrategy report={report} />
         <CashIntelligence report={report} />
-      </Modal>
+      </Sheet>
 
       {/* ═══ ASK — one surface for questions AND decisions ═══ */}
       <AskDecide s={s} report={report} actions={actionsQ.data ?? []} insights={insights}
@@ -1088,7 +1089,7 @@ function WhatMattersNow({ findings, insightByFinding, onEvidence, onStatus, onAc
 
 function EvidenceDrawer({ finding, onClose }: { finding: Finding | null; onClose: () => void }) {
   return (
-    <Modal open={!!finding} onClose={onClose} title="Evidence">
+    <Sheet open={!!finding} onClose={onClose} title="Evidence">
       {finding && (
         <div className="space-y-3">
           <div className="disp" style={{ fontSize: 15, fontWeight: 700 }}>{finding.title}</div>
@@ -1117,7 +1118,7 @@ function EvidenceDrawer({ finding, onClose }: { finding: Finding | null; onClose
           </div>
         </div>
       )}
-    </Modal>
+    </Sheet>
   );
 }
 
