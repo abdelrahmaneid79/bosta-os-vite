@@ -98,7 +98,7 @@ export function OpeningBalancesScreen() {
             ))}
           </div>
         )}
-        <p className="px-5 py-3 text-[11px] text-dim">Run once at setup. Leave a product blank to skip. Costs come from Inventory → Product costs.</p>
+        <p className="px-5 py-3 text-[11px] text-dim">Run once at setup · blank skips · costs come from Inventory → Product costs</p>
       </Card>
     </div>
   );

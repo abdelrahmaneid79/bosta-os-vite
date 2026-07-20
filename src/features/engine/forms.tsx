@@ -428,7 +428,7 @@ export function CashForm({ mode, onDone }: { mode: CashMode; onDone?: () => void
           {isFirstCount ? (
             <label className="flex items-start gap-2 rounded-lg bg-panel2 px-3 py-2 text-[11px] text-muted">
               <input type="checkbox" checked={baseline} onChange={(e) => setBaseline(e.target.checked)} className="mt-0.5" />
-              <span>The <b>opening baseline</b> — first verified count. Any gap vs the ledger is an <b>opening difference</b> (not an expense, loss or withdrawal). Reconciliation starts fresh here. {isFirstCount ? "" : ""}</span>
+              <span>The <b>opening baseline</b> — first verified count. Any gap vs the ledger is an <b>opening difference</b> (not an expense, loss or withdrawal). Reconciliation starts fresh here.</span>
             </label>
           ) : (
             <p className="text-[11px] text-dim">Compares to expected balance; posts a voidable adjustment for any gap.</p>

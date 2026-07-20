@@ -176,7 +176,7 @@ export function ProductLineImportScreen() {
 
   return (
     <div className="space-y-4">
-      <Eyebrow>Product-line sales · preview, then approve (never auto-saves)</Eyebrow>
+      <Eyebrow>Sheet → map → approve · never auto-saves</Eyebrow>
 
       {!rows ? (
         <Card>
@@ -185,9 +185,9 @@ export function ProductLineImportScreen() {
             <label className="lift cursor-pointer rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">
               Choose file<input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onFile} />
             </label>
-            {missingDay.data && <p className="text-[12px] font-semibold text-pink">Next up: {fmtDate(missingDay.data)} — no product lines yet.</p>}
-            <p className="max-w-md text-[12px] text-dim">One file = one day. Unmatched rows queue for you to map. Nothing saves until you approve.</p>
-            <p className="text-[12px] text-faint">Have a photo instead? <Link to="/sales/product-lines" className="text-pink underline">Use the photo importer</Link> — matches by POS code.</p>
+            {missingDay.data && <p className="text-[12px] font-semibold text-pink">Next: {fmtDate(missingDay.data)} · no product lines yet</p>}
+            <p className="max-w-md text-[12px] text-dim">One file = one day · nothing saves until you approve</p>
+            <p className="text-[12px] text-faint">Photo? <Link to="/sales/product-lines" className="text-pink underline">Use the photo importer</Link></p>
           </div>
         </Card>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
@@ -329,7 +329,7 @@ export function ProductCostImportScreen() {
             <label className="lift cursor-pointer rounded-2xl bg-pink px-4 py-2.5 font-display text-sm font-bold text-ink shadow-pink">
               Choose file<input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={onFile} />
             </label>
-            <p className="max-w-md text-[12px] text-dim">Your cost is taken as the real unit cost (drives profit/COGS). Sets cost + selling price and refreshes margins. Nothing saves until you approve.</p>
+            <p className="max-w-md text-[12px] text-dim">Sets cost + selling price · refreshes margins · nothing saves until you approve</p>
           </div>
         </Card>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (

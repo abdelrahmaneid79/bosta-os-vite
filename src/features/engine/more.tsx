@@ -93,7 +93,7 @@ function TargetsCard() {
   return (
     <Card>
       <Eyebrow>Monthly targets & budgets</Eyebrow>
-      <p className="mt-1 text-[12px] text-dim">Set monthly goals. Leave blank to disable one.</p>
+      <p className="mt-1 text-[12px] text-dim">Monthly goals · blank = off</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Field label="Revenue target (EGP)"><Input type="number" step="any" value={rev} onChange={(e) => setRev(e.target.value)} placeholder="150000" /></Field>
         <Field label="Profit target (EGP)"><Input type="number" step="any" value={prof} onChange={(e) => setProf(e.target.value)} placeholder="40000" /></Field>

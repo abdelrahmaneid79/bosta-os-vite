@@ -214,7 +214,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Eyebrow>Upload CSV · Excel · or a photo/screenshot → review → approve</Eyebrow>
+        <Eyebrow>File or photo → review → approve</Eyebrow>
         <div className="flex-1" />
         {!fixedKind && <Tabs value={kind} onChange={(v) => { setKind(v); reset(); }} options={[{ value: "sales", label: "Daily sales" }, { value: "expenses", label: "Expenses" }]} />}
       </div>
@@ -224,8 +224,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
           <div className="flex flex-col items-center gap-3 py-8 text-center">
             <div className="font-display text-base font-semibold">Add {noun}</div>
             <div className="max-w-md text-sm text-dim">
-              Upload a <b>CSV</b>, <b>Excel</b>, or <b>photo</b> of your {kind === "sales" ? "sales sheet" : "receipt"}.
-              {kind === "sales" ? " Each dated row becomes a day." : " Columns: date, category, amount."}
+              CSV, Excel, or photo — {kind === "sales" ? "each dated row becomes a day" : "columns: date, category, amount"}
             </div>
             <label className="lift cursor-pointer rounded-xl bg-pink px-4 py-2.5 font-display text-sm font-semibold text-ink shadow-pink">
               Choose file
@@ -243,7 +242,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
                 <img src={imgUrl} alt="receipt" className="max-h-56 rounded-lg border border-line object-contain" />
                 <div className="min-w-0 flex-1 text-[12px] text-dim">
                   <div className="font-display text-sm font-semibold text-text">{fileName}</div>
-                  {status ? <div className="mt-1 text-pink">{status}</div> : <div className="mt-1">Confirm the values. Add rows for more days.</div>}
+                  {status ? <div className="mt-1 text-pink">{status}</div> : <div className="mt-1">Check the values.</div>}
                   {rawText && (
                     <details className="mt-2">
                       <summary className="cursor-pointer text-pink">What the reader saw</summary>
@@ -257,7 +256,7 @@ export function ReceiptsScreen({ fixedKind }: { fixedKind?: Kind }) {
 
           {headers.length > 0 && (
             <Card className="!py-3">
-              <div className="mb-1.5 flex items-center gap-2"><Eyebrow>Map your columns</Eyebrow><span className="text-[11px] text-dim">(remembered for next time)</span></div>
+              <div className="mb-1.5 flex items-center gap-2"><Eyebrow>Map your columns</Eyebrow><span className="text-[11px] text-dim">saved for next time</span></div>
               <div className="flex flex-wrap items-end gap-3">
                 {kind === "sales" ? (
                   <>

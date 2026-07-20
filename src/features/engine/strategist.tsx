@@ -92,8 +92,9 @@ const CLASS_META: Record<Finding["class"], { label: string; color: string }> = {
 const URGENCY_LABEL: Record<string, string> = { today: "Today", this_week: "This week", this_month: "This month", monitor: "Monitor" };
 const CONF_LABEL: Record<string, string> = { high: "High confidence", medium: "Medium confidence", low: "Low confidence" };
 
+/** Every strategist chip is a chipx — the app's one chip family. */
 function Chip({ text, color }: { text: string; color: string }) {
-  return <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color, border: `1px solid ${color}`, borderRadius: 999, padding: "2px 8px", opacity: 0.9 }}>{text}</span>;
+  return <span className="chipx tint" style={{ "--tint": color } as React.CSSProperties}>{text}</span>;
 }
 
 /* ═══ MAIN SCREEN ═════════════════════════════════════════════════════ */
@@ -202,7 +203,7 @@ export function StrategistScreen() {
     <div className="cdk space-y-4">
       {/* ═══ COMMAND HEADER — one glance: what period, how fresh, one setting ═══ */}
       <PageHdr title="Strategist" sub="Your books, read like an operator"
-        right={<button className="addbtn" onClick={() => setTuneOpen(true)}>⚙ Tune</button>} />
+        right={<button className="addbtn" onClick={() => setTuneOpen(true)}>Tune</button>} />
       <FreshnessStrip s={s} />
 
       {/* ═══ FIRST THING SEEN — where the business stands today ═══ */}
@@ -512,7 +513,7 @@ function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
   if (loading && !exceptions.length) return null;
   if (!exceptions.length) {
     return <DeckTile><div className="th"><span className="tname">Operational exceptions</span><span style={{ marginLeft: "auto" }}><Chip text="all clear" color="var(--green)" /></span></div>
-      <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>No open operational issues.</div></DeckTile>;
+      <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>Nothing open.</div></DeckTile>;
   }
   return (
     <DeckTile>
@@ -521,20 +522,21 @@ function OperationalExceptionsPanel({ exceptions, loading, onAck, onDismiss }: {
       </div>
       <div className="space-y-2" style={{ marginTop: 10 }}>
         {exceptions.map((e) => (
-          <div key={e.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px" }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{e.title}</span>
+          <div key={e.id} className="scard" style={{ "--tint": EXC_COLOR[e.severity] } as React.CSSProperties}>
+            <i className="sev" aria-hidden />
+            <div className="scard-h">
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: "rgb(var(--text))" }}>{e.title}</span>
               <Chip text={e.severity} color={EXC_COLOR[e.severity]} />
               {e.status !== "open" && <Chip text={e.status} color="rgb(var(--dim))" />}
-              {e.recurrenceCount > 1 && <Chip text={`×${e.recurrenceCount}`} color="rgb(var(--dim))" />}
+              {e.recurrenceCount > 1 && <span className="chipx mute">×{e.recurrenceCount}</span>}
               <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
                 <Link to={e.screenLink} className="mbtn">Fix</Link>
                 {e.status === "open" && <button className="mbtn" onClick={() => void onAck(e.id)}>Ack</button>}
                 <button className="mbtn" onClick={() => { setDismissing(dismissing === e.id ? null : e.id); setReason(""); }}>Dismiss</button>
               </span>
             </div>
-            <div style={{ fontSize: 12, color: "rgb(var(--muted))", marginTop: 4 }}>{e.detail}</div>
-            <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 3 }}>→ {e.resolutionAction}</div>
+            <div className="scard-d">{e.detail}</div>
+            <div className="fix-a">→ {e.resolutionAction}</div>
             {dismissing === e.id && (
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                 <Input placeholder="Reason (required)" value={reason} onChange={(ev) => setReason(ev.target.value)} style={{ maxWidth: 260 }} />
@@ -578,11 +580,13 @@ function SalesCatchUpWorkspace({ gaps, loading }: { gaps: SalesGap[]; loading: b
       <div className="th"><span className="tname">Sales catch-up</span>
         <span style={{ marginLeft: "auto" }}><Chip text={`${gaps.length} day${gaps.length === 1 ? "" : "s"}`} color={GAP_META.missing.color} /></span>
       </div>
-      <div className="chiprow" style={{ margin: "10px 0" }}>
-        <button className={filter === "all" ? "mbtn on" : "mbtn"} onClick={() => setFilter("all")}>All</button>
-        {counts.map((c) => (
-          <button key={c.kind} className={filter === c.kind ? "mbtn on" : "mbtn"} onClick={() => setFilter(c.kind)}>{GAP_META[c.kind].label} · {c.n}</button>
-        ))}
+      <div style={{ margin: "10px 0" }}>
+        <select className="input" aria-label="Filter days" value={filter}
+          style={{ width: "auto", padding: "9px 38px 9px 13px", fontSize: 13 }}
+          onChange={(e) => setFilter(e.target.value as SalesGap["kind"] | "all")}>
+          <option value="all">All · {gaps.length}</option>
+          {counts.map((c) => <option key={c.kind} value={c.kind}>{GAP_META[c.kind].label} · {c.n}</option>)}
+        </select>
       </div>
       <div className="space-y-1" style={{ maxHeight: 260, overflowY: "auto" }}>
         {shown.slice(0, 60).map((g) => {
@@ -595,7 +599,7 @@ function SalesCatchUpWorkspace({ gaps, loading }: { gaps: SalesGap[]; loading: b
             </div>
           );
         })}
-        {shown.length > 60 && <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", padding: "6px 2px" }}>+{shown.length - 60} more — use a filter to narrow.</div>}
+        {shown.length > 60 && <div style={{ fontSize: 11.5, color: "rgb(var(--faint))", padding: "6px 2px" }}>+{shown.length - 60} more</div>}
       </div>
     </DeckTile>
   );
@@ -625,7 +629,6 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: 
             <button className="mbtn" onClick={onOpenSetup}>Edit stand</button>
           </span>
         </div>
-        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>Answers make merchandising and packaging advice specific to your stand.</div>
       </DeckTile>
     );
   }
@@ -637,12 +640,11 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: 
           <button className="mbtn" onClick={onOpenSetup}>Set up my stand</button>
         </span>
       </div>
-      <div style={{ fontSize: 12, color: "rgb(var(--faint))", margin: "6px 0 10px" }}>Makes advice specific to your stand — BostaOS never guesses this.</div>
-      <div className="space-y-2">
+      <div className="space-y-2" style={{ marginTop: 10 }}>
         {data.questions.map((q) => {
           const field = QUESTION_FIELD[q.id];
           return (
-            <div key={q.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px" }}>
+            <div key={q.id} className="scard">
               <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "rgb(var(--faint))" }}>{q.section}</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: "rgb(var(--text))", marginTop: 2 }}>{q.question}</div>
               <div style={{ fontSize: 12, color: "rgb(var(--muted))", marginTop: 4 }}>{q.why}</div>
@@ -656,7 +658,7 @@ function OwnerInterviewCard({ data, onMarkUnknown, onAnswerList, onOpenSetup }: 
                 ) : (
                   <Link to={q.screenLink} className="mbtn">Answer in {q.screenLink.replace("/", "")}</Link>
                 )}
-                {q.allowUnknown && <button className="mbtn" onClick={() => void onMarkUnknown(q.id)}>Unknown / skip</button>}
+                {q.allowUnknown && <button className="mbtn" onClick={() => void onMarkUnknown(q.id)}>Skip</button>}
               </div>
             </div>
           );
@@ -698,10 +700,6 @@ function RetailSetupModal({ open, onClose, onSaved, onError }: { open: boolean; 
   const products = prodQ.data ?? [];
   return (
     <Modal open={open} onClose={onClose} title="Set up my stand" wide>
-      <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginBottom: 12 }}>
-        How your stand is merchandised and packaged. Asked once — makes advice specific.
-      </div>
-
       <div style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.3, color: "rgb(var(--faint))", marginBottom: 6 }}>Packaging formats you offer</div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
         <Input placeholder="Name (e.g. 150g mini)" value={pkg.name} onChange={(e) => setPkg({ ...pkg, name: e.target.value })} style={{ maxWidth: 150 }} />
@@ -794,9 +792,7 @@ function RetailAdvisor({ result, loading, onExperiment }: {
       </div>
 
       {recs.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>
-          Nothing to change today — the stand and the numbers both look right.
-        </div>
+        <div style={{ fontSize: 12.5, color: "rgb(var(--dim))", marginTop: 8 }}>Nothing to change today.</div>
       ) : (
         <>
           {/* THE PRIZE — the size of the whole list, before reading any of it */}
@@ -811,18 +807,25 @@ function RetailAdvisor({ result, loading, onExperiment }: {
             </div>
           )}
 
-          <div className="chiprow" style={{ margin: "12px 0 10px" }}>
-            {buckets.map((b) => (
-              <button key={b} className={filter === b ? "mbtn on" : "mbtn"} onClick={() => setFilter(b)}>{b}</button>
-            ))}
+          <div style={{ margin: "12px 0 10px" }}>
+            <select className="input" aria-label="Filter advice" value={filter}
+              style={{ width: "auto", padding: "9px 38px 9px 13px", fontSize: 13 }}
+              onChange={(e) => setFilter(e.target.value)}>
+              {buckets.map((b) => {
+                const n = b === "All" ? recs.length : recs.filter((r) => (FILTER_BUCKET[r.domain] ?? "Operations") === b).length;
+                return <option key={b} value={b}>{b} · {n}</option>;
+              })}
+            </select>
           </div>
 
           <div className="space-y-2">
-            {shown.map((r) => {
-              const open = openId === r.id;
+            {shown.map((r, ri) => {
+              // playbook ids can repeat (same playbook, different target) — key per position
+              const rid = `${r.id}·${ri}`;
+              const open = openId === rid;
               return (
-                <div key={r.id} className={cn("wid-row", open && "open")}>
-                  <button type="button" className="wid-head" onClick={() => setOpenId(open ? null : r.id)}>
+                <div key={rid} className={cn("wid-row", open && "open")}>
+                  <button type="button" className="wid-head" onClick={() => setOpenId(open ? null : rid)}>
                     <span className="wid-worth tnum">
                       {r.expectedMonthlyEgp >= 13
                         ? <><b>{egp(r.expectedMonthlyEgp)}</b><small>/month</small></>
@@ -844,7 +847,7 @@ function RetailAdvisor({ result, loading, onExperiment }: {
                         <div className="wid-basis">
                           <b>{egp(r.impact.monthlyEgp)}/month</b> — {r.impact.basis}.
                           {r.expectedMonthlyEgp < r.impact.monthlyEgp && (
-                            <> Ranked at {egp(r.expectedMonthlyEgp)} after allowing for how sure this is.</>
+                            <> Ranked at {egp(r.expectedMonthlyEgp)} after confidence.</>
                           )}
                         </div>
                       )}
@@ -868,7 +871,7 @@ function RetailAdvisor({ result, loading, onExperiment }: {
           {result.facts.basisNote && result.facts.basisNote !== "full coverage" && (
             <div className="wid-foot">
               <button type="button" className="aq-more" onClick={() => setWhy((v) => !v)}>{why ? "Hide" : "How sure is this?"}</button>
-              {why && <div style={{ marginTop: 6, lineHeight: 1.5 }}>Advice above is ranked on what it earns. Sharper once: {result.facts.basisNote}.</div>}
+              {why && <div style={{ marginTop: 6, lineHeight: 1.5 }}>Ranked by what it earns. Sharper once: {result.facts.basisNote}.</div>}
             </div>
           )}
         </>
@@ -952,19 +955,19 @@ function ExecutiveBriefing({ s, report, weekly }: { s: StrategistSnapshot; repor
             ? <Chip text={ai.cached ? "Enhanced · cached" : "Enhanced"} color="rgb(var(--cyan))" />
             : <Chip text="BostaOS analysis" color="rgb(var(--violet))" />}
           <Button onClick={() => void generate()} disabled={aiState === "loading"}>
-            {aiState === "loading" ? "Working…" : ai ? "Refresh enhanced briefing" : "Enhanced briefing"}
+            {aiState === "loading" ? "Working…" : ai ? "Refresh" : "Enhanced briefing"}
           </Button>
         </span>
       </div>
 
       {ai?.fallbackReason && (
         <div style={{ margin: "10px 0", fontSize: 12.5, color: "var(--amber)", fontWeight: 600 }}>
-          Language service unavailable — BostaOS templates wrote this briefing. ({ai.fallbackReason}) Nothing retries automatically.
+          Template briefing — AI offline ({ai.fallbackReason}).
         </div>
       )}
       {ai && cacheIsStale && (
         <div style={{ margin: "10px 0", fontSize: 12, color: "rgb(var(--dim))" }}>
-          This AI briefing came from an earlier snapshot ({ai.snapshotLabel}). The findings below are current.
+          Earlier snapshot · {ai.snapshotLabel} — findings below are current.
         </div>
       )}
 
@@ -1032,44 +1035,43 @@ function WhatMattersNow({ findings, insightByFinding, onEvidence, onStatus, onAc
   return (
     <DeckTile>
       <div className="th"><span className="tname">What matters now</span>
-        <span className="eyebrow" style={{ marginLeft: "auto" }}>{findings.length} finding(s) · ranked by impact</span>
+        <span className="eyebrow" style={{ marginLeft: "auto" }}>{findings.length} · ranked by impact</span>
       </div>
       <div className="space-y-3" style={{ marginTop: 10 }}>
         {visible.map((f) => {
           const meta = CLASS_META[f.class];
           const row = insightByFinding.get(f.id);
           return (
-            <div key={f.id} style={{ border: "1px solid var(--stroke2)", borderRadius: 12, padding: "12px 14px" }}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 11, fontWeight: 800, color: "rgb(var(--faint))" }}>#{f.rank}</span>
+            <div key={f.id} className="scard" style={{ "--tint": meta.color } as React.CSSProperties}>
+              <i className="sev" aria-hidden />
+              <div className="scard-h">
                 <Chip text={meta.label} color={meta.color} />
                 <Chip text={URGENCY_LABEL[f.urgency]} color={f.urgency === "today" ? "var(--red)" : "rgb(var(--dim))"} />
-                <Chip text={CONF_LABEL[f.confidence]} color="rgb(var(--dim))" />
-                {f.impactEgp != null && f.impactEgp > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "rgb(var(--text))" }}>{egp(f.impactEgp)} at stake</span>}
-                {row && row.seenCount > 1 && <span style={{ fontSize: 11, color: "rgb(var(--faint))" }}>seen {row.seenCount}× since {fmtDate(row.firstSeenAt.slice(0, 10))}</span>}
+                {row && row.seenCount > 1 && <span className="chipx mute">×{row.seenCount}</span>}
+                {f.impactEgp != null && f.impactEgp > 0 && <span className="scard-worth">{egp(f.impactEgp)}</span>}
               </div>
-              <div className="disp" style={{ fontSize: 15, fontWeight: 700, marginTop: 8 }}>{f.title}</div>
-              <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 4, lineHeight: 1.5 }}>{f.detail}</div>
+              <div className="scard-t">{f.title}</div>
+              <div className="scard-d">{f.detail}</div>
               {f.evidence[0] && (
-                <button onClick={() => onEvidence(f)} style={{ marginTop: 8, fontSize: 12, color: "rgb(var(--cyan))", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                  {f.evidence[0].label}: {f.evidence[0].value} · see all evidence →
+                <button type="button" className="scard-ev" onClick={() => onEvidence(f)}>
+                  {f.evidence[0].label} <b>{f.evidence[0].value}</b><span>Evidence →</span>
                 </button>
               )}
               {f.missingData.length > 0 && (
                 <div style={{ fontSize: 11.5, color: "rgb(var(--dim))", marginTop: 6 }}>Missing: {f.missingData.join(" · ")}</div>
               )}
               {f.action && (
-                <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-                  <span style={{ fontSize: 12.5, color: "rgb(var(--text))", fontWeight: 600 }}>→ {f.action.action}</span>
-                  <Link to={f.action.screenLink} style={{ fontSize: 12, color: "var(--mag)", fontWeight: 700 }}>Open screen</Link>
-                  <button className="addbtn" style={{ fontSize: 11.5, padding: "3px 10px" }} onClick={() => void onAccept(f)}>+ Queue action</button>
+                <div className="scard-act">
+                  <span className="do">→ {f.action.action}</span>
+                  <Link to={f.action.screenLink} className="mbtn">Open</Link>
+                  <button className="mbtn accent" onClick={() => void onAccept(f)}>+ Queue</button>
                 </div>
               )}
               {row && (row.status === "active" || row.status === "reopened") && (
-                <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
+                <div className="scard-act">
                   <button className="mbtn" onClick={() => void onStatus(row, "acknowledged")}>Acknowledge</button>
                   <button className="mbtn" onClick={() => void onStatus(row, "dismissed")}>Dismiss</button>
-                  {row.status === "reopened" && <Chip text="Returned after being resolved" color="var(--amber)" />}
+                  {row.status === "reopened" && <Chip text="Returned" color="var(--amber)" />}
                 </div>
               )}
             </div>
@@ -1078,7 +1080,7 @@ function WhatMattersNow({ findings, insightByFinding, onEvidence, onStatus, onAc
       </div>
       {findings.length > 3 && (
         <button className="mbtn" style={{ marginTop: 12 }} onClick={() => setShowAll((v) => !v)}>
-          {showAll ? "Show top 3 only" : `Show all ${findings.length} findings`}
+          {showAll ? "Top 3" : `All ${findings.length}`}
         </button>
       )}
     </DeckTile>
@@ -1094,10 +1096,10 @@ function EvidenceDrawer({ finding, onClose }: { finding: Finding | null; onClose
         <div className="space-y-3">
           <div className="disp" style={{ fontSize: 15, fontWeight: 700 }}>{finding.title}</div>
           <div style={{ fontSize: 12.5, color: "rgb(var(--muted))", lineHeight: 1.55 }}>
-            <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}>Why this was raised: </span>{finding.detail}
+            <span style={{ color: "rgb(var(--faint))", fontWeight: 700 }}>Why: </span>{finding.detail}
           </div>
           {finding.evidence.map((e, i) => (
-            <div key={i} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "10px 12px" }}>
+            <div key={i} className="scard">
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700 }}>{e.label}</span>
                 <span className="tnum" style={{ fontSize: 12.5, fontWeight: 700, color: "rgb(var(--text))" }}>{e.value}</span>
@@ -1110,7 +1112,7 @@ function EvidenceDrawer({ finding, onClose }: { finding: Finding | null; onClose
           ))}
           {finding.missingData.length > 0 && (
             <div style={{ fontSize: 12, color: "var(--amber)" }}>
-              Would be stronger with: {finding.missingData.join(" · ")}
+              Sharper with: {finding.missingData.join(" · ")}
             </div>
           )}
           <div style={{ fontSize: 11.5, color: "rgb(var(--faint))" }}>
@@ -1611,7 +1613,7 @@ function ActivationTile({ checklist, liveHealth, onConfirmStart }: {
             </div>
           ))}
           <div style={{ fontSize: 11, color: "rgb(var(--faint))", marginTop: 8 }}>
-            Live completeness {liveHealth.liveCompleteness}% · cash confidence {liveHealth.cashConfidence} · inventory {liveHealth.inventoryConfidence}. Historical gaps don't count against you.
+            Live {liveHealth.liveCompleteness}% · cash {liveHealth.cashConfidence} · stock {liveHealth.inventoryConfidence}
           </div>
         </div>
       )}
@@ -1621,7 +1623,7 @@ function ActivationTile({ checklist, liveHealth, onConfirmStart }: {
 
 /* ═══ DAILY CLOSE ═════════════════════════════════════════════════════ */
 
-const KIND_GLYPH: Record<CloseEvaluation["items"][number]["kind"], string> = { auto: "✓", confirm: "◻", blocked: "⛔", unresolved: "⚠", optional: "·" };
+const KIND_GLYPH: Record<CloseEvaluation["items"][number]["kind"], string> = { auto: "✓", confirm: "○", blocked: "✕", unresolved: "!", optional: "·" };
 const KIND_COLOR: Record<CloseEvaluation["items"][number]["kind"], string> = { auto: "var(--green)", confirm: "rgb(var(--muted))", blocked: "var(--red)", unresolved: "var(--amber)", optional: "rgb(var(--dim))" };
 
 /** Auto-detecting daily close (Cycle 9): BostaOS derives the checklist from
@@ -1681,7 +1683,6 @@ function DailyCloseTile({ lastDataDate, signals, onSaved, onError }: { lastDataD
         <div style={{ marginTop: 10 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 160 }} />
-            <span style={{ fontSize: 12, color: "rgb(var(--faint))" }}>BostaOS auto-detects what it can read.</span>
           </div>
           {factsQ.isLoading && <div style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 10 }}>Detecting…</div>}
           {evalr && (
@@ -1699,11 +1700,11 @@ function DailyCloseTile({ lastDataDate, signals, onSaved, onError }: { lastDataD
               <div className="space-y-1" style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--stroke2)" }}>
                 {evalr.confirmRequired.some((c) => c.key === "expenses") && (
                   <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
-                    <input type="checkbox" checked={conf.expensesNone} onChange={(e) => setConf({ ...conf, expensesNone: e.target.checked })} /> Confirm: no expenses occurred today</label>
+                    <input type="checkbox" checked={conf.expensesNone} onChange={(e) => setConf({ ...conf, expensesNone: e.target.checked })} /> No expenses today</label>
                 )}
                 {evalr.confirmRequired.some((c) => c.key === "purchases") && (
                   <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
-                    <input type="checkbox" checked={conf.purchasesNone} onChange={(e) => setConf({ ...conf, purchasesNone: e.target.checked })} /> Confirm: no purchase was made today</label>
+                    <input type="checkbox" checked={conf.purchasesNone} onChange={(e) => setConf({ ...conf, purchasesNone: e.target.checked })} /> No purchases today</label>
                 )}
                 {evalr.confirmRequired.some((c) => c.key === "cash_count") && (
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -1713,7 +1714,7 @@ function DailyCloseTile({ lastDataDate, signals, onSaved, onError }: { lastDataD
                 )}
               </div>
               <div style={{ fontSize: 12, color: evalr.canComplete ? "rgb(var(--dim))" : "var(--amber)", marginTop: 8 }}>
-                {evalr.canComplete ? `Ready — will save as ${evalr.recommendedStatus} · ${evalr.completeness}% · confidence ${evalr.confidence}` : evalr.blockReason}
+                {evalr.canComplete ? `Saves as ${evalr.recommendedStatus} · ${evalr.completeness}% · ${evalr.confidence}` : evalr.blockReason}
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                 <Button onClick={() => void saveComplete()}>{evalr.canComplete ? "Complete close" : "Save partial"}</Button>
@@ -1864,7 +1865,7 @@ function ProductStrategy({ report }: { report: StrategyReport }) {
               </div>
               <div className="space-y-2">
                 {pf.classifications.slice(0, 20).map((c) => (
-                  <div key={c.name} style={{ border: "1px solid var(--stroke2)", borderRadius: 10, padding: "8px 12px" }}>
+                  <div key={c.name} className="scard">
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                       <button onClick={() => setDetail(detail === c.name ? null : c.name)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, fontWeight: 700, color: "rgb(var(--text))" }}>{c.name}</button>
                       {c.tags.slice(0, 3).map((t) => <Chip key={t} text={TAG_LABEL[t] ?? t} color={t === "star" || t === "emerging" ? "var(--green)" : t.startsWith("review") || t === "declining" || t === "stock_risk" ? "var(--amber)" : "rgb(var(--dim))"} />)}
@@ -1969,7 +1970,7 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
   return (
     <Modal open={open} onClose={onClose} title="Tune the strategist">
       <div className="space-y-3">
-        <p style={{ fontSize: 12, color: "rgb(var(--dim))" }}>Anything left empty uses a documented default — the strategist says so when it relies on one.</p>
+        <p style={{ fontSize: 12, color: "rgb(var(--dim))" }}>Empty fields use documented defaults.</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
           <Field label="Monthly revenue target (EGP)"><Input type="number" value={form.monthlyRevenueTarget ?? ""} onChange={(e) => setForm({ ...form, monthlyRevenueTarget: num(e.target.value) })} /></Field>
           <Field label="Monthly profit target (EGP)"><Input type="number" value={form.monthlyProfitTarget ?? ""} onChange={(e) => setForm({ ...form, monthlyProfitTarget: num(e.target.value) })} /></Field>
@@ -1981,8 +1982,7 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
           <Field label="Outcome review period (days)"><Input type="number" placeholder="14" value={form.reviewPeriodDays ?? ""} onChange={(e) => setForm({ ...form, reviewPeriodDays: num(e.target.value) })} /></Field>
           <Field label="Cheque overdue after (days)"><Input type="number" placeholder="45" value={form.maxChequeAgeDays ?? ""} onChange={(e) => setForm({ ...form, maxChequeAgeDays: num(e.target.value) })} /></Field>
           <Field label="Reserve policy">
-            <select value={form.reserveType ?? "higher_of_both"} onChange={(e) => setForm({ ...form, reserveType: e.target.value as OwnerContextAnswers["reserveType"] })}
-              style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
+            <select className="input" value={form.reserveType ?? "higher_of_both"} onChange={(e) => setForm({ ...form, reserveType: e.target.value as OwnerContextAnswers["reserveType"] })}>
               <option value="higher_of_both">Higher of floor / 30d costs</option>
               <option value="fixed">Fixed floor only</option>
               <option value="days_of_costs">30 days of costs</option>
@@ -1991,14 +1991,12 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
           <Field label="Cash count fresh for (days)"><Input type="number" placeholder="7" value={form.cashCountFreshnessDays ?? ""} onChange={(e) => setForm({ ...form, cashCountFreshnessDays: num(e.target.value) })} /></Field>
           <Field label="Downside sales assumption (%)"><Input type="number" placeholder="-25" value={form.downsideSalesPct ?? ""} onChange={(e) => setForm({ ...form, downsideSalesPct: num(e.target.value) })} /></Field>
           <Field label="Right now, what matters more?">
-            <select value={form.priorityFocus ?? "balanced"} onChange={(e) => setForm({ ...form, priorityFocus: e.target.value as OwnerContextAnswers["priorityFocus"] })}
-              style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
+            <select className="input" value={form.priorityFocus ?? "balanced"} onChange={(e) => setForm({ ...form, priorityFocus: e.target.value as OwnerContextAnswers["priorityFocus"] })}>
               <option value="balanced">Balanced</option><option value="growth">Growth</option><option value="cash_preservation">Cash preservation</option>
             </select>
           </Field>
           <Field label="Strategy style">
-            <select value={form.aggressiveness ?? "balanced"} onChange={(e) => setForm({ ...form, aggressiveness: e.target.value as OwnerContextAnswers["aggressiveness"] })}
-              style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
+            <select className="input" value={form.aggressiveness ?? "balanced"} onChange={(e) => setForm({ ...form, aggressiveness: e.target.value as OwnerContextAnswers["aggressiveness"] })}>
               <option value="conservative">Conservative</option><option value="balanced">Balanced</option><option value="aggressive">Aggressive</option>
             </select>
           </Field>
@@ -2013,12 +2011,11 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
         </label>
         <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))" }}>
           <input type="checkbox" checked={form.allowExpectedCashForOptional ?? false} onChange={(e) => setForm({ ...form, allowExpectedCashForOptional: e.target.checked })} />
-          Let OPTIONAL spending decisions use expected (uncounted) cash — off means verified cash only
+          Optional spending may use expected (uncounted) cash — off = verified only
         </label>
 
         <div style={{ borderTop: "1px solid var(--stroke2)", paddingTop: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "rgb(var(--faint))", marginBottom: 8 }}>Products &amp; priorities</div>
-          <p style={{ fontSize: 12, color: "rgb(var(--dim))", marginTop: 0, marginBottom: 8 }}>A protected product is never suggested for discontinuation; a product to grow is weighted up in shelf and purchase advice.</p>
           <div className="space-y-2">
             <Field label="Strategic products — never recommend discontinuing (comma-separated)">
               <Input value={(form.strategicProducts ?? []).join(", ")}
@@ -2057,8 +2054,7 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", color: "rgb(var(--faint))", marginBottom: 8 }}>Language service</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
             <Field label="Enhanced explanations">
-              <select value={lang.provider} onChange={(e) => setLang({ ...lang, provider: e.target.value as LanguageSettings["provider"] })}
-                style={{ width: "100%", background: "var(--surface2)", color: "rgb(var(--text))", border: "1px solid var(--stroke)", borderRadius: 10, padding: "8px 10px", fontSize: 13 }}>
+              <select className="input" value={lang.provider} onChange={(e) => setLang({ ...lang, provider: e.target.value as LanguageSettings["provider"] })}>
                 <option value="anthropic">On (external service)</option>
                 <option value="deterministic">Off — BostaOS templates only</option>
               </select>
@@ -2067,7 +2063,7 @@ function TuneModal({ open, onClose, onSaved, onError }: { open: boolean; onClose
           </div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12.5, color: "rgb(var(--muted))", marginTop: 8 }}>
             <input type="checkbox" checked={lang.allowEnhanced} onChange={(e) => setLang({ ...lang, allowEnhanced: e.target.checked })} />
-            Allow enhanced briefings and answers (each call costs money; nothing runs automatically)
+            Allow enhanced answers — each call costs money
           </label>
           <button className="mbtn" style={{ marginTop: 10 }} onClick={() => setShowDiag((v) => !v)}>{showDiag ? "Hide diagnostics" : "Diagnostics"}</button>
           {showDiag && (

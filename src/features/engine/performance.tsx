@@ -400,7 +400,7 @@ function ExportPanel() {
 
   return (
     <div>
-      <p className="mb-3 text-[12.5px] text-dim">Opens in Excel or Google Sheets. Uses the period you picked.</p>
+      <p className="mb-3 text-[12.5px] text-dim">Opens in Excel or Sheets · uses the picked period</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {items.map((it) => (
           <Button key={it.label} variant="outline" disabled={!it.ready} onClick={it.run}>

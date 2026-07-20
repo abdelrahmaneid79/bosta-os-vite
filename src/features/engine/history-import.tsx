@@ -56,11 +56,10 @@ export function HistoryImportScreen() {
       <Card accent="#F868C8">
         <Eyebrow accent="#F868C8">Load my Bosta Bites history</Eyebrow>
         <p className="mt-2 max-w-2xl text-sm text-dim">
-          Your real numbers, cleaned and de-duplicated, as ordinary entries you can edit or void.
-          Run again to add only what's missing.
+          Real entries you can edit or void · re-running adds only what's missing
         </p>
         <p className="mt-2 max-w-2xl text-[12px] text-faint">
-          Before your bookkeeping date, entries are revenue-only — so profit stays honest.
+          Before your bookkeeping date, entries are revenue-only — profit stays honest.
         </p>
       </Card>
 

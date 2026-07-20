@@ -309,13 +309,13 @@ export function DaySalesPhotoImport() {
 
   return (
     <div className="space-y-4">
-      <Eyebrow>Daily sales · photo → check the totals → approve (never auto-saves)</Eyebrow>
+      <Eyebrow>Photo → check → approve · never auto-saves</Eyebrow>
 
       {pendingDraft && !lines && (
         <Card className="!border-pink/40 !bg-pink/5">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0 flex-1 text-sm text-text">
-              <b>You have an unfinished review</b> — {pendingDraft.lines.length} product line(s){pendingDraft.dayDate ? ` for ${new Date(pendingDraft.dayDate + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}, saved on this device. Pick up where you left off?
+              <b>Unfinished review</b> — {pendingDraft.lines.length} lines{pendingDraft.dayDate ? ` · ${new Date(pendingDraft.dayDate + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}
             </div>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => { setPendingDraft(null); void clearDraft(); }}>Discard</Button>
@@ -350,7 +350,7 @@ export function DaySalesPhotoImport() {
             {busy
               ? <div className="flex items-center gap-2 text-[13px] font-medium text-pink"><span className="h-2 w-2 animate-pulse rounded-full bg-pink" />{stage || "Reading…"}</div>
               : <Badge tone={rd.tone}>{rd.text}</Badge>}
-            <p className="text-[12px] text-faint">Have a spreadsheet instead? <Link to="/sales/product-lines/file" className="text-pink underline">Use the file importer</Link>.</p>
+            <p className="text-[12px] text-faint">Spreadsheet? <Link to="/sales/product-lines/file" className="text-pink underline">Use the file importer</Link></p>
           </div>
         </div>
       ) : prods.isLoading ? <SkeletonRows rows={4} /> : (
@@ -364,12 +364,13 @@ export function DaySalesPhotoImport() {
                 <div className="mt-0.5 text-[13px] text-dim">
                   {analysis?.lines.length ?? 0} products read · <span className="text-good">{analysis?.matchedCount ?? 0} matched</span>{toAssign ? <> · <span className="text-warn">{toAssign} to assign</span></> : null}
                 </div>
-                <button className="mt-1.5 text-[12px] text-pink underline" onClick={resetAll}>Read a different photo</button>
+                <button className="mt-1.5 text-[12px] text-pink underline" onClick={resetAll}>New photo</button>
               </div>
             </div>
             {dupMark && (
               <div className="mt-3 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/10 px-3 py-2 text-[12px] text-warn">
-                <span>⚠</span><span>Already imported this photo{dupMark.date ? ` (for ${new Date(dupMark.date + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })})` : ""}. Saving again may double-count.</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="mt-px h-4 w-4 flex-shrink-0"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></svg>
+                <span>Photo already imported{dupMark.date ? ` · ${new Date(dupMark.date + "T00:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""} — approving again may double-count.</span>
               </div>
             )}
           </Card>
@@ -396,17 +397,19 @@ export function DaySalesPhotoImport() {
 
             {/* Big friendly status banner */}
             <div className={`mt-3 flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-[13px] ${reconciled ? "border-good/30 bg-good/10 text-good" : branchTotal == null ? "border-line bg-panel2 text-dim" : "border-warn/40 bg-warn/10 text-warn"}`}>
-              <span className="mt-px text-base leading-none">{reconciled ? "✓" : branchTotal == null ? "ℹ" : "⚠"}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" className="mt-px h-4 w-4 flex-shrink-0">
+                {reconciled ? <path d="M5 13l4 4L19 7" /> : branchTotal == null ? <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></> : <><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></>}
+              </svg>
               <div className="min-w-0">
                 {reconciled
-                  ? <span><b>Everything adds up.</b> Good to approve.</span>
+                  ? <span><b>Adds up.</b> Ready to approve.</span>
                   : branchTotal == null
-                    ? <span>Type your report's total above, then check the lines.</span>
-                    : <span><b>Off by {egp(gap)}.</b> Fix the highlighted lines to match your report.</span>}
+                    ? <span>Type your report's total.</span>
+                    : <span><b>Off by {egp(gap)}.</b> Fix the flagged lines.</span>}
               </div>
             </div>
             {existing.data && !decision?.totalsMatch && (
-              <p className="mt-2 text-[12px] text-dim">Note: this day already has a saved total of {egp(existing.data.total)}.</p>
+              <p className="mt-2 text-[12px] text-dim">Day already saved at {egp(existing.data.total)}.</p>
             )}
             {decision && decision.action.startsWith("duplicate") && <p className="mt-2 text-[12px] text-warn">{decision.reason}</p>}
           </Card>
